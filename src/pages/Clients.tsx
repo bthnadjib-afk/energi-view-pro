@@ -1,18 +1,31 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useClients, useCreateClient } from '@/hooks/useDolibarr';
-import { UserPlus, Search } from 'lucide-react';
+import { UserPlus, Search, Mail, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { formatDateFR, type Client } from '@/services/dolibarr';
+
+interface EmailRecord {
+  id: string;
+  document_ref: string | null;
+  destinataire: string;
+  objet: string;
+  created_at: string;
+  user_id: string;
+}
 
 export default function Clients() {
   const { data: clients = [] } = useClients();
   const createClientMutation = useCreateClient();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [detailClient, setDetailClient] = useState<Client | null>(null);
+  const [emailHistory, setEmailHistory] = useState<EmailRecord[]>([]);
 
-  // Form states
   const [nom, setNom] = useState('');
   const [ville, setVille] = useState('');
   const [telephone, setTelephone] = useState('');
@@ -30,6 +43,13 @@ export default function Clients() {
     await createClientMutation.mutateAsync({ nom, ville, telephone, email, adresse, codePostal });
     setNom(''); setVille(''); setTelephone(''); setEmail(''); setAdresse(''); setCodePostal('');
     setDialogOpen(false);
+  };
+
+  const openDetail = (client: Client) => {
+    setDetailClient(client);
+    supabase.from('email_history').select('*').eq('client_id', client.id).order('created_at', { ascending: false }).then(({ data }) => {
+      setEmailHistory((data || []) as any);
+    });
   };
 
   return (
@@ -95,7 +115,7 @@ export default function Clients() {
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr key={c.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors">
+                <tr key={c.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors cursor-pointer" onClick={() => openDetail(c)}>
                   <td className="py-3 px-2 font-medium text-foreground">{c.nom}</td>
                   <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{c.ville}</td>
                   <td className="py-3 px-2 text-muted-foreground hidden md:table-cell font-mono text-xs">{c.telephone}</td>
@@ -116,6 +136,63 @@ export default function Clients() {
           </table>
         </div>
       </div>
+
+      {/* Client detail dialog */}
+      <Dialog open={!!detailClient} onOpenChange={(open) => { if (!open) setDetailClient(null); }}>
+        <DialogContent className="glass-strong border-border/50 max-w-2xl max-h-[80vh] overflow-y-auto">
+          {detailClient && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-foreground">{detailClient.nom}</DialogTitle>
+              </DialogHeader>
+              <Tabs defaultValue="info" className="pt-2">
+                <TabsList className="glass border-border/50">
+                  <TabsTrigger value="info">Informations</TabsTrigger>
+                  <TabsTrigger value="emails" className="gap-1.5">
+                    <Mail className="h-3.5 w-3.5" /> Emails envoyés
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="info">
+                  <div className="grid grid-cols-2 gap-4 text-sm pt-3">
+                    <div><span className="text-muted-foreground">Adresse :</span> <span className="text-foreground ml-1">{detailClient.adresse || '—'}</span></div>
+                    <div><span className="text-muted-foreground">Ville :</span> <span className="text-foreground ml-1">{detailClient.ville}</span></div>
+                    <div><span className="text-muted-foreground">Téléphone :</span> <span className="text-foreground ml-1 font-mono">{detailClient.telephone}</span></div>
+                    <div><span className="text-muted-foreground">Email :</span> <span className="text-foreground ml-1">{detailClient.email}</span></div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="emails">
+                  <div className="pt-3">
+                    {emailHistory.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">Aucun email envoyé à ce client</p>
+                    ) : (
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-border/50">
+                            <th className="text-left py-2 px-1 text-muted-foreground">Date</th>
+                            <th className="text-left py-2 px-1 text-muted-foreground">Document</th>
+                            <th className="text-left py-2 px-1 text-muted-foreground">Objet</th>
+                            <th className="text-left py-2 px-1 text-muted-foreground">Destinataire</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {emailHistory.map(e => (
+                            <tr key={e.id} className="border-b border-border/20">
+                              <td className="py-2 px-1 text-muted-foreground">{formatDateFR(e.created_at)}</td>
+                              <td className="py-2 px-1 font-mono text-foreground">{e.document_ref || '—'}</td>
+                              <td className="py-2 px-1 text-foreground">{e.objet}</td>
+                              <td className="py-2 px-1 text-muted-foreground">{e.destinataire}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -283,12 +283,52 @@ export async function createClient(data: { nom: string; adresse?: string; codePo
 }
 
 export async function createIntervention(data: { socid: string; description: string; date: string }): Promise<string> {
+  const socidInt = parseInt(data.socid, 10) || data.socid;
+  const ts = toUnixTimestamp(data.date);
   const result = await dolibarrCall<string>('/interventions', 'POST', {
-    socid: parseInt(data.socid, 10) || data.socid,
+    socid: socidInt,
+    fk_soc: socidInt,
     description: data.description,
-    datei: toUnixTimestamp(data.date),
+    datei: ts,
+    dateo: ts,
   });
   return result || '';
+}
+
+// --- Devis status management ---
+
+export async function updateDevis(id: string, socid: string, lines: CreateDevisLine[]): Promise<string> {
+  const result = await dolibarrCall<string>(`/proposals/${id}`, 'PUT', {
+    socid: parseInt(socid, 10) || socid,
+    lines,
+  });
+  return result || '';
+}
+
+export async function validateDevis(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/proposals/${id}/validate`, 'POST');
+}
+
+export async function closeDevis(id: string, status: number): Promise<string | null> {
+  return dolibarrCall<string>(`/proposals/${id}/close`, 'POST', { status });
+}
+
+// --- Dolibarr user sync ---
+
+export async function createDolibarrUser(data: { login: string; firstname: string; lastname: string; email: string }): Promise<string | null> {
+  return dolibarrCall<string>('/users', 'POST', {
+    login: data.login,
+    firstname: data.firstname,
+    lastname: data.lastname,
+    email: data.email,
+    statut: 1,
+  });
+}
+
+// --- Email variable replacement ---
+
+export function replaceEmailVariables(text: string, vars: Record<string, string>): string {
+  return text.replace(/\[([A-Z_]+)\]/g, (match, key) => vars[key] || match);
 }
 
 export interface CreateDevisLine {

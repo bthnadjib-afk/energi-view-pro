@@ -1,17 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useConfig } from '@/hooks/useConfig';
 import { testDolibarrConnection } from '@/services/dolibarr';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2, Save } from 'lucide-react';
+import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2, Save, Mail, Plus, Trash2, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+
+interface EmailTemplate {
+  id: string;
+  nom: string;
+  objet: string;
+  corps: string;
+}
 
 export default function Configuration() {
   const { config, saving, updateEntreprise, updateDefaults, updateNotifications, updateDolibarr, saveToSupabase } = useConfig();
   const [testing, setTesting] = useState(false);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editNom, setEditNom] = useState('');
+  const [editObjet, setEditObjet] = useState('');
+  const [editCorps, setEditCorps] = useState('');
 
   const handleTestConnection = async () => {
     setTesting(true);
@@ -29,6 +44,47 @@ export default function Configuration() {
       toast.error('Erreur lors du test de connexion');
     }
     setTesting(false);
+  };
+
+  const fetchTemplates = async () => {
+    setLoadingTemplates(true);
+    const { data } = await supabase.from('email_templates').select('*').order('created_at', { ascending: true });
+    if (data) setTemplates(data as any);
+    setLoadingTemplates(false);
+  };
+
+  useEffect(() => { fetchTemplates(); }, []);
+
+  const startEdit = (t: EmailTemplate) => {
+    setEditingId(t.id);
+    setEditNom(t.nom);
+    setEditObjet(t.objet);
+    setEditCorps(t.corps);
+  };
+
+  const startNew = () => {
+    setEditingId('new');
+    setEditNom('');
+    setEditObjet('');
+    setEditCorps('');
+  };
+
+  const saveTemplate = async () => {
+    if (!editNom.trim()) return;
+    if (editingId === 'new') {
+      await supabase.from('email_templates').insert({ nom: editNom, objet: editObjet, corps: editCorps });
+    } else {
+      await supabase.from('email_templates').update({ nom: editNom, objet: editObjet, corps: editCorps }).eq('id', editingId!);
+    }
+    setEditingId(null);
+    fetchTemplates();
+    toast.success('Modèle sauvegardé');
+  };
+
+  const deleteTemplate = async (id: string) => {
+    await supabase.from('email_templates').delete().eq('id', id);
+    fetchTemplates();
+    toast.success('Modèle supprimé');
   };
 
   return (
@@ -58,6 +114,9 @@ export default function Configuration() {
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Bell className="h-3.5 w-3.5" /> Notifications
+          </TabsTrigger>
+          <TabsTrigger value="emails" className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Mail className="h-3.5 w-3.5" /> Modèles emails
           </TabsTrigger>
           <TabsTrigger value="dolibarr" className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Database className="h-3.5 w-3.5" /> Dolibarr
@@ -134,6 +193,58 @@ export default function Configuration() {
                 </div>
               ))}
             </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="emails">
+          <div className="glass rounded-xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">Modèles d'emails</h2>
+              <Button onClick={startNew} className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0" size="sm">
+                <Plus className="h-3.5 w-3.5" /> Ajouter
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Variables disponibles : <code>[NOM_CLIENT]</code>, <code>[REF_DEVIS]</code>, <code>[REF_FACTURE]</code>, <code>[REF_INTERVENTION]</code>, <code>[MONTANT_TTC]</code>, <code>[NOM_ENTREPRISE]</code>
+            </p>
+
+            {editingId && (
+              <div className="space-y-3 p-4 rounded-lg bg-accent/20 border border-border/30">
+                <Input placeholder="Nom du modèle" value={editNom} onChange={e => setEditNom(e.target.value)} className="glass border-border/50" />
+                <Input placeholder="Objet de l'email" value={editObjet} onChange={e => setEditObjet(e.target.value)} className="glass border-border/50" />
+                <Textarea placeholder="Corps du message..." value={editCorps} onChange={e => setEditCorps(e.target.value)} className="glass border-border/50 min-h-[100px]" />
+                <div className="flex gap-2">
+                  <Button onClick={saveTemplate} className="bg-gradient-to-r from-emerald-500 to-green-600 border-0" size="sm">Enregistrer</Button>
+                  <Button onClick={() => setEditingId(null)} variant="outline" size="sm" className="glass border-border/50">Annuler</Button>
+                </div>
+              </div>
+            )}
+
+            {loadingTemplates ? (
+              <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            ) : templates.length === 0 && !editingId ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Aucun modèle créé</p>
+            ) : (
+              <div className="space-y-2">
+                {templates.map(t => (
+                  <div key={t.id} className="flex items-start justify-between p-3 rounded-lg bg-accent/10 border border-border/20">
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">{t.nom}</p>
+                      <p className="text-xs text-muted-foreground truncate">Objet : {t.objet}</p>
+                      <p className="text-xs text-muted-foreground truncate">{t.corps.slice(0, 80)}...</p>
+                    </div>
+                    <div className="flex gap-1 ml-2">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => startEdit(t)}>
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteTemplate(t.id)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </TabsContent>
 

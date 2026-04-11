@@ -1,13 +1,18 @@
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useEffect } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte } from '@/hooks/useDolibarr';
-import { getAcompteBadge, formatDateFR, type Devis as DevisType } from '@/services/dolibarr';
+import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis } from '@/hooks/useDolibarr';
+import { getAcompteBadge, formatDateFR, replaceEmailVariables, type Devis as DevisType } from '@/services/dolibarr';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SignaturePad } from '@/components/SignaturePad';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 interface LigneForm {
   desc: string;
@@ -32,17 +37,76 @@ function AcompteBadge({ montantTTC }: { montantTTC: number }) {
   );
 }
 
-function DevisDetail({ devis, onConvert, onAcompte, convertPending, acomptePending }: {
+function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, acomptePending }: {
   devis: DevisType;
+  clients: { id: string; nom: string; email: string }[];
   onConvert: () => void;
   onAcompte: () => void;
   convertPending: boolean;
   acomptePending: boolean;
 }) {
+  const validateMutation = useValidateDevis();
+  const closeMutation = useCloseDevis();
+  const { user } = useAuth();
+
+  const [showSignature, setShowSignature] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailDest, setEmailDest] = useState('');
+  const [emailObjet, setEmailObjet] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [emailTemplates, setEmailTemplates] = useState<{ id: string; nom: string; objet: string; corps: string }[]>([]);
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  const client = clients.find(c => c.id === devis.socid);
+
+  useEffect(() => {
+    if (emailOpen) {
+      setEmailDest(client?.email || '');
+      supabase.from('email_templates').select('*').then(({ data }) => {
+        if (data) setEmailTemplates(data as any);
+      });
+    }
+  }, [emailOpen, client]);
+
+  const applyTemplate = (templateId: string) => {
+    const tmpl = emailTemplates.find(t => t.id === templateId);
+    if (!tmpl) return;
+    const vars: Record<string, string> = {
+      NOM_CLIENT: client?.nom || devis.client,
+      REF_DEVIS: devis.ref,
+      MONTANT_TTC: `${devis.montantTTC.toLocaleString('fr-FR')} €`,
+      NOM_ENTREPRISE: 'Notre entreprise',
+    };
+    setEmailObjet(replaceEmailVariables(tmpl.objet, vars));
+    setEmailMessage(replaceEmailVariables(tmpl.corps, vars));
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailDest || !emailObjet) return;
+    setSendingEmail(true);
+    await supabase.from('email_history').insert({
+      user_id: user?.id || '',
+      client_id: devis.socid || '',
+      document_ref: devis.ref,
+      destinataire: emailDest,
+      objet: emailObjet,
+      message: emailMessage,
+    });
+    setSendingEmail(false);
+    setEmailOpen(false);
+    toast.success('Email enregistré dans l\'historique');
+  };
+
+  const handleAccepter = (signatureDataUrl: string) => {
+    closeMutation.mutate({ id: devis.id, status: 2 });
+    setShowSignature(false);
+    toast.success('Signature client enregistrée');
+  };
+
   return (
     <tr>
       <td colSpan={7} className="p-0">
-        <div className="bg-accent/20 p-4 mx-2 mb-2 rounded-lg">
+        <div className="bg-accent/20 p-4 mx-2 mb-2 rounded-lg space-y-4">
           <p className="text-xs font-medium text-muted-foreground mb-2">Détail des lignes</p>
           <table className="w-full text-xs">
             <thead>
@@ -65,27 +129,100 @@ function DevisDetail({ devis, onConvert, onAcompte, convertPending, acomptePendi
             </tbody>
           </table>
 
-          {devis.statut === 'accepté' && (
-            <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-border/30">
+          {/* Status action buttons */}
+          <div className="flex flex-wrap gap-3 pt-3 border-t border-border/30">
+            {devis.statut === 'en attente' && (
               <Button
-                onClick={onConvert}
-                disabled={convertPending}
-                className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0"
+                onClick={() => validateMutation.mutate(devis.id)}
+                disabled={validateMutation.isPending}
+                className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0"
               >
-                <ArrowRightLeft className="h-4 w-4" />
-                {convertPending ? 'Conversion...' : 'Convertir en Facture'}
+                <FileCheck className="h-4 w-4" />
+                {validateMutation.isPending ? 'Validation...' : 'Valider le devis'}
               </Button>
-              <Button
-                onClick={onAcompte}
-                disabled={acomptePending}
-                variant="outline"
-                className="gap-2 glass border-border/50"
-              >
-                <Receipt className="h-4 w-4" />
-                {acomptePending ? 'Création...' : 'Saisir un acompte'}
-              </Button>
+            )}
+
+            {(devis.statut === 'en attente') && (
+              <>
+                <Button
+                  onClick={() => setShowSignature(true)}
+                  disabled={closeMutation.isPending}
+                  className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Accepter (Signé)
+                </Button>
+                <Button
+                  onClick={() => closeMutation.mutate({ id: devis.id, status: 3 })}
+                  disabled={closeMutation.isPending}
+                  variant="outline"
+                  className="gap-2 glass border-red-500/30 text-red-400 hover:text-red-300"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Refuser
+                </Button>
+              </>
+            )}
+
+            {devis.statut === 'accepté' && (
+              <>
+                <Button onClick={onConvert} disabled={convertPending} className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0">
+                  <ArrowRightLeft className="h-4 w-4" />
+                  {convertPending ? 'Conversion...' : 'Convertir en Facture'}
+                </Button>
+                <Button onClick={onAcompte} disabled={acomptePending} variant="outline" className="gap-2 glass border-border/50">
+                  <Receipt className="h-4 w-4" />
+                  {acomptePending ? 'Création...' : 'Saisir un acompte'}
+                </Button>
+              </>
+            )}
+
+            <Button onClick={() => setEmailOpen(true)} variant="outline" className="gap-2 glass border-border/50">
+              <Send className="h-4 w-4" /> Envoyer par email
+            </Button>
+          </div>
+
+          {/* Signature pad for acceptance */}
+          {showSignature && (
+            <div className="p-4 rounded-lg bg-accent/30 border border-border/30 space-y-3">
+              <p className="text-sm font-medium text-foreground">Signature du client pour acceptation</p>
+              <SignaturePad onSave={handleAccepter} />
+              <Button variant="ghost" size="sm" onClick={() => setShowSignature(false)}>Annuler</Button>
             </div>
           )}
+
+          {/* Email dialog */}
+          <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+            <DialogContent className="glass-strong border-border/50 max-w-lg">
+              <DialogHeader><DialogTitle className="text-foreground">Envoyer par email</DialogTitle></DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Modèle</label>
+                  <Select onValueChange={applyTemplate}>
+                    <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Choisir un modèle..." /></SelectTrigger>
+                    <SelectContent>
+                      {emailTemplates.map(t => <SelectItem key={t.id} value={t.id}>{t.nom}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Destinataire</label>
+                  <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} className="glass border-border/50" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Objet</label>
+                  <Input value={emailObjet} onChange={e => setEmailObjet(e.target.value)} className="glass border-border/50" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Message</label>
+                  <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="glass border-border/50 min-h-[120px]" />
+                </div>
+                <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest} className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
+                  {sendingEmail ? 'Envoi...' : 'Envoyer'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </td>
     </tr>
@@ -183,6 +320,17 @@ export default function Devis() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {!l.productId && (
+                      <Select value={String(l.product_type)} onValueChange={v => updateLigne(i, 'product_type', Number(v))}>
+                        <SelectTrigger className="glass border-border/50 text-xs w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Produit</SelectItem>
+                          <SelectItem value="1">Service</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
                     <div className="grid grid-cols-12 gap-2 items-end">
                       <div className="col-span-5">
                         <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="glass border-border/50 text-xs" />
@@ -254,6 +402,7 @@ export default function Devis() {
                   {expandedId === d.id && (
                     <DevisDetail
                       devis={d}
+                      clients={clients}
                       onConvert={() => convertMutation.mutate(d.id)}
                       onAcompte={() => acompteMutation.mutate({ socid: d.socid || '', montantTTC: d.montantTTC, devisRef: d.ref })}
                       convertPending={convertMutation.isPending}

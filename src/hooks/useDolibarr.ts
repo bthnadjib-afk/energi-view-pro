@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, createIntervention, createDevis, createFacture, createProduit, convertDevisToFacture, createAcompteFacture, type CreateDevisLine } from '@/services/dolibarr';
+import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, createIntervention, createDevis, createFacture, createProduit, convertDevisToFacture, createAcompteFacture, updateDevis, validateDevis, closeDevis, createDolibarrUser, type CreateDevisLine } from '@/services/dolibarr';
 import { toast } from 'sonner';
 
 export function useFactures() {
@@ -82,5 +82,43 @@ export function useCreateAcompte() {
     mutationFn: (data: { socid: string; montantTTC: number; devisRef: string }) => createAcompteFacture(data.socid, data.montantTTC, data.devisRef),
     onSuccess: () => { toast.success('Facture d\'acompte créée'); qc.invalidateQueries({ queryKey: ['factures'] }); },
     onError: (e: any) => toast.error(`Erreur acompte : ${e.message || e}`),
+  });
+}
+
+export function useUpdateDevis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { id: string; socid: string; lines: CreateDevisLine[] }) => updateDevis(data.id, data.socid, data.lines),
+    onSuccess: () => { toast.success('Devis modifié'); qc.invalidateQueries({ queryKey: ['devis'] }); },
+    onError: (e: any) => toast.error(`Erreur modification devis : ${e.message || e}`),
+  });
+}
+
+export function useValidateDevis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => validateDevis(id),
+    onSuccess: () => { toast.success('Devis validé'); qc.invalidateQueries({ queryKey: ['devis'] }); },
+    onError: (e: any) => toast.error(`Erreur validation : ${e.message || e}`),
+  });
+}
+
+export function useCloseDevis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { id: string; status: number }) => closeDevis(data.id, data.status),
+    onSuccess: (_, vars) => {
+      toast.success(vars.status === 2 ? 'Devis accepté (signé)' : 'Devis refusé');
+      qc.invalidateQueries({ queryKey: ['devis'] });
+    },
+    onError: (e: any) => toast.error(`Erreur changement statut : ${e.message || e}`),
+  });
+}
+
+export function useCreateDolibarrUser() {
+  return useMutation({
+    mutationFn: (data: { login: string; firstname: string; lastname: string; email: string }) => createDolibarrUser(data),
+    onSuccess: () => { toast.success('Utilisateur synchronisé avec Dolibarr'); },
+    onError: () => { toast.warning('Utilisateur créé localement mais la synchro Dolibarr a échoué'); },
   });
 }

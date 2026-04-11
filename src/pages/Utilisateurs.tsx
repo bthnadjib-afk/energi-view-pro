@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { UserRole, Profile } from '@/hooks/useAuth';
+import { useCreateDolibarrUser } from '@/hooks/useDolibarr';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -42,6 +43,7 @@ export default function Utilisateurs() {
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('technicien');
   const { toast } = useToast();
+  const dolibarrUserMutation = useCreateDolibarrUser();
 
   const fetchUsers = async () => {
     setLoadingUsers(true);
@@ -83,6 +85,13 @@ export default function Utilisateurs() {
     }
 
     toast({ title: 'Utilisateur créé', description: `Un email de confirmation a été envoyé à ${newEmail}.` });
+    
+    // Sync to Dolibarr
+    const nameParts = newNom.trim().split(' ');
+    const firstname = nameParts[0] || '';
+    const lastname = nameParts.slice(1).join(' ') || firstname;
+    dolibarrUserMutation.mutate({ login: newEmail.split('@')[0], firstname, lastname, email: newEmail });
+    
     setDialogOpen(false);
     setNewNom('');
     setNewEmail('');
