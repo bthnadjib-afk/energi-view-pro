@@ -1,51 +1,115 @@
 
 
-## Dashboard ERP Électricité — Dolibarr Headless
+## Plan Final — Build Complet ERP Dolibarr
 
-### Vue d'ensemble
-Un dashboard métier dark mode avec effets glassmorphism, connecté à l'API Dolibarr, pour gérer factures, devis et interventions d'une entreprise d'électricité.
+Ce plan couvre l'ensemble du build : Edge Function proxy, connexion API réelle, pages Configuration et Utilisateurs, modules anti-collision, adresse et signature, plus le dashboard avancé et le workflow interventions.
 
-### Structure & Pages
+### Séquence de Build
 
-**1. Layout principal**
-- Sidebar fine (collapsible) avec navigation : Dashboard, Factures, Devis, Interventions
-- Header avec titre de page et SidebarTrigger
-- Dark mode par défaut avec palette sombre (bg #0F172A, surfaces glass rgba blanc 5-10%)
+#### Étape 1 — Secrets & Edge Function Proxy
 
-**2. Page Dashboard (accueil)**
-- 4 cartes statistiques avec dégradés (bleu, violet, vert, orange) et effets glass :
-  - Chiffre d'Affaires (total factures)
-  - Devis en attente (nombre)
-  - Interventions planifiées (nombre)
-  - Taux de conversion devis→factures
-- Liste récente des interventions avec badges statut colorés (Planifié, En cours, Terminé, Annulé)
+- Stocker `DOLIBARR_API_URL` et `DOLIBARR_API_KEY` comme secrets runtime
+- Créer `supabase/functions/dolibarr-proxy/index.ts` : proxy générique qui reçoit `{ endpoint, method, data }`, ajoute le header `DOLAPIKEY`, relaye vers Dolibarr, renvoie la réponse avec CORS headers
+- Refactorer `src/services/dolibarr.ts` pour appeler le proxy au lieu de Dolibarr directement, avec fallback mock data
 
-**3. Page Factures**
-- Tableau avec colonnes : Référence, Client, Date, Montant TTC, Statut
-- Cartes résumé en haut (total CA, factures payées, impayées)
+#### Étape 2 — Page Configuration (Paramètres)
 
-**4. Page Devis**
-- Tableau : Référence, Client, Date, Montant TTC, Statut, Badge Acompte
-- **Règle métier** : Montant TTC > 5000€ → badge "Acompte 30% requis" (vert), sinon → "Acompte 50% requis" (orange)
-- Détail devis avec lignes : Désignation, Quantité, Prix Unitaire, Total HT
+Nouvelle page `/configuration` avec 4 sections en onglets (style glassmorphism) :
 
-**5. Page Interventions**
-- Tableau/liste avec badges statut colorés
-- **Filtres** : par technicien (select) et par statut (select/toggle)
-- Colonnes : Référence, Client, Technicien, Date, Statut
+- **Entreprise** : Nom, adresse (avec autocomplétion), SIRET, téléphone, email
+- **Valeurs par défaut** : Taux TVA (défaut 20%), délai de paiement (30 jours), durée intervention (2h), taux horaire
+- **Notifications** : Toggles pour alertes email (nouveau devis, intervention planifiée, facture en retard)
+- **Dolibarr** : URL API et clé API (masquée), bouton "Tester la connexion", statut de connexion
 
-### Design
-- Glassmorphism : `backdrop-blur-xl`, bordures semi-transparentes, bg `white/5`
-- Dégradés sur les cartes stats (blue-500→indigo-600, violet-500→purple-600, etc.)
-- Badges colorés par statut avec opacité
-- 100% responsive (grille adaptive, tableau scrollable sur mobile)
+Les valeurs sont persistées dans `localStorage` (et exposées via un hook `useConfig()` utilisé par les formulaires de création devis/intervention).
 
-### Architecture technique
-- Service API (`src/services/dolibarr.ts`) avec base URL et API key configurables, fonctions fetch pour chaque endpoint
-- Données fictives réalistes (clients électricité, interventions type) pour le rendu initial
-- Hook `useDolibarr` pour basculer facilement entre mock et API réelle
-- React Query pour le data fetching
+Les credentials Dolibarr saisis ici sont envoyés à l'Edge Function pour mise à jour des secrets (ou stockés côté client pour le proxy).
 
-### Données fictives
-Données réalistes : clients type (particuliers, copropriétés), interventions électriques (mise aux normes, dépannage, installation tableau), devis avec lignes détaillées.
+#### Étape 3 — Gestion Utilisateurs & Rôles
+
+Nouvelle page `/utilisateurs` avec :
+
+- Tableau des utilisateurs : Nom, Email, Rôle, Statut
+- Bouton "Ajouter un utilisateur"
+- 3 rôles avec contrôle d'accès côté frontend :
+
+| Fonctionnalité | Admin | Secrétaire | Technicien |
+|---|---|---|---|
+| Dashboard (CA global) | ✅ | ❌ | ❌ |
+| Configuration | ✅ | ❌ | ❌ |
+| Factures | ✅ | ❌ | ❌ |
+| Clients, Devis, Agenda | ✅ | ✅ | ❌ |
+| Ses interventions | ✅ | ✅ | ✅ |
+| Upload photos/signatures | ✅ | ✅ | ✅ |
+
+- Hook `useCurrentUser()` qui retourne le rôle actuel
+- Composant `<RoleGuard role="admin">` pour protéger les routes et éléments UI
+- Sidebar adaptative : masque les liens selon le rôle
+- Pour cette version : gestion locale (sans auth Supabase), avec un sélecteur de rôle pour tester
+
+#### Étape 4 — Module Autocomplétion Adresse
+
+- Composant `AddressAutocomplete.tsx` utilisant l'API **adresse.data.gouv.fr** (gratuite, pas de clé API nécessaire)
+- Endpoint : `https://api-adresse.data.gouv.fr/search/?q=...`
+- Remplit automatiquement : Rue, Code Postal, Ville
+- Intégré dans : Config entreprise, formulaire client, formulaire intervention
+- Dropdown stylé glassmorphism avec debounce 300ms
+
+#### Étape 5 — Dashboard Avancé
+
+- `PeriodSelector` : toggle Annuel/Mensuel/Hebdomadaire pour filtrer le CA
+- Vue "Aujourd'hui" : interventions du jour groupées par technicien
+- Widget "Urgences" : interventions SAV/Panne non traitées avec badge pulse rouge
+
+#### Étape 6 — Workflow Interventions Complet
+
+- Types d'intervention : sélecteur (Devis sur place, Panne, SAV, Chantier, Réalisation)
+- Formulaire avec champs `heureDebut`/`heureFin`
+- **Anti-collision** : `checkCollision()` vérifie les interventions existantes du technicien sur le créneau. Si conflit → `AlertDialog` bloquant
+- Flux Avant/Pendant/Après avec notes et upload photo
+- Boutons conversion : Intervention → Devis, Intervention → Facture
+
+#### Étape 7 — Signature Client
+
+- Composant `SignaturePad.tsx` : canvas tactile, boutons Effacer/Valider
+- Capture en base64 PNG
+- Intégré au formulaire fin d'intervention
+- Inclus dans le Bon d'Intervention PDF (via jsPDF)
+
+#### Étape 8 — Devis & Facturation
+
+- Conversion Devis → Facture en un clic via proxy
+- Lien signature électronique Dolibarr
+
+### Fichiers à créer/modifier
+
+| Fichier | Action |
+|---|---|
+| `supabase/functions/dolibarr-proxy/index.ts` | Créer |
+| `src/services/dolibarr.ts` | Refactorer (proxy + mapping) |
+| `src/pages/Configuration.tsx` | Créer |
+| `src/pages/Utilisateurs.tsx` | Créer |
+| `src/components/AddressAutocomplete.tsx` | Créer |
+| `src/components/SignaturePad.tsx` | Créer |
+| `src/components/CollisionAlert.tsx` | Créer |
+| `src/components/InterventionForm.tsx` | Créer |
+| `src/components/InterventionDetail.tsx` | Créer |
+| `src/components/PeriodSelector.tsx` | Créer |
+| `src/components/UrgencyWidget.tsx` | Créer |
+| `src/components/RoleGuard.tsx` | Créer |
+| `src/hooks/useConfig.ts` | Créer |
+| `src/hooks/useCurrentUser.ts` | Créer |
+| `src/components/AppSidebar.tsx` | Modifier (ajout Config, Utilisateurs, rôles) |
+| `src/App.tsx` | Modifier (nouvelles routes) |
+| `src/pages/Dashboard.tsx` | Modifier (dashboard avancé) |
+| `src/pages/Interventions.tsx` | Modifier (workflow complet) |
+| `src/pages/Clients.tsx` | Modifier (autocomplétion adresse) |
+
+### Dépendances
+
+- `jspdf` — génération PDF bon d'intervention
+
+### Note technique — Adresse.data.gouv.fr
+
+API gratuite française, aucune clé nécessaire. Retourne des résultats structurés (rue, code postal, ville, coordonnées GPS). Parfaitement adaptée pour une entreprise d'électricité en France.
 
