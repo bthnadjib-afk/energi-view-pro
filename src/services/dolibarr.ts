@@ -82,9 +82,24 @@ async function dolibarrCall<T>(endpoint: string, method = 'GET', data?: unknown)
     if (error) throw error;
     return result as T;
   } catch (e) {
-    console.warn('Dolibarr proxy error, using mock data:', e);
+    console.warn('Dolibarr proxy error:', e);
+    // For mutations, throw so useMutation.onError works
+    if (method !== 'GET') throw e;
     return null;
   }
+}
+
+// --- Date helper ---
+
+export function formatDateFR(dateStr: string | undefined | null): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('fr-FR');
+}
+
+function toUnixTimestamp(dateStr: string): number {
+  return Math.floor(new Date(dateStr).getTime() / 1000);
 }
 
 // --- Mock Data ---
@@ -212,25 +227,53 @@ export async function fetchProduits(): Promise<Produit[]> {
 
 // --- Mutation functions ---
 
-export async function createClient(data: Partial<Client>): Promise<string | null> {
-  return dolibarrCall<string>('/thirdparties', 'POST', {
+export async function createClient(data: { nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }): Promise<string> {
+  const result = await dolibarrCall<string>('/thirdparties', 'POST', {
     name: data.nom,
-    address: data.adresse,
-    zip: data.codePostal,
-    town: data.ville,
-    phone: data.telephone,
-    email: data.email,
+    address: data.adresse || '',
+    zip: data.codePostal || '',
+    town: data.ville || '',
+    phone: data.telephone || '',
+    email: data.email || '',
     client: 1,
   });
+  return result || '';
 }
 
-export async function createIntervention(data: Partial<Intervention>): Promise<string | null> {
-  return dolibarrCall<string>('/interventions', 'POST', {
-    ref_client: data.ref,
-    fk_soc: data.client,
+export async function createIntervention(data: { socid: string; description: string; date: string }): Promise<string> {
+  const result = await dolibarrCall<string>('/interventions', 'POST', {
+    fk_soc: data.socid,
     description: data.description,
     datei: data.date,
   });
+  return result || '';
+}
+
+export interface CreateDevisLine {
+  desc: string;
+  qty: number;
+  subprice: number;
+  tva_tx: number;
+  product_type?: number;
+}
+
+export async function createDevis(socid: string, lines: CreateDevisLine[]): Promise<string> {
+  const result = await dolibarrCall<string>('/proposals', 'POST', {
+    socid,
+    date: toUnixTimestamp(new Date().toISOString()),
+    lines,
+  });
+  return result || '';
+}
+
+export async function createFacture(socid: string, lines: CreateDevisLine[]): Promise<string> {
+  const result = await dolibarrCall<string>('/invoices', 'POST', {
+    socid,
+    type: 0,
+    date: toUnixTimestamp(new Date().toISOString()),
+    lines,
+  });
+  return result || '';
 }
 
 export async function convertDevisToFacture(devisId: string): Promise<string | null> {
@@ -246,9 +289,7 @@ export async function testDolibarrConnection(): Promise<boolean> {
 
 function parseDolibarrDate(val: any): string {
   if (!val || val === '0') return '';
-  // Already a date string like "2025-04-11" or "2025-04-11 10:30:00"
   if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)) return val.slice(0, 10);
-  // Unix timestamp (seconds) — could be string or number
   const num = Number(val);
   if (!isNaN(num) && num > 0) {
     const d = new Date(num * 1000);
