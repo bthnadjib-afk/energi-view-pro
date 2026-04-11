@@ -245,13 +245,15 @@ export async function testDolibarrConnection(): Promise<boolean> {
 // --- Helpers ---
 
 function parseDolibarrDate(val: any): string {
-  if (!val) return '';
-  const num = Number(val);
-  if (!isNaN(num) && num > 1000000000) {
-    return new Date(num * 1000).toISOString().slice(0, 10);
-  }
-  // Already a date string
+  if (!val || val === '0') return '';
+  // Already a date string like "2025-04-11" or "2025-04-11 10:30:00"
   if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)) return val.slice(0, 10);
+  // Unix timestamp (seconds) — could be string or number
+  const num = Number(val);
+  if (!isNaN(num) && num > 0) {
+    const d = new Date(num * 1000);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
   return '';
 }
 
