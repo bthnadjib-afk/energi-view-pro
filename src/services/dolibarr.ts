@@ -1,4 +1,8 @@
-// Dolibarr API Service — mock data for now, swap to real API later
+// Dolibarr API Service — proxy through edge function, fallback to mock data
+
+import { supabase } from '@/integrations/supabase/client';
+
+// --- Types ---
 
 export interface Facture {
   id: string;
@@ -26,19 +30,31 @@ export interface Devis {
   lignes: DevisLigne[];
 }
 
+export type InterventionType = 'devis_sur_place' | 'panne' | 'sav' | 'chantier' | 'realisation';
+
 export interface Intervention {
   id: string;
   ref: string;
   client: string;
   technicien: string;
   date: string;
+  heureDebut: string;
+  heureFin: string;
   statut: 'planifié' | 'en cours' | 'terminé' | 'annulé';
+  type: InterventionType;
   description: string;
+  noteClient?: string;
+  noteTechnicien?: string;
+  noteFinChantier?: string;
+  signatureBase64?: string;
+  photos?: string[];
 }
 
 export interface Client {
   id: string;
   nom: string;
+  adresse?: string;
+  codePostal?: string;
   ville: string;
   telephone: string;
   email: string;
@@ -54,6 +70,21 @@ export interface Produit {
   tauxTVA: number;
   type: 'service' | 'produit';
   categorie: string;
+}
+
+// --- Proxy call ---
+
+async function dolibarrCall<T>(endpoint: string, method = 'GET', data?: unknown): Promise<T | null> {
+  try {
+    const { data: result, error } = await supabase.functions.invoke('dolibarr-proxy', {
+      body: { endpoint, method, data },
+    });
+    if (error) throw error;
+    return result as T;
+  } catch (e) {
+    console.warn('Dolibarr proxy error, using mock data:', e);
+    return null;
+  }
 }
 
 // --- Mock Data ---
@@ -111,14 +142,14 @@ export const mockDevis: Devis[] = [
 ];
 
 export const mockInterventions: Intervention[] = [
-  { id: '1', ref: 'INT-2025-001', client: 'M. Dupont Jean', technicien: 'Thomas Moreau', date: '2025-04-11', statut: 'en cours', description: 'Dépannage panne tableau électrique' },
-  { id: '2', ref: 'INT-2025-002', client: 'Copropriété Les Érables', technicien: 'Lucas Martin', date: '2025-04-11', statut: 'planifié', description: 'Mise aux normes NF C 15-100' },
-  { id: '3', ref: 'INT-2025-003', client: 'Restaurant Le Provençal', technicien: 'Thomas Moreau', date: '2025-04-12', statut: 'planifié', description: 'Installation éclairage LED salle' },
-  { id: '4', ref: 'INT-2025-004', client: 'Mme. Martin Sophie', technicien: 'Nicolas Petit', date: '2025-04-09', statut: 'terminé', description: 'Remplacement tableau divisionnaire' },
-  { id: '5', ref: 'INT-2025-005', client: 'SCI Bâtiment Central', technicien: 'Lucas Martin', date: '2025-04-08', statut: 'terminé', description: 'Câblage réseau RJ45 bureaux' },
-  { id: '6', ref: 'INT-2025-006', client: 'Hôtel Bellevue', technicien: 'Nicolas Petit', date: '2025-04-14', statut: 'planifié', description: 'Diagnostic installation générale' },
-  { id: '7', ref: 'INT-2025-007', client: 'M. Bernard Luc', technicien: 'Thomas Moreau', date: '2025-04-07', statut: 'annulé', description: 'Installation borne recharge véhicule' },
-  { id: '8', ref: 'INT-2025-008', client: 'Copropriété Résidence du Parc', technicien: 'Lucas Martin', date: '2025-04-15', statut: 'planifié', description: 'Remplacement colonnes montantes' },
+  { id: '1', ref: 'INT-2025-001', client: 'M. Dupont Jean', technicien: 'Thomas Moreau', date: '2025-04-11', heureDebut: '08:00', heureFin: '10:00', statut: 'en cours', type: 'panne', description: 'Dépannage panne tableau électrique' },
+  { id: '2', ref: 'INT-2025-002', client: 'Copropriété Les Érables', technicien: 'Lucas Martin', date: '2025-04-11', heureDebut: '09:00', heureFin: '12:00', statut: 'planifié', type: 'chantier', description: 'Mise aux normes NF C 15-100' },
+  { id: '3', ref: 'INT-2025-003', client: 'Restaurant Le Provençal', technicien: 'Thomas Moreau', date: '2025-04-12', heureDebut: '14:00', heureFin: '17:00', statut: 'planifié', type: 'realisation', description: 'Installation éclairage LED salle' },
+  { id: '4', ref: 'INT-2025-004', client: 'Mme. Martin Sophie', technicien: 'Nicolas Petit', date: '2025-04-09', heureDebut: '08:00', heureFin: '11:00', statut: 'terminé', type: 'chantier', description: 'Remplacement tableau divisionnaire' },
+  { id: '5', ref: 'INT-2025-005', client: 'SCI Bâtiment Central', technicien: 'Lucas Martin', date: '2025-04-08', heureDebut: '09:00', heureFin: '16:00', statut: 'terminé', type: 'realisation', description: 'Câblage réseau RJ45 bureaux' },
+  { id: '6', ref: 'INT-2025-006', client: 'Hôtel Bellevue', technicien: 'Nicolas Petit', date: '2025-04-14', heureDebut: '10:00', heureFin: '12:00', statut: 'planifié', type: 'devis_sur_place', description: 'Diagnostic installation générale' },
+  { id: '7', ref: 'INT-2025-007', client: 'M. Bernard Luc', technicien: 'Thomas Moreau', date: '2025-04-07', heureDebut: '13:00', heureFin: '15:00', statut: 'annulé', type: 'sav', description: 'Installation borne recharge véhicule' },
+  { id: '8', ref: 'INT-2025-008', client: 'Copropriété Résidence du Parc', technicien: 'Lucas Martin', date: '2025-04-15', heureDebut: '08:00', heureFin: '17:00', statut: 'planifié', type: 'chantier', description: 'Remplacement colonnes montantes' },
 ];
 
 export const mockClients: Client[] = [
@@ -147,50 +178,157 @@ export const mockProduits: Produit[] = [
   { id: '10', ref: 'SRV-008', label: 'Rénovation électrique appartement', description: 'Rénovation complète installation électrique appartement T3', prixHT: 3200, tauxTVA: 10, type: 'service', categorie: 'Rénovation' },
 ];
 
-// --- API Config (for future real connection) ---
-
-let API_BASE_URL = '';
-let API_KEY = '';
-
-export function configureDolibarr(baseUrl: string, apiKey: string) {
-  API_BASE_URL = baseUrl;
-  API_KEY = apiKey;
-}
-
-export function isConfigured(): boolean {
-  return API_BASE_URL !== '' && API_KEY !== '';
-}
-
-// --- API Fetch functions (return mock data for now) ---
+// --- API Fetch functions (proxy with mock fallback) ---
 
 export async function fetchFactures(): Promise<Facture[]> {
-  if (!isConfigured()) return mockFactures;
-  const res = await fetch(`${API_BASE_URL}/api/index.php/invoices`, { headers: { DOLAPIKEY: API_KEY } });
-  return res.json();
+  const result = await dolibarrCall<any[]>('/invoices?sortfield=t.rowid&sortorder=DESC&limit=50');
+  if (!result) return mockFactures;
+  return result.map(mapDolibarrFacture);
 }
 
 export async function fetchDevis(): Promise<Devis[]> {
-  if (!isConfigured()) return mockDevis;
-  const res = await fetch(`${API_BASE_URL}/api/index.php/proposals`, { headers: { DOLAPIKEY: API_KEY } });
-  return res.json();
+  const result = await dolibarrCall<any[]>('/proposals?sortfield=t.rowid&sortorder=DESC&limit=50');
+  if (!result) return mockDevis;
+  return result.map(mapDolibarrDevis);
 }
 
 export async function fetchInterventions(): Promise<Intervention[]> {
-  if (!isConfigured()) return mockInterventions;
-  const res = await fetch(`${API_BASE_URL}/api/index.php/interventions`, { headers: { DOLAPIKEY: API_KEY } });
-  return res.json();
+  const result = await dolibarrCall<any[]>('/interventions?sortfield=t.rowid&sortorder=DESC&limit=50');
+  if (!result) return mockInterventions;
+  return result.map(mapDolibarrIntervention);
 }
 
 export async function fetchClients(): Promise<Client[]> {
-  if (!isConfigured()) return mockClients;
-  const res = await fetch(`${API_BASE_URL}/api/index.php/thirdparties`, { headers: { DOLAPIKEY: API_KEY } });
-  return res.json();
+  const result = await dolibarrCall<any[]>('/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=100');
+  if (!result) return mockClients;
+  return result.map(mapDolibarrClient);
 }
 
 export async function fetchProduits(): Promise<Produit[]> {
-  if (!isConfigured()) return mockProduits;
-  const res = await fetch(`${API_BASE_URL}/api/index.php/products`, { headers: { DOLAPIKEY: API_KEY } });
-  return res.json();
+  const result = await dolibarrCall<any[]>('/products?sortfield=t.rowid&sortorder=DESC&limit=100');
+  if (!result) return mockProduits;
+  return result.map(mapDolibarrProduit);
+}
+
+// --- Mutation functions ---
+
+export async function createClient(data: Partial<Client>): Promise<string | null> {
+  return dolibarrCall<string>('/thirdparties', 'POST', {
+    name: data.nom,
+    address: data.adresse,
+    zip: data.codePostal,
+    town: data.ville,
+    phone: data.telephone,
+    email: data.email,
+    client: 1,
+  });
+}
+
+export async function createIntervention(data: Partial<Intervention>): Promise<string | null> {
+  return dolibarrCall<string>('/interventions', 'POST', {
+    ref_client: data.ref,
+    fk_soc: data.client,
+    description: data.description,
+    datei: data.date,
+  });
+}
+
+export async function convertDevisToFacture(devisId: string): Promise<string | null> {
+  return dolibarrCall<string>(`/proposals/${devisId}/createinvoice`, 'POST');
+}
+
+export async function testDolibarrConnection(): Promise<boolean> {
+  const result = await dolibarrCall<any>('/status');
+  return result !== null;
+}
+
+// --- Helpers ---
+
+function parseDolibarrDate(val: any): string {
+  if (!val || val === '0') return '';
+  // Already a date string like "2025-04-11" or "2025-04-11 10:30:00"
+  if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)) return val.slice(0, 10);
+  // Unix timestamp (seconds) — could be string or number
+  const num = Number(val);
+  if (!isNaN(num) && num > 0) {
+    const d = new Date(num * 1000);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  return '';
+}
+
+// --- Mapping Dolibarr → App types ---
+
+function mapDolibarrFacture(d: any): Facture {
+  const statut = d.fk_statut === '2' || d.paye === '1' ? 'payée' : d.fk_statut === '1' ? 'impayée' : 'en retard';
+  return {
+    id: String(d.id),
+    ref: d.ref || `FA-${d.id}`,
+    client: d.thirdparty?.name || d.nom || d.client_nom || `Client #${d.socid}`,
+    date: parseDolibarrDate(d.date || d.datef || d.date_creation),
+    montantTTC: parseFloat(d.total_ttc) || 0,
+    statut,
+  };
+}
+
+function mapDolibarrDevis(d: any): Devis {
+  const statut = d.fk_statut === '2' ? 'accepté' : d.fk_statut === '3' ? 'refusé' : 'en attente';
+  return {
+    id: String(d.id),
+    ref: d.ref || `DE-${d.id}`,
+    client: d.thirdparty?.name || d.nom || `Client #${d.socid}`,
+    date: parseDolibarrDate(d.date || d.datep || d.date_creation),
+    montantTTC: parseFloat(d.total_ttc) || 0,
+    statut,
+    lignes: (d.lines || []).map((l: any) => ({
+      designation: l.desc || l.label || '',
+      quantite: parseFloat(l.qty) || 0,
+      prixUnitaire: parseFloat(l.subprice) || 0,
+      totalHT: parseFloat(l.total_ht) || 0,
+    })),
+  };
+}
+
+function mapDolibarrIntervention(d: any): Intervention {
+  const statutMap: Record<string, Intervention['statut']> = { '0': 'planifié', '1': 'en cours', '2': 'terminé', '3': 'annulé' };
+  return {
+    id: String(d.id),
+    ref: d.ref || `INT-${d.id}`,
+    client: d.thirdparty?.name || d.nom || `Client #${d.socid}`,
+    technicien: '',
+    date: parseDolibarrDate(d.datei || d.dateo || d.date || d.date_creation),
+    heureDebut: '08:00',
+    heureFin: '10:00',
+    statut: statutMap[String(d.fk_statut)] || 'planifié',
+    type: 'chantier',
+    description: d.description || '',
+  };
+}
+
+function mapDolibarrClient(d: any): Client {
+  return {
+    id: String(d.id),
+    nom: d.name || '',
+    adresse: d.address || '',
+    codePostal: d.zip || '',
+    ville: d.town || '',
+    telephone: d.phone || '',
+    email: d.email || '',
+    projetsEnCours: 0,
+  };
+}
+
+function mapDolibarrProduit(d: any): Produit {
+  return {
+    id: String(d.id),
+    ref: d.ref || '',
+    label: d.label || '',
+    description: d.description || '',
+    prixHT: parseFloat(d.price) || 0,
+    tauxTVA: parseFloat(d.tva_tx) || 20,
+    type: d.type === '1' ? 'service' : 'produit',
+    categorie: '',
+  };
 }
 
 // Helpers
@@ -202,3 +340,10 @@ export function getAcompteBadge(montantTTC: number): { label: string; variant: '
 
 export const techniciens = ['Thomas Moreau', 'Lucas Martin', 'Nicolas Petit'];
 export const statutsIntervention = ['planifié', 'en cours', 'terminé', 'annulé'] as const;
+export const typesIntervention: { value: InterventionType; label: string }[] = [
+  { value: 'devis_sur_place', label: 'Devis sur place' },
+  { value: 'panne', label: 'Panne' },
+  { value: 'sav', label: 'SAV' },
+  { value: 'chantier', label: 'Chantier' },
+  { value: 'realisation', label: 'Réalisation' },
+];
