@@ -6,11 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Configuration() {
-  const { config, updateEntreprise, updateDefaults, updateNotifications, updateDolibarr } = useConfig();
+  const { config, saving, updateEntreprise, updateDefaults, updateNotifications, updateDolibarr, saveToSupabase } = useConfig();
   const [testing, setTesting] = useState(false);
 
   const handleTestConnection = async () => {
@@ -33,9 +33,19 @@ export default function Configuration() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Configuration</h1>
-        <p className="text-muted-foreground text-sm">Paramètres de l'application</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Configuration</h1>
+          <p className="text-muted-foreground text-sm">Paramètres de l'application</p>
+        </div>
+        <Button
+          onClick={saveToSupabase}
+          disabled={saving}
+          className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0 h-12 px-6 text-base"
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Sauvegarder les paramètres
+        </Button>
       </div>
 
       <Tabs defaultValue="entreprise" className="space-y-4">
@@ -140,7 +150,7 @@ export default function Configuration() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Les credentials sont stockés en tant que secrets runtime côté serveur (Edge Function). Les valeurs ci-dessous sont informatives.
+              Les credentials sont sauvegardés dans la base de données. Cliquez sur « Sauvegarder les paramètres » pour les persister.
             </p>
             <div className="space-y-4">
               <div className="space-y-2">

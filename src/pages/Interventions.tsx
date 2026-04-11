@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions } from '@/hooks/useDolibarr';
-import { techniciens, statutsIntervention, typesIntervention, type InterventionType, type Intervention } from '@/services/dolibarr';
+import { useInterventions, useClients, useCreateIntervention } from '@/hooks/useDolibarr';
+import { techniciens, statutsIntervention, typesIntervention, formatDateFR, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,8 @@ const typeColors: Record<InterventionType, string> = {
 
 export default function Interventions() {
   const { data: interventions = [] } = useInterventions();
+  const { data: clients = [] } = useClients();
+  const createInterventionMutation = useCreateIntervention();
   const [techFilter, setTechFilter] = useState('all');
   const [statutFilter, setStatutFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -44,7 +46,7 @@ export default function Interventions() {
   const [newHeureFin, setNewHeureFin] = useState('10:00');
   const [newType, setNewType] = useState<InterventionType>('chantier');
   const [newDescription, setNewDescription] = useState('');
-  const [newClient, setNewClient] = useState('');
+  const [newClientId, setNewClientId] = useState('');
   const [noteClient, setNoteClient] = useState('');
   const [noteTechnicien, setNoteTechnicien] = useState('');
 
@@ -62,7 +64,12 @@ export default function Interventions() {
     return true;
   });
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
+    if (!newClientId || !newDescription || !newDate) {
+      toast.error('Veuillez remplir client, description et date');
+      return;
+    }
+
     // Check collision
     const slots: InterventionSlot[] = interventions.map(i => ({
       technicien: i.technicien,
@@ -86,8 +93,13 @@ export default function Interventions() {
       return;
     }
 
-    toast.success('Intervention créée (mode démo)');
+    await createInterventionMutation.mutateAsync({
+      socid: newClientId,
+      description: newDescription,
+      date: newDate,
+    });
     setDialogOpen(false);
+    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech('');
   };
 
   const openDetail = (inter: Intervention) => {
@@ -111,7 +123,12 @@ export default function Interventions() {
           <DialogContent className="glass-strong border-border/50 max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle className="text-foreground">Nouvelle intervention</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
-              <Input placeholder="Client" value={newClient} onChange={(e) => setNewClient(e.target.value)} className="glass border-border/50" />
+              <Select value={newClientId} onValueChange={setNewClientId}>
+                <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
+                <SelectContent>
+                  {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>)}
+                </SelectContent>
+              </Select>
               <Select value={newType} onValueChange={(v) => setNewType(v as InterventionType)}>
                 <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Type" /></SelectTrigger>
                 <SelectContent>
@@ -143,8 +160,12 @@ export default function Interventions() {
                 <Input placeholder="Instructions technicien" value={noteTechnicien} onChange={(e) => setNoteTechnicien(e.target.value)} className="glass border-border/50" />
               </div>
 
-              <Button onClick={handleCreate} className="w-full bg-gradient-to-r from-emerald-500 to-green-600 border-0 h-12 text-base">
-                Créer l'intervention
+              <Button
+                onClick={handleCreate}
+                disabled={createInterventionMutation.isPending}
+                className="w-full bg-gradient-to-r from-emerald-500 to-green-600 border-0 h-12 text-base"
+              >
+                {createInterventionMutation.isPending ? 'Création...' : "Créer l'intervention"}
               </Button>
             </div>
           </DialogContent>
@@ -207,7 +228,7 @@ export default function Interventions() {
                     <td className="py-3 px-2 text-muted-foreground hidden lg:table-cell text-xs">
                       <Clock className="inline h-3 w-3 mr-1" />{i.heureDebut}–{i.heureFin}
                     </td>
-                    <td className="py-3 px-2 text-muted-foreground">{new Date(i.date).toLocaleDateString('fr-FR')}</td>
+                    <td className="py-3 px-2 text-muted-foreground">{formatDateFR(i.date)}</td>
                     <td className="py-3 px-2"><StatusBadge statut={i.statut} /></td>
                     <td className="py-3 px-2">
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
@@ -244,7 +265,7 @@ export default function Interventions() {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div><span className="text-muted-foreground">Client :</span> <span className="text-foreground ml-1">{selectedIntervention.client}</span></div>
                   <div><span className="text-muted-foreground">Technicien :</span> <span className="text-foreground ml-1">{selectedIntervention.technicien}</span></div>
-                  <div><span className="text-muted-foreground">Date :</span> <span className="text-foreground ml-1">{new Date(selectedIntervention.date).toLocaleDateString('fr-FR')}</span></div>
+                  <div><span className="text-muted-foreground">Date :</span> <span className="text-foreground ml-1">{formatDateFR(selectedIntervention.date)}</span></div>
                   <div><span className="text-muted-foreground">Horaire :</span> <span className="text-foreground ml-1">{selectedIntervention.heureDebut} – {selectedIntervention.heureFin}</span></div>
                 </div>
                 <div className="text-sm"><span className="text-muted-foreground">Description :</span> <span className="text-foreground ml-1">{selectedIntervention.description}</span></div>

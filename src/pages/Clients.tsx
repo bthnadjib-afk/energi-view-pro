@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useClients } from '@/hooks/useDolibarr';
+import { useClients, useCreateClient } from '@/hooks/useDolibarr';
 import { UserPlus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,13 +8,29 @@ import { cn } from '@/lib/utils';
 
 export default function Clients() {
   const { data: clients = [] } = useClients();
+  const createClientMutation = useCreateClient();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Form states
+  const [nom, setNom] = useState('');
+  const [ville, setVille] = useState('');
+  const [telephone, setTelephone] = useState('');
+  const [email, setEmail] = useState('');
+  const [adresse, setAdresse] = useState('');
+  const [codePostal, setCodePostal] = useState('');
 
   const filtered = clients.filter((c) =>
     c.nom.toLowerCase().includes(search.toLowerCase()) ||
     c.ville.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleCreate = async () => {
+    if (!nom.trim()) return;
+    await createClientMutation.mutateAsync({ nom, ville, telephone, email, adresse, codePostal });
+    setNom(''); setVille(''); setTelephone(''); setEmail(''); setAdresse(''); setCodePostal('');
+    setDialogOpen(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -35,12 +51,20 @@ export default function Clients() {
               <DialogTitle className="text-foreground">Nouveau client</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
-              <Input placeholder="Nom du client" className="glass border-border/50" />
-              <Input placeholder="Ville" className="glass border-border/50" />
-              <Input placeholder="Téléphone" className="glass border-border/50" />
-              <Input placeholder="Email" type="email" className="glass border-border/50" />
-              <Button className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0" onClick={() => setDialogOpen(false)}>
-                Enregistrer
+              <Input placeholder="Nom du client *" value={nom} onChange={e => setNom(e.target.value)} className="glass border-border/50" />
+              <Input placeholder="Adresse" value={adresse} onChange={e => setAdresse(e.target.value)} className="glass border-border/50" />
+              <div className="grid grid-cols-2 gap-3">
+                <Input placeholder="Code postal" value={codePostal} onChange={e => setCodePostal(e.target.value)} className="glass border-border/50" />
+                <Input placeholder="Ville" value={ville} onChange={e => setVille(e.target.value)} className="glass border-border/50" />
+              </div>
+              <Input placeholder="Téléphone" value={telephone} onChange={e => setTelephone(e.target.value)} className="glass border-border/50" />
+              <Input placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="glass border-border/50" />
+              <Button
+                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0"
+                onClick={handleCreate}
+                disabled={createClientMutation.isPending || !nom.trim()}
+              >
+                {createClientMutation.isPending ? 'Création...' : 'Enregistrer'}
               </Button>
             </div>
           </DialogContent>
