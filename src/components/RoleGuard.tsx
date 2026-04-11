@@ -1,4 +1,4 @@
-import { type UserRole } from '@/hooks/useCurrentUser';
+import { type UserRole } from '@/hooks/useAuth';
 import { ReactNode } from 'react';
 
 interface RoleGuardProps {
