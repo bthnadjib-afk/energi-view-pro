@@ -263,7 +263,7 @@ function mapDolibarrFacture(d: any): Facture {
     id: String(d.id),
     ref: d.ref || `FA-${d.id}`,
     client: d.thirdparty?.name || d.socid || '',
-    date: d.date ? new Date(d.date * 1000).toISOString().slice(0, 10) : '',
+    date: parseDolibarrDate(d.date),
     montantTTC: parseFloat(d.total_ttc) || 0,
     statut,
   };
@@ -275,7 +275,7 @@ function mapDolibarrDevis(d: any): Devis {
     id: String(d.id),
     ref: d.ref || `DE-${d.id}`,
     client: d.thirdparty?.name || d.socid || '',
-    date: d.date ? new Date(d.date * 1000).toISOString().slice(0, 10) : '',
+    date: parseDolibarrDate(d.date),
     montantTTC: parseFloat(d.total_ttc) || 0,
     statut,
     lignes: (d.lines || []).map((l: any) => ({
@@ -294,7 +294,7 @@ function mapDolibarrIntervention(d: any): Intervention {
     ref: d.ref || `INT-${d.id}`,
     client: d.thirdparty?.name || d.socid || '',
     technicien: '',
-    date: d.datei ? new Date(d.datei * 1000).toISOString().slice(0, 10) : '',
+    date: parseDolibarrDate(d.datei || d.date),
     heureDebut: '08:00',
     heureFin: '10:00',
     statut: statutMap[String(d.fk_statut)] || 'planifié',
