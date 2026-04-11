@@ -288,6 +288,7 @@ export async function createIntervention(data: { socid: string; description: str
   const result = await dolibarrCall<string>('/interventions', 'POST', {
     socid: socidInt,
     fk_soc: socidInt,
+    fk_project: null,
     description: data.description,
     datei: ts,
     dateo: ts,
