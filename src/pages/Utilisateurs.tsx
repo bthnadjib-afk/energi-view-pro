@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import { useCurrentUser, type UserRole } from '@/hooks/useCurrentUser';
+import { useState, useEffect } from 'react';
+import { useAuthContext } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import type { UserRole, Profile } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { UserPlus, Shield, ShieldCheck, Wrench as WrenchIcon } from 'lucide-react';
+import { UserPlus, Shield, ShieldCheck, Wrench as WrenchIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 const roleIcons: Record<UserRole, typeof Shield> = {
   admin: ShieldCheck,
@@ -25,9 +28,67 @@ const roleColors: Record<UserRole, string> = {
   technicien: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
 };
 
+interface UserWithRole extends Profile {
+  role: UserRole;
+}
+
 export default function Utilisateurs() {
-  const { allUsers, currentRole, switchRole } = useCurrentUser();
+  const { role: currentRole } = useAuthContext();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [newNom, setNewNom] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newRole, setNewRole] = useState<UserRole>('technicien');
+  const { toast } = useToast();
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    const [profilesRes, rolesRes] = await Promise.all([
+      supabase.from('profiles').select('*'),
+      supabase.from('user_roles').select('*'),
+    ]);
+
+    const profiles = (profilesRes.data || []) as Profile[];
+    const roles = (rolesRes.data || []) as { user_id: string; role: UserRole }[];
+
+    const merged: UserWithRole[] = profiles.map(p => {
+      const userRole = roles.find(r => r.user_id === p.id);
+      return { ...p, role: (userRole?.role as UserRole) || 'technicien' };
+    });
+
+    setUsers(merged);
+    setLoadingUsers(false);
+  };
+
+  useEffect(() => { fetchUsers(); }, []);
+
+  const handleCreate = async () => {
+    if (!newNom || !newEmail) {
+      toast({ title: 'Erreur', description: 'Nom et email sont requis.', variant: 'destructive' });
+      return;
+    }
+    setCreating(true);
+
+    const { data, error } = await supabase.functions.invoke('create-user', {
+      body: { email: newEmail, nom: newNom, role: newRole },
+    });
+
+    setCreating(false);
+
+    if (error || data?.error) {
+      toast({ title: 'Erreur', description: data?.error || error?.message || 'Erreur inconnue', variant: 'destructive' });
+      return;
+    }
+
+    toast({ title: 'Utilisateur créé', description: `Un email de confirmation a été envoyé à ${newEmail}.` });
+    setDialogOpen(false);
+    setNewNom('');
+    setNewEmail('');
+    setNewRole('technicien');
+    fetchUsers();
+  };
 
   return (
     <div className="space-y-6">
@@ -36,20 +97,7 @@ export default function Utilisateurs() {
           <h1 className="text-2xl font-bold text-foreground">Utilisateurs</h1>
           <p className="text-muted-foreground text-sm">Gestion des comptes et rôles</p>
         </div>
-        <div className="flex gap-3 items-center">
-          <div className="glass rounded-lg px-3 py-2 flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Tester en tant que :</span>
-            <Select value={currentRole} onValueChange={(v) => switchRole(v as UserRole)}>
-              <SelectTrigger className="w-[140px] h-8 text-xs glass border-border/50">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="secretaire">Secrétaire</SelectItem>
-                <SelectItem value="technicien">Technicien</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {currentRole === 'admin' && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0">
@@ -59,9 +107,9 @@ export default function Utilisateurs() {
             <DialogContent className="glass-strong border-border/50">
               <DialogHeader><DialogTitle className="text-foreground">Nouvel utilisateur</DialogTitle></DialogHeader>
               <div className="space-y-4 pt-2">
-                <Input placeholder="Nom complet" className="glass border-border/50" />
-                <Input placeholder="Email" type="email" className="glass border-border/50" />
-                <Select defaultValue="technicien">
+                <Input placeholder="Nom complet" className="glass border-border/50" value={newNom} onChange={e => setNewNom(e.target.value)} />
+                <Input placeholder="Email" type="email" className="glass border-border/50" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
+                <Select value={newRole} onValueChange={(v) => setNewRole(v as UserRole)}>
                   <SelectTrigger className="glass border-border/50"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Administrateur</SelectItem>
@@ -69,11 +117,14 @@ export default function Utilisateurs() {
                     <SelectItem value="technicien">Technicien</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0" onClick={() => setDialogOpen(false)}>Enregistrer</Button>
+                <Button className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0" onClick={handleCreate} disabled={creating}>
+                  {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Enregistrer
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
-        </div>
+        )}
       </div>
 
       {/* Permissions matrix */}
@@ -93,7 +144,7 @@ export default function Utilisateurs() {
               {[
                 ['Dashboard (CA global)', true, false, false],
                 ['Configuration', true, false, false],
-                ['Factures', true, false, false],
+                ['Factures', true, true, false],
                 ['Clients, Devis, Agenda', true, true, false],
                 ['Interventions', true, true, true],
                 ['Upload photos/signatures', true, true, true],
@@ -112,39 +163,46 @@ export default function Utilisateurs() {
 
       {/* Users list */}
       <div className="glass rounded-xl p-5">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border/50">
-                <th className="text-left py-3 px-2 text-muted-foreground font-medium">Nom</th>
-                <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Email</th>
-                <th className="text-left py-3 px-2 text-muted-foreground font-medium">Rôle</th>
-                <th className="text-left py-3 px-2 text-muted-foreground font-medium">Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allUsers.map((u) => {
-                const Icon = roleIcons[u.role];
-                return (
-                  <tr key={u.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors">
-                    <td className="py-3 px-2 font-medium text-foreground">{u.nom}</td>
-                    <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell text-xs">{u.email}</td>
-                    <td className="py-3 px-2">
-                      <span className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium', roleColors[u.role])}>
-                        <Icon className="h-3 w-3" /> {roleLabels[u.role]}
-                      </span>
-                    </td>
-                    <td className="py-3 px-2">
-                      <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs', u.actif ? 'bg-emerald-500/20 text-emerald-400' : 'bg-muted text-muted-foreground')}>
-                        {u.actif ? 'Actif' : 'Inactif'}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        {loadingUsers ? (
+          <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/50">
+                  <th className="text-left py-3 px-2 text-muted-foreground font-medium">Nom</th>
+                  <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Email</th>
+                  <th className="text-left py-3 px-2 text-muted-foreground font-medium">Rôle</th>
+                  <th className="text-left py-3 px-2 text-muted-foreground font-medium">Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => {
+                  const Icon = roleIcons[u.role] || Shield;
+                  return (
+                    <tr key={u.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors">
+                      <td className="py-3 px-2 font-medium text-foreground">{u.nom || '—'}</td>
+                      <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell text-xs">{u.email}</td>
+                      <td className="py-3 px-2">
+                        <span className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium', roleColors[u.role] || '')}>
+                          <Icon className="h-3 w-3" /> {roleLabels[u.role] || u.role}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2">
+                        <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs', u.actif ? 'bg-emerald-500/20 text-emerald-400' : 'bg-muted text-muted-foreground')}>
+                          {u.actif ? 'Actif' : 'Inactif'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {users.length === 0 && (
+                  <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">Aucun utilisateur trouvé</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
