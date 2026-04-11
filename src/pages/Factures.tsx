@@ -1,20 +1,114 @@
-import { Euro, CheckCircle, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Euro, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useFactures } from '@/hooks/useDolibarr';
+import { useFactures, useClients, useCreateFacture } from '@/hooks/useDolibarr';
+import { formatDateFR } from '@/services/dolibarr';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+interface LigneForm {
+  desc: string;
+  qty: number;
+  subprice: number;
+  tva_tx: number;
+}
 
 export default function Factures() {
   const { data: factures = [] } = useFactures();
+  const { data: clients = [] } = useClients();
+  const createFactureMutation = useCreateFacture();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [socid, setSocid] = useState('');
+  const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20 }]);
 
   const totalCA = factures.reduce((s, f) => s + f.montantTTC, 0);
   const payees = factures.filter(f => f.statut === 'payée');
   const impayees = factures.filter(f => f.statut !== 'payée');
 
+  const addLigne = () => setLignes([...lignes, { desc: '', qty: 1, subprice: 0, tva_tx: 20 }]);
+  const removeLigne = (i: number) => setLignes(lignes.filter((_, idx) => idx !== i));
+  const updateLigne = (i: number, field: keyof LigneForm, value: string | number) => {
+    const updated = [...lignes];
+    (updated[i] as any)[field] = value;
+    setLignes(updated);
+  };
+
+  const handleCreate = async () => {
+    if (!socid || lignes.length === 0 || !lignes[0].desc) return;
+    await createFactureMutation.mutateAsync({ socid, lines: lignes });
+    setDialogOpen(false);
+    setSocid('');
+    setLignes([{ desc: '', qty: 1, subprice: 0, tva_tx: 20 }]);
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Factures</h1>
-        <p className="text-muted-foreground text-sm">Gestion des factures clients</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Factures</h1>
+          <p className="text-muted-foreground text-sm">Gestion des factures clients</p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0 h-12 px-6 text-base">
+              <Plus className="h-4 w-4" /> Créer une facture
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="glass-strong border-border/50 max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle className="text-foreground">Nouvelle facture</DialogTitle></DialogHeader>
+            <div className="space-y-4 pt-2">
+              <Select value={socid} onValueChange={setSocid}>
+                <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
+                <SelectContent>
+                  {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>)}
+                </SelectContent>
+              </Select>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-foreground">Lignes</h3>
+                  <Button variant="outline" size="sm" onClick={addLigne} className="gap-1 glass border-border/50">
+                    <Plus className="h-3 w-3" /> Ajouter
+                  </Button>
+                </div>
+                {lignes.map((l, i) => (
+                  <div key={i} className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-5">
+                      <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="glass border-border/50 text-xs" />
+                    </div>
+                    <div className="col-span-2">
+                      <Input type="number" placeholder="Qté" value={l.qty} onChange={e => updateLigne(i, 'qty', Number(e.target.value))} className="glass border-border/50 text-xs" />
+                    </div>
+                    <div className="col-span-2">
+                      <Input type="number" placeholder="Prix" value={l.subprice} onChange={e => updateLigne(i, 'subprice', Number(e.target.value))} className="glass border-border/50 text-xs" />
+                    </div>
+                    <div className="col-span-2">
+                      <Input type="number" placeholder="TVA%" value={l.tva_tx} onChange={e => updateLigne(i, 'tva_tx', Number(e.target.value))} className="glass border-border/50 text-xs" />
+                    </div>
+                    <div className="col-span-1">
+                      {lignes.length > 1 && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeLigne(i)}>
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                onClick={handleCreate}
+                disabled={createFactureMutation.isPending || !socid}
+                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 text-base"
+              >
+                {createFactureMutation.isPending ? 'Création...' : 'Créer la facture'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -40,7 +134,7 @@ export default function Factures() {
                 <tr key={f.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors">
                   <td className="py-3 px-2 font-mono text-xs text-foreground">{f.ref}</td>
                   <td className="py-3 px-2 text-foreground">{f.client}</td>
-                  <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{new Date(f.date).toLocaleDateString('fr-FR')}</td>
+                  <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(f.date)}</td>
                   <td className="py-3 px-2 text-right font-medium text-foreground">{f.montantTTC.toLocaleString('fr-FR')} €</td>
                   <td className="py-3 px-2"><StatusBadge statut={f.statut} /></td>
                 </tr>
