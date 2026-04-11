@@ -36,6 +36,26 @@ export interface Intervention {
   description: string;
 }
 
+export interface Client {
+  id: string;
+  nom: string;
+  ville: string;
+  telephone: string;
+  email: string;
+  projetsEnCours: number;
+}
+
+export interface Produit {
+  id: string;
+  ref: string;
+  label: string;
+  description: string;
+  prixHT: number;
+  tauxTVA: number;
+  type: 'service' | 'produit';
+  categorie: string;
+}
+
 // --- Mock Data ---
 
 export const mockFactures: Facture[] = [
