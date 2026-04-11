@@ -1,115 +1,96 @@
 
 
-## Plan Final — Build Complet ERP Dolibarr
+## Plan — Authentification Supabase & Gestion des Utilisateurs
 
-Ce plan couvre l'ensemble du build : Edge Function proxy, connexion API réelle, pages Configuration et Utilisateurs, modules anti-collision, adresse et signature, plus le dashboard avancé et le workflow interventions.
+### Situation actuelle
+- Authentification = mock (localStorage avec rôle en dur)
+- Aucune table dans la base de données
+- Aucun système de login/session
 
-### Séquence de Build
+### Ce qui sera construit
 
-#### Étape 1 — Secrets & Edge Function Proxy
+#### 1. Base de données — 2 tables + trigger
 
-- Stocker `DOLIBARR_API_URL` et `DOLIBARR_API_KEY` comme secrets runtime
-- Créer `supabase/functions/dolibarr-proxy/index.ts` : proxy générique qui reçoit `{ endpoint, method, data }`, ajoute le header `DOLAPIKEY`, relaye vers Dolibarr, renvoie la réponse avec CORS headers
-- Refactorer `src/services/dolibarr.ts` pour appeler le proxy au lieu de Dolibarr directement, avec fallback mock data
+**Table `profiles`** (liée à `auth.users`) :
+- `id` (uuid, FK → auth.users ON DELETE CASCADE)
+- `nom` (text)
+- `email` (text)
+- `actif` (boolean, default true)
+- `created_at` (timestamptz)
 
-#### Étape 2 — Page Configuration (Paramètres)
+**Table `user_roles`** (table de rôles séparée, sécurité) :
+- `id` (uuid, PK)
+- `user_id` (uuid, FK → auth.users ON DELETE CASCADE)
+- `role` (enum `app_role` : admin, secretaire, technicien)
+- Contrainte unique sur (user_id, role)
 
-Nouvelle page `/configuration` avec 4 sections en onglets (style glassmorphism) :
+**Fonction `has_role`** : SECURITY DEFINER pour vérifier les rôles sans récursion RLS.
 
-- **Entreprise** : Nom, adresse (avec autocomplétion), SIRET, téléphone, email
-- **Valeurs par défaut** : Taux TVA (défaut 20%), délai de paiement (30 jours), durée intervention (2h), taux horaire
-- **Notifications** : Toggles pour alertes email (nouveau devis, intervention planifiée, facture en retard)
-- **Dolibarr** : URL API et clé API (masquée), bouton "Tester la connexion", statut de connexion
+**Trigger** : Auto-création du profil à l'inscription (`handle_new_user`).
 
-Les valeurs sont persistées dans `localStorage` (et exposées via un hook `useConfig()` utilisé par les formulaires de création devis/intervention).
+**RLS** : Les utilisateurs lisent tous les profils, modifient uniquement le leur. Admins gèrent les rôles.
 
-Les credentials Dolibarr saisis ici sont envoyés à l'Edge Function pour mise à jour des secrets (ou stockés côté client pour le proxy).
+#### 2. Edge Function — `create-user`
 
-#### Étape 3 — Gestion Utilisateurs & Rôles
+Nouvelle Edge Function qui utilise le `service_role_key` pour :
+- Créer l'utilisateur via `supabase.auth.admin.createUser()` avec `email_confirm: false` (l'utilisateur reçoit un email de confirmation)
+- Insérer le rôle dans `user_roles`
+- Accessible uniquement par un admin authentifié
 
-Nouvelle page `/utilisateurs` avec :
+#### 3. Page Login (`/login`)
 
-- Tableau des utilisateurs : Nom, Email, Rôle, Statut
-- Bouton "Ajouter un utilisateur"
-- 3 rôles avec contrôle d'accès côté frontend :
+- Formulaire Email + Mot de passe (style glassmorphism dark)
+- Lien "Mot de passe oublié" → appel `resetPasswordForEmail`
+- Redirection vers `/` après connexion
 
-| Fonctionnalité | Admin | Secrétaire | Technicien |
-|---|---|---|---|
-| Dashboard (CA global) | ✅ | ❌ | ❌ |
-| Configuration | ✅ | ❌ | ❌ |
-| Factures | ✅ | ❌ | ❌ |
-| Clients, Devis, Agenda | ✅ | ✅ | ❌ |
-| Ses interventions | ✅ | ✅ | ✅ |
-| Upload photos/signatures | ✅ | ✅ | ✅ |
+#### 4. Page Reset Password (`/reset-password`)
 
-- Hook `useCurrentUser()` qui retourne le rôle actuel
-- Composant `<RoleGuard role="admin">` pour protéger les routes et éléments UI
-- Sidebar adaptative : masque les liens selon le rôle
-- Pour cette version : gestion locale (sans auth Supabase), avec un sélecteur de rôle pour tester
+- Formulaire nouveau mot de passe
+- Détecte le token `type=recovery` dans l'URL
+- Appel `updateUser({ password })`
 
-#### Étape 4 — Module Autocomplétion Adresse
+#### 5. Refonte `useCurrentUser` → `useAuth`
 
-- Composant `AddressAutocomplete.tsx` utilisant l'API **adresse.data.gouv.fr** (gratuite, pas de clé API nécessaire)
-- Endpoint : `https://api-adresse.data.gouv.fr/search/?q=...`
-- Remplit automatiquement : Rue, Code Postal, Ville
-- Intégré dans : Config entreprise, formulaire client, formulaire intervention
-- Dropdown stylé glassmorphism avec debounce 300ms
+- Remplace les mock users par des requêtes Supabase (`auth.getSession`, `onAuthStateChange`)
+- Charge le profil + rôle depuis `profiles` et `user_roles`
+- Expose : `user`, `profile`, `role`, `signOut`, `canAccess`, `loading`
+- Session persistée automatiquement par Supabase (localStorage)
 
-#### Étape 5 — Dashboard Avancé
+#### 6. Protection des routes (`App.tsx`)
 
-- `PeriodSelector` : toggle Annuel/Mensuel/Hebdomadaire pour filtrer le CA
-- Vue "Aujourd'hui" : interventions du jour groupées par technicien
-- Widget "Urgences" : interventions SAV/Panne non traitées avec badge pulse rouge
+- Si non connecté → affiche Login
+- Si connecté → affiche le layout avec sidebar
+- `onAuthStateChange` écoute les changements de session
 
-#### Étape 6 — Workflow Interventions Complet
+#### 7. Page Utilisateurs — fonctionnelle
 
-- Types d'intervention : sélecteur (Devis sur place, Panne, SAV, Chantier, Réalisation)
-- Formulaire avec champs `heureDebut`/`heureFin`
-- **Anti-collision** : `checkCollision()` vérifie les interventions existantes du technicien sur le créneau. Si conflit → `AlertDialog` bloquant
-- Flux Avant/Pendant/Après avec notes et upload photo
-- Boutons conversion : Intervention → Devis, Intervention → Facture
+- "Ajouter un utilisateur" appelle l'Edge Function `create-user`
+- Liste chargée depuis `profiles` + `user_roles`
+- L'admin peut modifier le rôle ou désactiver un utilisateur
 
-#### Étape 7 — Signature Client
+#### 8. Profil utilisateur
 
-- Composant `SignaturePad.tsx` : canvas tactile, boutons Effacer/Valider
-- Capture en base64 PNG
-- Intégré au formulaire fin d'intervention
-- Inclus dans le Bon d'Intervention PDF (via jsPDF)
+- Bouton dans la sidebar/header pour accéder à son profil
+- Possibilité de changer son mot de passe (`updateUser`)
 
-#### Étape 8 — Devis & Facturation
-
-- Conversion Devis → Facture en un clic via proxy
-- Lien signature électronique Dolibarr
-
-### Fichiers à créer/modifier
+### Fichiers impactés
 
 | Fichier | Action |
 |---|---|
-| `supabase/functions/dolibarr-proxy/index.ts` | Créer |
-| `src/services/dolibarr.ts` | Refactorer (proxy + mapping) |
-| `src/pages/Configuration.tsx` | Créer |
-| `src/pages/Utilisateurs.tsx` | Créer |
-| `src/components/AddressAutocomplete.tsx` | Créer |
-| `src/components/SignaturePad.tsx` | Créer |
-| `src/components/CollisionAlert.tsx` | Créer |
-| `src/components/InterventionForm.tsx` | Créer |
-| `src/components/InterventionDetail.tsx` | Créer |
-| `src/components/PeriodSelector.tsx` | Créer |
-| `src/components/UrgencyWidget.tsx` | Créer |
-| `src/components/RoleGuard.tsx` | Créer |
-| `src/hooks/useConfig.ts` | Créer |
-| `src/hooks/useCurrentUser.ts` | Créer |
-| `src/components/AppSidebar.tsx` | Modifier (ajout Config, Utilisateurs, rôles) |
-| `src/App.tsx` | Modifier (nouvelles routes) |
-| `src/pages/Dashboard.tsx` | Modifier (dashboard avancé) |
-| `src/pages/Interventions.tsx` | Modifier (workflow complet) |
-| `src/pages/Clients.tsx` | Modifier (autocomplétion adresse) |
+| Migration SQL | Créer `profiles`, `user_roles`, enum, trigger, RLS |
+| `supabase/functions/create-user/index.ts` | Créer |
+| `src/pages/Login.tsx` | Créer |
+| `src/pages/ResetPassword.tsx` | Créer |
+| `src/hooks/useAuth.ts` | Créer (remplace useCurrentUser) |
+| `src/App.tsx` | Modifier (auth guard, nouvelles routes) |
+| `src/pages/Utilisateurs.tsx` | Modifier (appels API réels) |
+| `src/components/AppSidebar.tsx` | Modifier (bouton déconnexion, profil) |
 
-### Dépendances
+### Sécurité
 
-- `jspdf` — génération PDF bon d'intervention
-
-### Note technique — Adresse.data.gouv.fr
-
-API gratuite française, aucune clé nécessaire. Retourne des résultats structurés (rue, code postal, ville, coordonnées GPS). Parfaitement adaptée pour une entreprise d'électricité en France.
+- Rôles stockés dans une table séparée (jamais dans profiles)
+- Fonction `has_role` en SECURITY DEFINER
+- Création d'utilisateurs via Edge Function service_role (jamais côté client)
+- RLS stricte sur toutes les tables
+- Auto-confirm email desactivé (l'utilisateur doit vérifier son email)
 
