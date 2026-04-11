@@ -260,12 +260,12 @@ function parseDolibarrDate(val: any): string {
 // --- Mapping Dolibarr → App types ---
 
 function mapDolibarrFacture(d: any): Facture {
-  const statut = d.fk_statut === '2' ? 'payée' : d.fk_statut === '1' ? 'impayée' : 'en retard';
+  const statut = d.fk_statut === '2' || d.paye === '1' ? 'payée' : d.fk_statut === '1' ? 'impayée' : 'en retard';
   return {
     id: String(d.id),
     ref: d.ref || `FA-${d.id}`,
-    client: d.thirdparty?.name || d.socid || '',
-    date: parseDolibarrDate(d.date),
+    client: d.thirdparty?.name || d.nom || d.client_nom || `Client #${d.socid}`,
+    date: parseDolibarrDate(d.date || d.datef || d.date_creation),
     montantTTC: parseFloat(d.total_ttc) || 0,
     statut,
   };
