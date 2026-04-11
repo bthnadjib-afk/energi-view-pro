@@ -12,6 +12,8 @@ import Interventions from "./pages/Interventions";
 import Clients from "./pages/Clients";
 import Catalogue from "./pages/Catalogue";
 import Agenda from "./pages/Agenda";
+import Configuration from "./pages/Configuration";
+import Utilisateurs from "./pages/Utilisateurs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,7 +28,7 @@ const App = () => (
           <div className="min-h-screen flex w-full">
             <AppSidebar />
             <div className="flex-1 flex flex-col min-w-0">
-              <header className="h-14 flex items-center border-b border-border/50 px-4 glass-strong">
+              <header className="h-14 flex items-center border-b border-border/50 glass-strong px-4">
                 <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
               </header>
               <main className="flex-1 p-4 md:p-6 overflow-auto">
@@ -38,6 +40,8 @@ const App = () => (
                   <Route path="/clients" element={<Clients />} />
                   <Route path="/catalogue" element={<Catalogue />} />
                   <Route path="/agenda" element={<Agenda />} />
+                  <Route path="/configuration" element={<Configuration />} />
+                  <Route path="/utilisateurs" element={<Utilisateurs />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>
