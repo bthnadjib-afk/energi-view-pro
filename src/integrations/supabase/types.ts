@@ -32,6 +32,63 @@ export type Database = {
         }
         Relationships: []
       }
+      email_history: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          destinataire: string
+          document_ref: string | null
+          id: string
+          message: string
+          objet: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          destinataire: string
+          document_ref?: string | null
+          id?: string
+          message?: string
+          objet?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          destinataire?: string
+          document_ref?: string | null
+          id?: string
+          message?: string
+          objet?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          corps: string
+          created_at: string | null
+          id: string
+          nom: string
+          objet: string
+        }
+        Insert: {
+          corps?: string
+          created_at?: string | null
+          id?: string
+          nom: string
+          objet?: string
+        }
+        Update: {
+          corps?: string
+          created_at?: string | null
+          id?: string
+          nom?: string
+          objet?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           actif: boolean
