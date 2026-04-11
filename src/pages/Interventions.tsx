@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions, useClients, useCreateIntervention } from '@/hooks/useDolibarr';
+import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture } from '@/hooks/useDolibarr';
 import { techniciens, statutsIntervention, typesIntervention, formatDateFR, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
 import { SignaturePad } from '@/components/SignaturePad';
-import { Plus, FileText, Receipt, Camera, Clock, ArrowRightLeft } from 'lucide-react';
+import { Plus, FileText, Receipt, Camera, Clock, ArrowRightLeft, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 
 const typeLabels: Record<InterventionType, string> = {
   devis_sur_place: 'Devis sur place',
@@ -32,6 +34,9 @@ export default function Interventions() {
   const { data: interventions = [] } = useInterventions();
   const { data: clients = [] } = useClients();
   const createInterventionMutation = useCreateIntervention();
+  const createDevisMutation = useCreateDevis();
+  const createFactureMutation = useCreateFacture();
+  const { role } = useAuth();
   const [techFilter, setTechFilter] = useState('all');
   const [statutFilter, setStatutFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -49,13 +54,15 @@ export default function Interventions() {
   const [newClientId, setNewClientId] = useState('');
   const [noteClient, setNoteClient] = useState('');
   const [noteTechnicien, setNoteTechnicien] = useState('');
+  const [notePrivee, setNotePrivee] = useState('');
 
   // Anti-collision
   const [collisionOpen, setCollisionOpen] = useState(false);
   const [collisionInfo, setCollisionInfo] = useState({ technicien: '', creneauExistant: '' });
 
-  // Signature
+  // Signatures
   const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [signatureTechData, setSignatureTechData] = useState<string | null>(null);
 
   const filtered = interventions.filter((i) => {
     if (techFilter !== 'all' && i.technicien !== techFilter) return false;
@@ -70,7 +77,6 @@ export default function Interventions() {
       return;
     }
 
-    // Check collision
     const slots: InterventionSlot[] = interventions.map(i => ({
       technicien: i.technicien,
       date: i.date,
@@ -99,12 +105,34 @@ export default function Interventions() {
       date: newDate,
     });
     setDialogOpen(false);
-    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech('');
+    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee('');
   };
 
   const openDetail = (inter: Intervention) => {
     setSelectedIntervention(inter);
     setDetailOpen(true);
+  };
+
+  const handleTransformDevis = async () => {
+    if (!selectedIntervention) return;
+    const socid = selectedIntervention.socid;
+    if (!socid) { toast.error('Client non identifié'); return; }
+    await createDevisMutation.mutateAsync({
+      socid,
+      lines: [{ desc: selectedIntervention.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+    });
+    toast.success('Devis créé à partir de l\'intervention');
+  };
+
+  const handleTransformFacture = async () => {
+    if (!selectedIntervention) return;
+    const socid = selectedIntervention.socid;
+    if (!socid) { toast.error('Client non identifié'); return; }
+    await createFactureMutation.mutateAsync({
+      socid,
+      lines: [{ desc: selectedIntervention.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+    });
+    toast.success('Facture créée à partir de l\'intervention');
   };
 
   return (
@@ -159,6 +187,20 @@ export default function Interventions() {
                 <Input placeholder="Note demande client" value={noteClient} onChange={(e) => setNoteClient(e.target.value)} className="glass border-border/50" />
                 <Input placeholder="Instructions technicien" value={noteTechnicien} onChange={(e) => setNoteTechnicien(e.target.value)} className="glass border-border/50" />
               </div>
+
+              {role === 'admin' && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                    <Lock className="h-3.5 w-3.5" /> Note privée (admin)
+                  </h3>
+                  <Textarea
+                    placeholder="Note visible uniquement par les administrateurs..."
+                    value={notePrivee}
+                    onChange={(e) => setNotePrivee(e.target.value)}
+                    className="glass border-border/50 min-h-[60px]"
+                  />
+                </div>
+              )}
 
               <Button
                 onClick={handleCreate}
@@ -232,10 +274,10 @@ export default function Interventions() {
                     <td className="py-3 px-2"><StatusBadge statut={i.statut} /></td>
                     <td className="py-3 px-2">
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => { setSelectedIntervention(i); handleTransformDevis(); }}>
                           <FileText className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Facture">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Facture" onClick={() => { setSelectedIntervention(i); handleTransformFacture(); }}>
                           <Receipt className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -270,6 +312,20 @@ export default function Interventions() {
                 </div>
                 <div className="text-sm"><span className="text-muted-foreground">Description :</span> <span className="text-foreground ml-1">{selectedIntervention.description}</span></div>
 
+                {/* Notes privées (admin only) */}
+                {role === 'admin' && (
+                  <div className="space-y-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <Lock className="h-3.5 w-3.5 text-orange-400" /> Note privée (admin)
+                    </h3>
+                    <Textarea
+                      placeholder="Ajouter une note privée..."
+                      defaultValue={selectedIntervention.notePrivee || ''}
+                      className="glass border-border/50 min-h-[60px] text-sm"
+                    />
+                  </div>
+                )}
+
                 {/* Section Pendant */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-foreground">📸 Pendant l'intervention</h3>
@@ -282,22 +338,39 @@ export default function Interventions() {
                 </div>
 
                 {/* Section Après */}
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-foreground">✅ Fin d'intervention</h3>
                   <Input placeholder="Note de fin de chantier..." className="glass border-border/50" />
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">Signature du client</p>
-                    <SignaturePad onSave={(data) => { setSignatureData(data); toast.success('Signature enregistrée'); }} />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">Signature du client</p>
+                      <SignaturePad onSave={(data) => { setSignatureData(data); toast.success('Signature client enregistrée'); }} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">Signature du technicien</p>
+                      <SignaturePad onSave={(data) => { setSignatureTechData(data); toast.success('Signature technicien enregistrée'); }} />
+                    </div>
                   </div>
                 </div>
 
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-3 pt-2">
-                  <Button className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 px-6 text-base">
-                    <ArrowRightLeft className="h-4 w-4" /> Transformer en Devis
+                  <Button
+                    onClick={handleTransformDevis}
+                    disabled={createDevisMutation.isPending}
+                    className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 px-6 text-base"
+                  >
+                    <ArrowRightLeft className="h-4 w-4" />
+                    {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
                   </Button>
-                  <Button className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0 h-12 px-6 text-base">
-                    <Receipt className="h-4 w-4" /> Transformer en Facture
+                  <Button
+                    onClick={handleTransformFacture}
+                    disabled={createFactureMutation.isPending}
+                    className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0 h-12 px-6 text-base"
+                  >
+                    <Receipt className="h-4 w-4" />
+                    {createFactureMutation.isPending ? 'Création...' : 'Transformer en Facture'}
                   </Button>
                   <Button variant="outline" className="gap-2 glass border-border/50 h-12 px-6 text-base">
                     <FileText className="h-4 w-4" /> Générer Bon d'Intervention

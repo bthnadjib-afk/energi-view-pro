@@ -1,9 +1,9 @@
 import { useState, Fragment } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useDevis, useClients, useCreateDevis } from '@/hooks/useDolibarr';
+import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte } from '@/hooks/useDolibarr';
 import { getAcompteBadge, formatDateFR, type Devis as DevisType } from '@/services/dolibarr';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -14,6 +14,8 @@ interface LigneForm {
   qty: number;
   subprice: number;
   tva_tx: number;
+  product_type: number;
+  productId: string;
 }
 
 function AcompteBadge({ montantTTC }: { montantTTC: number }) {
@@ -30,7 +32,13 @@ function AcompteBadge({ montantTTC }: { montantTTC: number }) {
   );
 }
 
-function DevisDetail({ devis }: { devis: DevisType }) {
+function DevisDetail({ devis, onConvert, onAcompte, convertPending, acomptePending }: {
+  devis: DevisType;
+  onConvert: () => void;
+  onAcompte: () => void;
+  convertPending: boolean;
+  acomptePending: boolean;
+}) {
   return (
     <tr>
       <td colSpan={7} className="p-0">
@@ -56,6 +64,28 @@ function DevisDetail({ devis }: { devis: DevisType }) {
               ))}
             </tbody>
           </table>
+
+          {devis.statut === 'accepté' && (
+            <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-border/30">
+              <Button
+                onClick={onConvert}
+                disabled={convertPending}
+                className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0"
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+                {convertPending ? 'Conversion...' : 'Convertir en Facture'}
+              </Button>
+              <Button
+                onClick={onAcompte}
+                disabled={acomptePending}
+                variant="outline"
+                className="gap-2 glass border-border/50"
+              >
+                <Receipt className="h-4 w-4" />
+                {acomptePending ? 'Création...' : 'Saisir un acompte'}
+              </Button>
+            </div>
+          )}
         </div>
       </td>
     </tr>
@@ -65,14 +95,32 @@ function DevisDetail({ devis }: { devis: DevisType }) {
 export default function Devis() {
   const { data: devis = [] } = useDevis();
   const { data: clients = [] } = useClients();
+  const { data: produits = [] } = useProduits();
   const createDevisMutation = useCreateDevis();
+  const convertMutation = useConvertDevisToFacture();
+  const acompteMutation = useCreateAcompte();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [socid, setSocid] = useState('');
-  const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20 }]);
+  const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '' }]);
 
-  const addLigne = () => setLignes([...lignes, { desc: '', qty: 1, subprice: 0, tva_tx: 20 }]);
+  const emptyLigne = (): LigneForm => ({ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '' });
+  const addLigne = () => setLignes([...lignes, emptyLigne()]);
   const removeLigne = (i: number) => setLignes(lignes.filter((_, idx) => idx !== i));
+
+  const selectProduct = (i: number, productId: string) => {
+    const updated = [...lignes];
+    if (productId === '__libre__') {
+      updated[i] = { ...updated[i], productId: '', desc: '' };
+    } else {
+      const p = produits.find(pr => pr.id === productId);
+      if (p) {
+        updated[i] = { ...updated[i], productId, desc: `[${p.ref}] ${p.label}`, subprice: p.prixHT, tva_tx: p.tauxTVA, product_type: p.type === 'service' ? 1 : 0 };
+      }
+    }
+    setLignes(updated);
+  };
+
   const updateLigne = (i: number, field: keyof LigneForm, value: string | number) => {
     const updated = [...lignes];
     (updated[i] as any)[field] = value;
@@ -81,10 +129,13 @@ export default function Devis() {
 
   const handleCreate = async () => {
     if (!socid || lignes.length === 0 || !lignes[0].desc) return;
-    await createDevisMutation.mutateAsync({ socid, lines: lignes });
+    await createDevisMutation.mutateAsync({
+      socid,
+      lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type })),
+    });
     setDialogOpen(false);
     setSocid('');
-    setLignes([{ desc: '', qty: 1, subprice: 0, tva_tx: 20 }]);
+    setLignes([emptyLigne()]);
   };
 
   return (
@@ -118,25 +169,40 @@ export default function Devis() {
                   </Button>
                 </div>
                 {lignes.map((l, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-5">
-                      <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="glass border-border/50 text-xs" />
-                    </div>
-                    <div className="col-span-2">
-                      <Input type="number" placeholder="Qté" value={l.qty} onChange={e => updateLigne(i, 'qty', Number(e.target.value))} className="glass border-border/50 text-xs" />
-                    </div>
-                    <div className="col-span-2">
-                      <Input type="number" placeholder="Prix" value={l.subprice} onChange={e => updateLigne(i, 'subprice', Number(e.target.value))} className="glass border-border/50 text-xs" />
-                    </div>
-                    <div className="col-span-2">
-                      <Input type="number" placeholder="TVA%" value={l.tva_tx} onChange={e => updateLigne(i, 'tva_tx', Number(e.target.value))} className="glass border-border/50 text-xs" />
-                    </div>
-                    <div className="col-span-1">
-                      {lignes.length > 1 && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeLigne(i)}>
-                          <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
-                      )}
+                  <div key={i} className="space-y-2 p-3 rounded-lg bg-accent/10 border border-border/30">
+                    <Select value={l.productId || '__libre__'} onValueChange={(v) => selectProduct(i, v)}>
+                      <SelectTrigger className="glass border-border/50 text-xs">
+                        <SelectValue placeholder="Sélectionner un produit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__libre__">✏️ Ligne libre</SelectItem>
+                        {produits.map(p => (
+                          <SelectItem key={p.id} value={p.id}>
+                            [{p.ref}] — {p.label} ({p.type === 'service' ? 'Service' : 'Produit'})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-5">
+                        <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="glass border-border/50 text-xs" />
+                      </div>
+                      <div className="col-span-2">
+                        <Input type="number" placeholder="Qté" value={l.qty} onChange={e => updateLigne(i, 'qty', Number(e.target.value))} className="glass border-border/50 text-xs" />
+                      </div>
+                      <div className="col-span-2">
+                        <Input type="number" placeholder="Prix HT" value={l.subprice} onChange={e => updateLigne(i, 'subprice', Number(e.target.value))} className="glass border-border/50 text-xs" />
+                      </div>
+                      <div className="col-span-2">
+                        <Input type="number" placeholder="TVA%" value={l.tva_tx} onChange={e => updateLigne(i, 'tva_tx', Number(e.target.value))} className="glass border-border/50 text-xs" />
+                      </div>
+                      <div className="col-span-1">
+                        {lignes.length > 1 && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeLigne(i)}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -185,7 +251,15 @@ export default function Devis() {
                     <td className="py-3 px-2 hidden md:table-cell"><StatusBadge statut={d.statut} /></td>
                     <td className="py-3 px-2"><AcompteBadge montantTTC={d.montantTTC} /></td>
                   </tr>
-                  {expandedId === d.id && <DevisDetail devis={d} />}
+                  {expandedId === d.id && (
+                    <DevisDetail
+                      devis={d}
+                      onConvert={() => convertMutation.mutate(d.id)}
+                      onAcompte={() => acompteMutation.mutate({ socid: d.socid || '', montantTTC: d.montantTTC, devisRef: d.ref })}
+                      convertPending={convertMutation.isPending}
+                      acomptePending={acompteMutation.isPending}
+                    />
+                  )}
                 </Fragment>
               ))}
             </tbody>
