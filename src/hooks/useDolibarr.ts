@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, createIntervention, createDevis, createFacture, type CreateDevisLine } from '@/services/dolibarr';
+import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, createIntervention, createDevis, createFacture, createProduit, convertDevisToFacture, createAcompteFacture, type CreateDevisLine } from '@/services/dolibarr';
 import { toast } from 'sonner';
 
 export function useFactures() {
@@ -55,5 +55,32 @@ export function useCreateFacture() {
     mutationFn: (data: { socid: string; lines: CreateDevisLine[] }) => createFacture(data.socid, data.lines),
     onSuccess: () => { toast.success('Facture créée avec succès'); qc.invalidateQueries({ queryKey: ['factures'] }); },
     onError: (e: any) => toast.error(`Erreur création facture : ${e.message || e}`),
+  });
+}
+
+export function useCreateProduit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { ref: string; label: string; description?: string; price: number; tva_tx: number; type: number }) => createProduit(data),
+    onSuccess: () => { toast.success('Produit créé avec succès'); qc.invalidateQueries({ queryKey: ['produits'] }); },
+    onError: (e: any) => toast.error(`Erreur création produit : ${e.message || e}`),
+  });
+}
+
+export function useConvertDevisToFacture() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (devisId: string) => convertDevisToFacture(devisId),
+    onSuccess: () => { toast.success('Devis converti en facture'); qc.invalidateQueries({ queryKey: ['devis'] }); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur conversion : ${e.message || e}`),
+  });
+}
+
+export function useCreateAcompte() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { socid: string; montantTTC: number; devisRef: string }) => createAcompteFacture(data.socid, data.montantTTC, data.devisRef),
+    onSuccess: () => { toast.success('Facture d\'acompte créée'); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur acompte : ${e.message || e}`),
   });
 }

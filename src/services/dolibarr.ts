@@ -8,6 +8,7 @@ export interface Facture {
   id: string;
   ref: string;
   client: string;
+  socid?: string;
   date: string;
   montantTTC: number;
   statut: 'payée' | 'impayée' | 'en retard';
@@ -24,6 +25,7 @@ export interface Devis {
   id: string;
   ref: string;
   client: string;
+  socid?: string;
   date: string;
   montantTTC: number;
   statut: 'en attente' | 'accepté' | 'refusé';
@@ -36,6 +38,7 @@ export interface Intervention {
   id: string;
   ref: string;
   client: string;
+  socid?: string;
   technicien: string;
   date: string;
   heureDebut: string;
@@ -46,7 +49,9 @@ export interface Intervention {
   noteClient?: string;
   noteTechnicien?: string;
   noteFinChantier?: string;
+  notePrivee?: string;
   signatureBase64?: string;
+  signatureTechnicien?: string;
   photos?: string[];
 }
 
@@ -83,7 +88,6 @@ async function dolibarrCall<T>(endpoint: string, method = 'GET', data?: unknown)
     return result as T;
   } catch (e) {
     console.warn('Dolibarr proxy error:', e);
-    // For mutations, throw so useMutation.onError works
     if (method !== 'GET') throw e;
     return null;
   }
@@ -100,6 +104,25 @@ export function formatDateFR(dateStr: string | undefined | null): string {
 
 function toUnixTimestamp(dateStr: string): number {
   return Math.floor(new Date(dateStr).getTime() / 1000);
+}
+
+// --- Client name resolution cache ---
+
+let clientsCachePromise: Promise<Client[]> | null = null;
+
+async function getClientsCache(): Promise<Client[]> {
+  if (!clientsCachePromise) {
+    clientsCachePromise = fetchClientsRaw();
+    // Expire cache after 60s
+    setTimeout(() => { clientsCachePromise = null; }, 60000);
+  }
+  return clientsCachePromise;
+}
+
+function resolveClientName(socid: string | undefined, clients: Client[], fallback: string): string {
+  if (!socid) return fallback;
+  const c = clients.find(cl => cl.id === String(socid));
+  return c ? c.nom : fallback;
 }
 
 // --- Mock Data ---
@@ -193,30 +216,49 @@ export const mockProduits: Produit[] = [
   { id: '10', ref: 'SRV-008', label: 'Rénovation électrique appartement', description: 'Rénovation complète installation électrique appartement T3', prixHT: 3200, tauxTVA: 10, type: 'service', categorie: 'Rénovation' },
 ];
 
-// --- API Fetch functions (proxy with mock fallback) ---
+// --- Raw fetch (no client resolution) ---
+
+async function fetchClientsRaw(): Promise<Client[]> {
+  const result = await dolibarrCall<any[]>('/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=100');
+  if (!result) return mockClients;
+  return result.map(mapDolibarrClient);
+}
+
+// --- API Fetch functions (proxy with mock fallback + client name resolution) ---
 
 export async function fetchFactures(): Promise<Facture[]> {
   const result = await dolibarrCall<any[]>('/invoices?sortfield=t.rowid&sortorder=DESC&limit=50');
   if (!result) return mockFactures;
-  return result.map(mapDolibarrFacture);
+  const mapped = result.map(mapDolibarrFacture);
+  // Resolve client names
+  try {
+    const clients = await getClientsCache();
+    return mapped.map(f => ({ ...f, client: resolveClientName(f.socid, clients, f.client) }));
+  } catch { return mapped; }
 }
 
 export async function fetchDevis(): Promise<Devis[]> {
   const result = await dolibarrCall<any[]>('/proposals?sortfield=t.rowid&sortorder=DESC&limit=50');
   if (!result) return mockDevis;
-  return result.map(mapDolibarrDevis);
+  const mapped = result.map(mapDolibarrDevis);
+  try {
+    const clients = await getClientsCache();
+    return mapped.map(d => ({ ...d, client: resolveClientName(d.socid, clients, d.client) }));
+  } catch { return mapped; }
 }
 
 export async function fetchInterventions(): Promise<Intervention[]> {
   const result = await dolibarrCall<any[]>('/interventions?sortfield=t.rowid&sortorder=DESC&limit=50');
   if (!result) return mockInterventions;
-  return result.map(mapDolibarrIntervention);
+  const mapped = result.map(mapDolibarrIntervention);
+  try {
+    const clients = await getClientsCache();
+    return mapped.map(i => ({ ...i, client: resolveClientName(i.socid, clients, i.client) }));
+  } catch { return mapped; }
 }
 
 export async function fetchClients(): Promise<Client[]> {
-  const result = await dolibarrCall<any[]>('/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=100');
-  if (!result) return mockClients;
-  return result.map(mapDolibarrClient);
+  return fetchClientsRaw();
 }
 
 export async function fetchProduits(): Promise<Produit[]> {
@@ -242,9 +284,9 @@ export async function createClient(data: { nom: string; adresse?: string; codePo
 
 export async function createIntervention(data: { socid: string; description: string; date: string }): Promise<string> {
   const result = await dolibarrCall<string>('/interventions', 'POST', {
-    fk_soc: data.socid,
+    socid: parseInt(data.socid, 10) || data.socid,
     description: data.description,
-    datei: data.date,
+    datei: toUnixTimestamp(data.date),
   });
   return result || '';
 }
@@ -259,7 +301,7 @@ export interface CreateDevisLine {
 
 export async function createDevis(socid: string, lines: CreateDevisLine[]): Promise<string> {
   const result = await dolibarrCall<string>('/proposals', 'POST', {
-    socid,
+    socid: parseInt(socid, 10) || socid,
     date: toUnixTimestamp(new Date().toISOString()),
     lines,
   });
@@ -268,7 +310,7 @@ export async function createDevis(socid: string, lines: CreateDevisLine[]): Prom
 
 export async function createFacture(socid: string, lines: CreateDevisLine[]): Promise<string> {
   const result = await dolibarrCall<string>('/invoices', 'POST', {
-    socid,
+    socid: parseInt(socid, 10) || socid,
     type: 0,
     date: toUnixTimestamp(new Date().toISOString()),
     lines,
@@ -276,8 +318,41 @@ export async function createFacture(socid: string, lines: CreateDevisLine[]): Pr
   return result || '';
 }
 
+export async function createProduit(data: { ref: string; label: string; description?: string; price: number; tva_tx: number; type: number }): Promise<string> {
+  const result = await dolibarrCall<string>('/products', 'POST', {
+    ref: data.ref,
+    label: data.label,
+    description: data.description || '',
+    price: data.price,
+    tva_tx: data.tva_tx,
+    type: data.type,
+    status: 1,
+    status_buy: 1,
+  });
+  return result || '';
+}
+
 export async function convertDevisToFacture(devisId: string): Promise<string | null> {
   return dolibarrCall<string>(`/proposals/${devisId}/createinvoice`, 'POST');
+}
+
+export async function createAcompteFacture(socid: string, montantTTC: number, devisRef: string): Promise<string> {
+  const tauxAcompte = montantTTC > 5000 ? 0.3 : 0.5;
+  const montantAcompte = Math.round(montantTTC * tauxAcompte * 100) / 100;
+  const montantHT = Math.round(montantAcompte / 1.2 * 100) / 100;
+  const result = await dolibarrCall<string>('/invoices', 'POST', {
+    socid: parseInt(socid, 10) || socid,
+    type: 3, // Acompte
+    date: toUnixTimestamp(new Date().toISOString()),
+    lines: [{
+      desc: `Acompte ${Math.round(tauxAcompte * 100)}% — ${devisRef}`,
+      qty: 1,
+      subprice: montantHT,
+      tva_tx: 20,
+      product_type: 1,
+    }],
+  });
+  return result || '';
 }
 
 export async function testDolibarrConnection(): Promise<boolean> {
@@ -306,6 +381,7 @@ function mapDolibarrFacture(d: any): Facture {
     id: String(d.id),
     ref: d.ref || `FA-${d.id}`,
     client: d.thirdparty?.name || d.nom || d.client_nom || `Client #${d.socid}`,
+    socid: String(d.socid || ''),
     date: parseDolibarrDate(d.date || d.datef || d.date_creation),
     montantTTC: parseFloat(d.total_ttc) || 0,
     statut,
@@ -318,6 +394,7 @@ function mapDolibarrDevis(d: any): Devis {
     id: String(d.id),
     ref: d.ref || `DE-${d.id}`,
     client: d.thirdparty?.name || d.nom || `Client #${d.socid}`,
+    socid: String(d.socid || ''),
     date: parseDolibarrDate(d.date || d.datep || d.date_creation),
     montantTTC: parseFloat(d.total_ttc) || 0,
     statut,
@@ -336,6 +413,7 @@ function mapDolibarrIntervention(d: any): Intervention {
     id: String(d.id),
     ref: d.ref || `INT-${d.id}`,
     client: d.thirdparty?.name || d.nom || `Client #${d.socid}`,
+    socid: String(d.socid || ''),
     technicien: '',
     date: parseDolibarrDate(d.datei || d.dateo || d.date || d.date_creation),
     heureDebut: '08:00',
