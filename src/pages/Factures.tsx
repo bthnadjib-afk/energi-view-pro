@@ -3,7 +3,7 @@ import { Euro, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useFactures, useClients, useProduits, useCreateFacture } from '@/hooks/useDolibarr';
-import { formatDateFR, type Produit } from '@/services/dolibarr';
+import { formatDateFR } from '@/services/dolibarr';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -15,7 +15,7 @@ interface LigneForm {
   subprice: number;
   tva_tx: number;
   product_type: number;
-  productId: string; // '' = ligne libre
+  productId: string;
 }
 
 export default function Factures() {
@@ -110,6 +110,17 @@ export default function Factures() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {!l.productId && (
+                      <Select value={String(l.product_type)} onValueChange={v => updateLigne(i, 'product_type', Number(v))}>
+                        <SelectTrigger className="glass border-border/50 text-xs w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Produit</SelectItem>
+                          <SelectItem value="1">Service</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
                     <div className="grid grid-cols-12 gap-2 items-end">
                       <div className="col-span-5">
                         <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="glass border-border/50 text-xs" />
