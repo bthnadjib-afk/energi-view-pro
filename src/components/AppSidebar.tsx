@@ -1,4 +1,4 @@
-import { LayoutDashboard, FileText, ClipboardList, Wrench, Zap } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardList, Wrench, Zap, Users, Package, Calendar } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation } from 'react-router-dom';
 import {
@@ -11,20 +11,26 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarSeparator,
   useSidebar,
 } from '@/components/ui/sidebar';
 
-const navItems = [
+const mainNav = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard },
   { title: 'Factures', url: '/factures', icon: FileText },
   { title: 'Devis', url: '/devis', icon: ClipboardList },
   { title: 'Interventions', url: '/interventions', icon: Wrench },
 ];
 
+const secondaryNav = [
+  { title: 'Clients', url: '/clients', icon: Users },
+  { title: 'Catalogue', url: '/catalogue', icon: Package },
+  { title: 'Agenda', url: '/agenda', icon: Calendar },
+];
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const location = useLocation();
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50">
@@ -40,15 +46,39 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {mainNav.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
                       end={item.url === '/'}
+                      className="hover:bg-sidebar-accent/50"
+                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                    >
+                      <item.icon className="mr-2 h-4 w-4" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Gestion</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {secondaryNav.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to={item.url}
                       className="hover:bg-sidebar-accent/50"
                       activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                     >

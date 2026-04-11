@@ -9,6 +9,9 @@ import Index from "./pages/Index";
 import Factures from "./pages/Factures";
 import Devis from "./pages/Devis";
 import Interventions from "./pages/Interventions";
+import Clients from "./pages/Clients";
+import Catalogue from "./pages/Catalogue";
+import Agenda from "./pages/Agenda";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +35,9 @@ const App = () => (
                   <Route path="/factures" element={<Factures />} />
                   <Route path="/devis" element={<Devis />} />
                   <Route path="/interventions" element={<Interventions />} />
+                  <Route path="/clients" element={<Clients />} />
+                  <Route path="/catalogue" element={<Catalogue />} />
+                  <Route path="/agenda" element={<Agenda />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>
