@@ -1,6 +1,6 @@
-import { LayoutDashboard, FileText, ClipboardList, Wrench, Zap, Users, Package, Calendar, Settings, UserCog } from 'lucide-react';
+import { LayoutDashboard, FileText, ClipboardList, Wrench, Zap, Users, Package, Calendar, Settings, UserCog, LogOut } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
-import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useAuthContext } from '@/contexts/AuthContext';
 import {
   Sidebar,
   SidebarContent,
@@ -11,9 +11,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarFooter,
   SidebarSeparator,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
 
 const allNav = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard, feature: 'dashboard_ca' },
@@ -36,7 +38,7 @@ const adminNav = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const { canAccess } = useCurrentUser();
+  const { canAccess, signOut, profile } = useAuthContext();
 
   const renderNav = (items: typeof allNav) =>
     items.filter(item => canAccess(item.feature)).map((item) => (
@@ -96,6 +98,21 @@ export function AppSidebar() {
           </>
         )}
       </SidebarContent>
+
+      <SidebarFooter className="p-3">
+        {!collapsed && profile && (
+          <p className="text-xs text-muted-foreground truncate mb-2 px-1">{profile.nom || profile.email}</p>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+          onClick={signOut}
+        >
+          <LogOut className="h-4 w-4" />
+          {!collapsed && <span>Déconnexion</span>}
+        </Button>
+      </SidebarFooter>
     </Sidebar>
   );
 }
