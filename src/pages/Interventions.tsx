@@ -1,49 +1,176 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useInterventions } from '@/hooks/useDolibarr';
-import { techniciens, statutsIntervention } from '@/services/dolibarr';
+import { techniciens, statutsIntervention, typesIntervention, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
+import { SignaturePad } from '@/components/SignaturePad';
+import { Plus, FileText, Receipt, Camera, Clock, ArrowRightLeft } from 'lucide-react';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+const typeLabels: Record<InterventionType, string> = {
+  devis_sur_place: 'Devis sur place',
+  panne: 'Panne',
+  sav: 'SAV',
+  chantier: 'Chantier',
+  realisation: 'Réalisation',
+};
+
+const typeColors: Record<InterventionType, string> = {
+  devis_sur_place: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  panne: 'bg-red-500/20 text-red-400 border-red-500/30',
+  sav: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+  chantier: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  realisation: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+};
 
 export default function Interventions() {
   const { data: interventions = [] } = useInterventions();
   const [techFilter, setTechFilter] = useState('all');
   const [statutFilter, setStatutFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedIntervention, setSelectedIntervention] = useState<Intervention | null>(null);
+
+  // New intervention form
+  const [newTech, setNewTech] = useState('');
+  const [newDate, setNewDate] = useState('');
+  const [newHeureDebut, setNewHeureDebut] = useState('08:00');
+  const [newHeureFin, setNewHeureFin] = useState('10:00');
+  const [newType, setNewType] = useState<InterventionType>('chantier');
+  const [newDescription, setNewDescription] = useState('');
+  const [newClient, setNewClient] = useState('');
+  const [noteClient, setNoteClient] = useState('');
+  const [noteTechnicien, setNoteTechnicien] = useState('');
+
+  // Anti-collision
+  const [collisionOpen, setCollisionOpen] = useState(false);
+  const [collisionInfo, setCollisionInfo] = useState({ technicien: '', creneauExistant: '' });
+
+  // Signature
+  const [signatureData, setSignatureData] = useState<string | null>(null);
 
   const filtered = interventions.filter((i) => {
     if (techFilter !== 'all' && i.technicien !== techFilter) return false;
     if (statutFilter !== 'all' && i.statut !== statutFilter) return false;
+    if (typeFilter !== 'all' && i.type !== typeFilter) return false;
     return true;
   });
 
+  const handleCreate = () => {
+    // Check collision
+    const slots: InterventionSlot[] = interventions.map(i => ({
+      technicien: i.technicien,
+      date: i.date,
+      heureDebut: i.heureDebut,
+      heureFin: i.heureFin,
+      ref: i.ref,
+    }));
+
+    const collision = checkCollision(
+      { technicien: newTech, date: newDate, heureDebut: newHeureDebut, heureFin: newHeureFin },
+      slots
+    );
+
+    if (collision) {
+      setCollisionInfo({
+        technicien: newTech,
+        creneauExistant: `${collision.ref || 'Intervention'} — ${collision.date} de ${collision.heureDebut} à ${collision.heureFin}`,
+      });
+      setCollisionOpen(true);
+      return;
+    }
+
+    toast.success('Intervention créée (mode démo)');
+    setDialogOpen(false);
+  };
+
+  const openDetail = (inter: Intervention) => {
+    setSelectedIntervention(inter);
+    setDetailOpen(true);
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Interventions</h1>
-        <p className="text-muted-foreground text-sm">Planning et suivi des interventions terrain</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Interventions</h1>
+          <p className="text-muted-foreground text-sm">Planning et suivi des interventions terrain</p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 border-0 h-12 px-6 text-base">
+              <Plus className="h-4 w-4" /> Nouvelle intervention
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="glass-strong border-border/50 max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle className="text-foreground">Nouvelle intervention</DialogTitle></DialogHeader>
+            <div className="space-y-4 pt-2">
+              <Input placeholder="Client" value={newClient} onChange={(e) => setNewClient(e.target.value)} className="glass border-border/50" />
+              <Select value={newType} onValueChange={(v) => setNewType(v as InterventionType)}>
+                <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Type" /></SelectTrigger>
+                <SelectContent>
+                  {typesIntervention.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={newTech} onValueChange={setNewTech}>
+                <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Technicien" /></SelectTrigger>
+                <SelectContent>
+                  {techniciens.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="glass border-border/50" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Début</label>
+                  <Input type="time" value={newHeureDebut} onChange={(e) => setNewHeureDebut(e.target.value)} className="glass border-border/50" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Fin</label>
+                  <Input type="time" value={newHeureFin} onChange={(e) => setNewHeureFin(e.target.value)} className="glass border-border/50" />
+                </div>
+              </div>
+              <Input placeholder="Description" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="glass border-border/50" />
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-foreground">📋 Avant l'intervention</h3>
+                <Input placeholder="Note demande client" value={noteClient} onChange={(e) => setNoteClient(e.target.value)} className="glass border-border/50" />
+                <Input placeholder="Instructions technicien" value={noteTechnicien} onChange={(e) => setNoteTechnicien(e.target.value)} className="glass border-border/50" />
+              </div>
+
+              <Button onClick={handleCreate} className="w-full bg-gradient-to-r from-emerald-500 to-green-600 border-0 h-12 text-base">
+                Créer l'intervention
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
         <Select value={techFilter} onValueChange={setTechFilter}>
-          <SelectTrigger className="w-full sm:w-[220px] glass border-border/50">
-            <SelectValue placeholder="Technicien" />
-          </SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[220px] glass border-border/50"><SelectValue placeholder="Technicien" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les techniciens</SelectItem>
-            {techniciens.map((t) => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
-            ))}
+            {techniciens.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
-
         <Select value={statutFilter} onValueChange={setStatutFilter}>
-          <SelectTrigger className="w-full sm:w-[200px] glass border-border/50">
-            <SelectValue placeholder="Statut" />
-          </SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[180px] glass border-border/50"><SelectValue placeholder="Statut" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les statuts</SelectItem>
-            {statutsIntervention.map((s) => (
-              <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
-            ))}
+            {statutsIntervention.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-full sm:w-[180px] glass border-border/50"><SelectValue placeholder="Type" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les types</SelectItem>
+            {typesIntervention.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -56,23 +183,42 @@ export default function Interventions() {
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Réf.</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Client</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Technicien</th>
-                <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden md:table-cell">Description</th>
+                <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden md:table-cell">Type</th>
+                <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden lg:table-cell">Horaire</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Date</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Statut</th>
+                <th className="text-left py-3 px-2 text-muted-foreground font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">Aucune intervention trouvée</td></tr>
+                <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">Aucune intervention trouvée</td></tr>
               ) : (
                 filtered.map((i) => (
-                  <tr key={i.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors">
+                  <tr key={i.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors cursor-pointer" onClick={() => openDetail(i)}>
                     <td className="py-3 px-2 font-mono text-xs text-foreground">{i.ref}</td>
                     <td className="py-3 px-2 text-foreground">{i.client}</td>
                     <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{i.technicien}</td>
-                    <td className="py-3 px-2 text-muted-foreground hidden md:table-cell text-xs">{i.description}</td>
+                    <td className="py-3 px-2 hidden md:table-cell">
+                      <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs', typeColors[i.type] || 'bg-muted text-muted-foreground')}>
+                        {typeLabels[i.type] || i.type}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 text-muted-foreground hidden lg:table-cell text-xs">
+                      <Clock className="inline h-3 w-3 mr-1" />{i.heureDebut}–{i.heureFin}
+                    </td>
                     <td className="py-3 px-2 text-muted-foreground">{new Date(i.date).toLocaleDateString('fr-FR')}</td>
                     <td className="py-3 px-2"><StatusBadge statut={i.statut} /></td>
+                    <td className="py-3 px-2">
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis">
+                          <FileText className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Facture">
+                          <Receipt className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -80,6 +226,74 @@ export default function Interventions() {
           </table>
         </div>
       </div>
+
+      {/* Detail dialog */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="glass-strong border-border/50 max-w-2xl max-h-[90vh] overflow-y-auto">
+          {selectedIntervention && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-foreground flex items-center gap-2">
+                  {selectedIntervention.ref}
+                  <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs ml-2', typeColors[selectedIntervention.type])}>
+                    {typeLabels[selectedIntervention.type]}
+                  </span>
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6 pt-2">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div><span className="text-muted-foreground">Client :</span> <span className="text-foreground ml-1">{selectedIntervention.client}</span></div>
+                  <div><span className="text-muted-foreground">Technicien :</span> <span className="text-foreground ml-1">{selectedIntervention.technicien}</span></div>
+                  <div><span className="text-muted-foreground">Date :</span> <span className="text-foreground ml-1">{new Date(selectedIntervention.date).toLocaleDateString('fr-FR')}</span></div>
+                  <div><span className="text-muted-foreground">Horaire :</span> <span className="text-foreground ml-1">{selectedIntervention.heureDebut} – {selectedIntervention.heureFin}</span></div>
+                </div>
+                <div className="text-sm"><span className="text-muted-foreground">Description :</span> <span className="text-foreground ml-1">{selectedIntervention.description}</span></div>
+
+                {/* Section Pendant */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground">📸 Pendant l'intervention</h3>
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer glass rounded-lg px-4 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                      <Camera className="h-4 w-4" /> Ajouter une photo depuis le mobile
+                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={() => toast.success('Photo ajoutée (mode démo)')} />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Section Après */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground">✅ Fin d'intervention</h3>
+                  <Input placeholder="Note de fin de chantier..." className="glass border-border/50" />
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Signature du client</p>
+                    <SignaturePad onSave={(data) => { setSignatureData(data); toast.success('Signature enregistrée'); }} />
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex flex-wrap gap-3 pt-2">
+                  <Button className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 px-6 text-base">
+                    <ArrowRightLeft className="h-4 w-4" /> Transformer en Devis
+                  </Button>
+                  <Button className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0 h-12 px-6 text-base">
+                    <Receipt className="h-4 w-4" /> Transformer en Facture
+                  </Button>
+                  <Button variant="outline" className="gap-2 glass border-border/50 h-12 px-6 text-base">
+                    <FileText className="h-4 w-4" /> Générer Bon d'Intervention
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <CollisionAlert
+        open={collisionOpen}
+        onClose={() => setCollisionOpen(false)}
+        technicien={collisionInfo.technicien}
+        creneauExistant={collisionInfo.creneauExistant}
+      />
     </div>
   );
 }
