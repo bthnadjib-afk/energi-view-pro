@@ -242,6 +242,19 @@ export async function testDolibarrConnection(): Promise<boolean> {
   return result !== null;
 }
 
+// --- Helpers ---
+
+function parseDolibarrDate(val: any): string {
+  if (!val) return '';
+  const num = Number(val);
+  if (!isNaN(num) && num > 1000000000) {
+    return new Date(num * 1000).toISOString().slice(0, 10);
+  }
+  // Already a date string
+  if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)) return val.slice(0, 10);
+  return '';
+}
+
 // --- Mapping Dolibarr → App types ---
 
 function mapDolibarrFacture(d: any): Facture {
