@@ -276,8 +276,8 @@ function mapDolibarrDevis(d: any): Devis {
   return {
     id: String(d.id),
     ref: d.ref || `DE-${d.id}`,
-    client: d.thirdparty?.name || d.socid || '',
-    date: parseDolibarrDate(d.date),
+    client: d.thirdparty?.name || d.nom || `Client #${d.socid}`,
+    date: parseDolibarrDate(d.date || d.datep || d.date_creation),
     montantTTC: parseFloat(d.total_ttc) || 0,
     statut,
     lignes: (d.lines || []).map((l: any) => ({
@@ -294,9 +294,9 @@ function mapDolibarrIntervention(d: any): Intervention {
   return {
     id: String(d.id),
     ref: d.ref || `INT-${d.id}`,
-    client: d.thirdparty?.name || d.socid || '',
+    client: d.thirdparty?.name || d.nom || `Client #${d.socid}`,
     technicien: '',
-    date: parseDolibarrDate(d.datei || d.date),
+    date: parseDolibarrDate(d.datei || d.dateo || d.date || d.date_creation),
     heureDebut: '08:00',
     heureFin: '10:00',
     statut: statutMap[String(d.fk_statut)] || 'planifié',
