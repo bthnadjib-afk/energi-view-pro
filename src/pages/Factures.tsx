@@ -1,14 +1,18 @@
 import { useState, useMemo } from 'react';
-import { Euro, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture } from '@/hooks/useDolibarr';
-import { formatDateFR } from '@/services/dolibarr';
+import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture } from '@/hooks/useDolibarr';
+import { formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendFactureByEmail } from '@/services/dolibarr';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface LigneForm {
   desc: string;
@@ -25,7 +29,15 @@ export default function Factures() {
   const { data: produits = [] } = useProduits();
   const createFactureMutation = useCreateFacture();
   const deleteFactureMutation = useDeleteFacture();
+  const validateFactureMutation = useValidateFacture();
+  const { user } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedFacture, setSelectedFacture] = useState<any>(null);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailDest, setEmailDest] = useState('');
+  const [emailObjet, setEmailObjet] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [socid, setSocid] = useState('');
   const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '' }]);
 
@@ -204,14 +216,14 @@ export default function Factures() {
             </thead>
             <tbody>
               {factures.map((f) => (
-                <tr key={f.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors">
+                <tr key={f.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors cursor-pointer" onClick={() => setSelectedFacture(f)}>
                   <td className="py-3 px-2 font-mono text-xs text-foreground">{f.ref}</td>
                   <td className="py-3 px-2 text-foreground">{f.client}</td>
                   <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(f.date)}</td>
                   <td className="py-3 px-2 text-right font-medium text-foreground">{f.montantTTC.toLocaleString('fr-FR')} €</td>
                   <td className="py-3 px-2"><StatusBadge statut={f.statut} /></td>
-                  <td className="py-3 px-2">
-                    {f.statut !== 'payée' && (
+                  <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
+                    {(f.statut === 'brouillon' || f.statut !== 'payée') && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-7 w-7">
@@ -237,6 +249,109 @@ export default function Factures() {
           </table>
         </div>
       </div>
+
+      {/* Facture detail dialog */}
+      <Dialog open={!!selectedFacture} onOpenChange={(open) => { if (!open) setSelectedFacture(null); }}>
+        <DialogContent className="glass-strong border-border/50 max-w-lg">
+          {selectedFacture && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-foreground">{selectedFacture.ref}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div><span className="text-muted-foreground">Client :</span> <span className="text-foreground ml-1">{selectedFacture.client}</span></div>
+                  <div><span className="text-muted-foreground">Date :</span> <span className="text-foreground ml-1">{formatDateFR(selectedFacture.date)}</span></div>
+                  <div><span className="text-muted-foreground">Montant HT :</span> <span className="text-foreground ml-1">{selectedFacture.montantHT.toLocaleString('fr-FR')} €</span></div>
+                  <div><span className="text-muted-foreground">Montant TTC :</span> <span className="text-foreground ml-1 font-bold">{selectedFacture.montantTTC.toLocaleString('fr-FR')} €</span></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Statut :</span>
+                  <StatusBadge statut={selectedFacture.statut} />
+                </div>
+                <div className="flex flex-wrap gap-3 pt-2">
+                  {selectedFacture.statut === 'brouillon' && (
+                    <Button
+                      onClick={() => validateFactureMutation.mutate(selectedFacture.id, { onSuccess: () => setSelectedFacture(null) })}
+                      disabled={validateFactureMutation.isPending}
+                      className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0"
+                    >
+                      <FileCheck className="h-4 w-4" />
+                      {validateFactureMutation.isPending ? 'Validation...' : 'Valider la facture'}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    className="gap-2 glass border-border/50"
+                    onClick={async () => {
+                      const url = await generatePDF('facture', selectedFacture.id, selectedFacture.ref, 'crabe');
+                      if (url) { openPDFInNewTab(url, `${selectedFacture.ref}.pdf`); toast.success('PDF téléchargé'); }
+                      else toast.error('Erreur PDF');
+                    }}
+                  >
+                    <FileDown className="h-4 w-4" /> Voir le PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="gap-2 glass border-border/50"
+                    onClick={() => { setEmailDest(''); setEmailObjet(`Facture ${selectedFacture.ref}`); setEmailMessage(''); setEmailOpen(true); }}
+                  >
+                    <Send className="h-4 w-4" /> Envoyer par email
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Email dialog for factures */}
+      <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+        <DialogContent className="glass-strong border-border/50 max-w-lg">
+          <DialogHeader><DialogTitle className="text-foreground">Envoyer la facture par email</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Destinataire</label>
+              <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} className="glass border-border/50" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Objet</label>
+              <Input value={emailObjet} onChange={e => setEmailObjet(e.target.value)} className="glass border-border/50" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Message</label>
+              <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="glass border-border/50 min-h-[120px]" />
+            </div>
+            <Button
+              onClick={async () => {
+                if (!selectedFacture || !emailDest) return;
+                setSendingEmail(true);
+                try {
+                  await generatePDF('facture', selectedFacture.id, selectedFacture.ref, 'crabe');
+                  await sendFactureByEmail(selectedFacture.id, emailDest, emailObjet, emailMessage);
+                  await supabase.from('email_history').insert({
+                    user_id: user?.id || '',
+                    client_id: selectedFacture.socid || '',
+                    document_ref: selectedFacture.ref,
+                    destinataire: emailDest,
+                    objet: emailObjet,
+                    message: emailMessage,
+                  });
+                  toast.success('Facture envoyée par email');
+                } catch {
+                  toast.warning('Email enregistré localement — l\'envoi a échoué');
+                }
+                setSendingEmail(false);
+                setEmailOpen(false);
+              }}
+              disabled={sendingEmail || !emailDest}
+              className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0"
+            >
+              {sendingEmail ? 'Envoi...' : 'Envoyer'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
