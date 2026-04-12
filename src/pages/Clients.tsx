@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { useClients, useCreateClient, useDevis, useInterventions } from '@/hooks/useDolibarr';
-import { UserPlus, Search, Mail, History } from 'lucide-react';
+import { useClients, useCreateClient, useDeleteClient, useDevis, useInterventions } from '@/hooks/useDolibarr';
+import { UserPlus, Search, Mail, History, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { StatusBadge } from '@/components/StatusBadge';
+import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDateFR, type Client } from '@/services/dolibarr';
@@ -32,6 +34,7 @@ export default function Clients() {
   const { data: allDevis = [] } = useDevis();
   const { data: allInterventions = [] } = useInterventions();
   const createClientMutation = useCreateClient();
+  const deleteClientMutation = useDeleteClient();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailClient, setDetailClient] = useState<Client | null>(null);
@@ -69,7 +72,7 @@ export default function Clients() {
       date: d.date,
       type: 'devis' as const,
       ref: d.ref,
-      label: `Devis — ${d.montantTTC.toLocaleString('fr-FR')} €`,
+      label: `Devis — ${d.montantHT.toLocaleString('fr-FR')} € HT`,
       statut: d.statut,
     })),
     ...allInterventions.filter(i => i.socid === detailClient.id).map(i => ({
@@ -98,7 +101,7 @@ export default function Clients() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Clients</h1>
-          <p className="text-muted-foreground text-sm">Répertoire clients — endpoint /thirdparties</p>
+          <p className="text-muted-foreground text-sm">Répertoire clients</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -113,7 +116,15 @@ export default function Clients() {
             </DialogHeader>
             <div className="space-y-4 pt-2">
               <Input placeholder="Nom du client *" value={nom} onChange={e => setNom(e.target.value)} className="glass border-border/50" />
-              <Input placeholder="Adresse" value={adresse} onChange={e => setAdresse(e.target.value)} className="glass border-border/50" />
+              <AddressAutocomplete
+                value={adresse}
+                onSelect={({ rue, codePostal: cp, ville: v }) => {
+                  setAdresse(rue);
+                  setCodePostal(cp);
+                  setVille(v);
+                }}
+                placeholder="Adresse (autocomplétion)"
+              />
               <div className="grid grid-cols-2 gap-3">
                 <Input placeholder="Code postal" value={codePostal} onChange={e => setCodePostal(e.target.value)} className="glass border-border/50" />
                 <Input placeholder="Ville" value={ville} onChange={e => setVille(e.target.value)} className="glass border-border/50" />
@@ -152,6 +163,7 @@ export default function Clients() {
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden md:table-cell">Téléphone</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden lg:table-cell">Email</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Projets</th>
+                <th className="text-left py-3 px-2 text-muted-foreground font-medium w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -170,6 +182,25 @@ export default function Clients() {
                     )}>
                       {c.projetsEnCours} en cours
                     </span>
+                  </td>
+                  <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Supprimer ce client ?</AlertDialogTitle>
+                          <AlertDialogDescription>Le client "{c.nom}" sera définitivement supprimé de Dolibarr.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteClientMutation.mutate(c.id)} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </td>
                 </tr>
               ))}

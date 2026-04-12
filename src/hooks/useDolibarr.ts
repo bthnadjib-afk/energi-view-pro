@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, createIntervention, createDevis, createFacture, createProduit, convertDevisToFacture, createAcompteFacture, updateDevis, validateDevis, closeDevis, createDolibarrUser, type CreateDevisLine } from '@/services/dolibarr';
+import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, deleteClient, createIntervention, createDevis, createFacture, createProduit, convertDevisToFacture, createAcompteFacture, updateDevis, validateDevis, closeDevis, deleteDevis, deleteFacture, deleteProduit, createDolibarrUser, type CreateDevisLine } from '@/services/dolibarr';
 import { toast } from 'sonner';
 
 export function useFactures() {
@@ -28,6 +28,15 @@ export function useCreateClient() {
     mutationFn: (data: { nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }) => createClient(data),
     onSuccess: () => { toast.success('Client créé avec succès'); qc.invalidateQueries({ queryKey: ['clients'] }); },
     onError: (e: any) => toast.error(`Erreur création client : ${e.message || e}`),
+  });
+}
+
+export function useDeleteClient() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteClient(id),
+    onSuccess: () => { toast.success('Client supprimé'); qc.invalidateQueries({ queryKey: ['clients'] }); },
+    onError: (e: any) => toast.error(`Erreur suppression client : ${e.message || e}`),
   });
 }
 
@@ -62,8 +71,17 @@ export function useCreateProduit() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: { ref: string; label: string; description?: string; price: number; tva_tx: number; type: number }) => createProduit(data),
-    onSuccess: () => { toast.success('Produit créé avec succès'); qc.invalidateQueries({ queryKey: ['produits'] }); },
-    onError: (e: any) => toast.error(`Erreur création produit : ${e.message || e}`),
+    onSuccess: () => { toast.success('Article créé avec succès'); qc.invalidateQueries({ queryKey: ['produits'] }); },
+    onError: (e: any) => toast.error(`Erreur création article : ${e.message || e}`),
+  });
+}
+
+export function useDeleteProduit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteProduit(id),
+    onSuccess: () => { toast.success('Article supprimé'); qc.invalidateQueries({ queryKey: ['produits'] }); },
+    onError: (e: any) => toast.error(`Erreur suppression : ${e.message || e}`),
   });
 }
 
@@ -79,7 +97,7 @@ export function useConvertDevisToFacture() {
 export function useCreateAcompte() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { socid: string; montantTTC: number; devisRef: string }) => createAcompteFacture(data.socid, data.montantTTC, data.devisRef),
+    mutationFn: (data: { socid: string; montantHT: number; devisRef: string }) => createAcompteFacture(data.socid, data.montantHT, data.devisRef),
     onSuccess: () => { toast.success('Facture d\'acompte créée'); qc.invalidateQueries({ queryKey: ['factures'] }); },
     onError: (e: any) => toast.error(`Erreur acompte : ${e.message || e}`),
   });
@@ -112,6 +130,24 @@ export function useCloseDevis() {
       qc.invalidateQueries({ queryKey: ['devis'] });
     },
     onError: (e: any) => toast.error(`Erreur changement statut : ${e.message || e}`),
+  });
+}
+
+export function useDeleteDevis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteDevis(id),
+    onSuccess: () => { toast.success('Devis supprimé'); qc.invalidateQueries({ queryKey: ['devis'] }); },
+    onError: (e: any) => toast.error(`Erreur suppression devis : ${e.message || e}`),
+  });
+}
+
+export function useDeleteFacture() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteFacture(id),
+    onSuccess: () => { toast.success('Facture supprimée'); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur suppression facture : ${e.message || e}`),
   });
 }
 

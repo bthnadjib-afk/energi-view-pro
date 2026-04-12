@@ -1,14 +1,15 @@
 import { useState, Fragment, useEffect, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis } from '@/hooks/useDolibarr';
-import { getAcompteBadge, formatDateFR, replaceEmailVariables, type Devis as DevisType } from '@/services/dolibarr';
+import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis } from '@/hooks/useDolibarr';
+import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, type Devis as DevisType } from '@/services/dolibarr';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { SignaturePad } from '@/components/SignaturePad';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,10 +22,11 @@ interface LigneForm {
   tva_tx: number;
   product_type: number;
   productId: string;
+  prixAchat: number;
 }
 
-function AcompteBadge({ montantTTC }: { montantTTC: number }) {
-  const { label, variant } = getAcompteBadge(montantTTC);
+function AcompteBadge({ montantHT }: { montantHT: number }) {
+  const { label, variant } = getAcompteBadge(montantHT);
   return (
     <span className={cn(
       'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
@@ -47,6 +49,7 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
 }) {
   const validateMutation = useValidateDevis();
   const closeMutation = useCloseDevis();
+  const deleteMutation = useDeleteDevis();
   const { user } = useAuth();
 
   const [showSignature, setShowSignature] = useState(false);
@@ -56,8 +59,22 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
   const [emailMessage, setEmailMessage] = useState('');
   const [emailTemplates, setEmailTemplates] = useState<{ id: string; nom: string; objet: string; corps: string }[]>([]);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   const client = clients.find(c => c.id === devis.socid);
+
+  // Margin calculations
+  const margeData = devis.lignes.map(l => {
+    const venteHT = l.totalHT;
+    const achatHT = (l.prixAchat || 0) * l.quantite;
+    const margeBrute = venteHT - achatHT;
+    const pctMarge = venteHT > 0 ? (margeBrute / venteHT) * 100 : 0;
+    return { margeBrute, pctMarge };
+  });
+  const totalVenteHT = devis.lignes.reduce((s, l) => s + l.totalHT, 0);
+  const totalAchatHT = devis.lignes.reduce((s, l) => s + (l.prixAchat || 0) * l.quantite, 0);
+  const totalMarge = totalVenteHT - totalAchatHT;
+  const totalPctMarge = totalVenteHT > 0 ? (totalMarge / totalVenteHT) * 100 : 0;
 
   useEffect(() => {
     if (emailOpen) {
@@ -74,7 +91,7 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
     const vars: Record<string, string> = {
       NOM_CLIENT: client?.nom || devis.client,
       REF_DEVIS: devis.ref,
-      MONTANT_TTC: `${devis.montantTTC.toLocaleString('fr-FR')} €`,
+      MONTANT_HT: `${devis.montantHT.toLocaleString('fr-FR')} €`,
       NOM_ENTREPRISE: 'Notre entreprise',
     };
     setEmailObjet(replaceEmailVariables(tmpl.objet, vars));
@@ -109,18 +126,31 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
     setShowSignature(false);
   };
 
+  const handleViewPDF = async () => {
+    setGeneratingPDF(true);
+    try {
+      await generatePDF('proposals', devis.id);
+      toast.success(`PDF du devis ${devis.ref} généré`);
+    } catch {
+      toast.error('Erreur lors de la génération du PDF');
+    }
+    setGeneratingPDF(false);
+  };
+
   return (
     <tr>
       <td colSpan={7} className="p-0">
         <div className="bg-accent/20 p-4 mx-2 mb-2 rounded-lg space-y-4">
-          <p className="text-xs font-medium text-muted-foreground mb-2">Détail des lignes</p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Détail des lignes (HT)</p>
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-border/30">
                 <th className="text-left py-2 px-1 text-muted-foreground">Désignation</th>
                 <th className="text-right py-2 px-1 text-muted-foreground">Qté</th>
-                <th className="text-right py-2 px-1 text-muted-foreground">Prix Unit.</th>
+                <th className="text-right py-2 px-1 text-muted-foreground">Prix Unit. HT</th>
                 <th className="text-right py-2 px-1 text-muted-foreground">Total HT</th>
+                <th className="text-right py-2 px-1 text-muted-foreground">Marge</th>
+                <th className="text-right py-2 px-1 text-muted-foreground">%</th>
               </tr>
             </thead>
             <tbody>
@@ -130,22 +160,49 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
                   <td className="py-2 px-1 text-right text-muted-foreground">{l.quantite}</td>
                   <td className="py-2 px-1 text-right text-muted-foreground">{l.prixUnitaire.toLocaleString('fr-FR')} €</td>
                   <td className="py-2 px-1 text-right font-medium text-foreground">{l.totalHT.toLocaleString('fr-FR')} €</td>
+                  <td className="py-2 px-1 text-right text-emerald-400">{margeData[i].margeBrute.toLocaleString('fr-FR')} €</td>
+                  <td className="py-2 px-1 text-right text-emerald-400">{margeData[i].pctMarge.toFixed(0)}%</td>
                 </tr>
               ))}
+              <tr className="border-t-2 border-border/50 font-bold">
+                <td colSpan={3} className="py-2 px-1 text-foreground">TOTAL</td>
+                <td className="py-2 px-1 text-right text-foreground">{totalVenteHT.toLocaleString('fr-FR')} €</td>
+                <td className="py-2 px-1 text-right text-emerald-400">{totalMarge.toLocaleString('fr-FR')} €</td>
+                <td className="py-2 px-1 text-right text-emerald-400">{totalPctMarge.toFixed(0)}%</td>
+              </tr>
             </tbody>
           </table>
 
           {/* Status action buttons */}
           <div className="flex flex-wrap gap-3 pt-3 border-t border-border/30">
             {devis.statut === 'brouillon' && (
-              <Button
-                onClick={() => validateMutation.mutate(devis.id)}
-                disabled={validateMutation.isPending}
-                className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0"
-              >
-                <FileCheck className="h-4 w-4" />
-                {validateMutation.isPending ? 'Validation...' : 'Valider le devis'}
-              </Button>
+              <>
+                <Button
+                  onClick={() => validateMutation.mutate(devis.id)}
+                  disabled={validateMutation.isPending}
+                  className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0"
+                >
+                  <FileCheck className="h-4 w-4" />
+                  {validateMutation.isPending ? 'Validation...' : 'Valider le devis'}
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" className="gap-2 glass border-red-500/30 text-red-400">
+                      <Trash2 className="h-4 w-4" /> Supprimer
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Supprimer ce devis ?</AlertDialogTitle>
+                      <AlertDialogDescription>Le devis {devis.ref} sera définitivement supprimé.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => deleteMutation.mutate(devis.id)} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
             )}
 
             {devis.statut === 'en attente' && (
@@ -182,6 +239,10 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
                 </Button>
               </>
             )}
+
+            <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2 glass border-border/50">
+              <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
+            </Button>
 
             <Button onClick={() => setEmailOpen(true)} variant="outline" className="gap-2 glass border-border/50">
               <Send className="h-4 w-4" /> Envoyer par email
@@ -245,9 +306,9 @@ export default function Devis() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [socid, setSocid] = useState('');
-  const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '' }]);
+  const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 0, product_type: 0, productId: '', prixAchat: 0 }]);
 
-  const emptyLigne = (): LigneForm => ({ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '' });
+  const emptyLigne = (): LigneForm => ({ desc: '', qty: 1, subprice: 0, tva_tx: 0, product_type: 0, productId: '', prixAchat: 0 });
   const addLigne = () => setLignes([...lignes, emptyLigne()]);
   const removeLigne = (i: number) => setLignes(lignes.filter((_, idx) => idx !== i));
 
@@ -258,7 +319,15 @@ export default function Devis() {
     } else {
       const p = produits.find(pr => pr.id === productId);
       if (p) {
-        updated[i] = { ...updated[i], productId, desc: `[${p.ref}] ${p.label}`, subprice: p.prixHT, tva_tx: p.tauxTVA, product_type: p.type === 'service' ? 1 : 0 };
+        updated[i] = {
+          ...updated[i],
+          productId,
+          desc: `[${p.ref}] ${p.label}`,
+          subprice: p.prixHT,
+          tva_tx: 0,
+          product_type: p.type === 'main_oeuvre' ? 1 : 0,
+          prixAchat: p.prixAchat || 0,
+        };
       }
     }
     setLignes(updated);
@@ -270,18 +339,20 @@ export default function Devis() {
     setLignes(updated);
   };
 
-  // Real-time totals
+  // Real-time totals (HT only, no TVA)
   const totals = useMemo(() => {
     const ht = lignes.reduce((s, l) => s + l.qty * l.subprice, 0);
-    const tva = lignes.reduce((s, l) => s + l.qty * l.subprice * l.tva_tx / 100, 0);
-    return { ht, tva, ttc: ht + tva };
+    const achat = lignes.reduce((s, l) => s + l.qty * l.prixAchat, 0);
+    const marge = ht - achat;
+    const pctMarge = ht > 0 ? (marge / ht) * 100 : 0;
+    return { ht, marge, pctMarge };
   }, [lignes]);
 
   const handleCreate = async () => {
     if (!socid || lignes.length === 0 || !lignes[0].desc) return;
     await createDevisMutation.mutateAsync({
       socid,
-      lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type })),
+      lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: 0, product_type: l.product_type })),
     });
     setDialogOpen(false);
     setSocid('');
@@ -293,7 +364,7 @@ export default function Devis() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Devis</h1>
-          <p className="text-muted-foreground text-sm">Propositions commerciales et règle d'acompte</p>
+          <p className="text-muted-foreground text-sm">Propositions commerciales HT — TVA sur facture finale uniquement</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -302,7 +373,7 @@ export default function Devis() {
             </Button>
           </DialogTrigger>
           <DialogContent className="glass-strong border-border/50 max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle className="text-foreground">Nouveau devis</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-foreground">Nouveau devis (HT)</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
               <Select value={socid} onValueChange={setSocid}>
                 <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
@@ -322,13 +393,13 @@ export default function Devis() {
                   <div key={i} className="space-y-2 p-3 rounded-lg bg-accent/10 border border-border/30">
                     <Select value={l.productId || '__libre__'} onValueChange={(v) => selectProduct(i, v)}>
                       <SelectTrigger className="glass border-border/50 text-xs">
-                        <SelectValue placeholder="Sélectionner un produit" />
+                        <SelectValue placeholder="Sélectionner un article" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__libre__">✏️ Ligne libre</SelectItem>
                         {produits.map(p => (
                           <SelectItem key={p.id} value={p.id}>
-                            [{p.ref}] — {p.label} ({p.type === 'service' ? 'Service' : 'Produit'})
+                            [{p.ref}] — {p.label} ({p.type === 'main_oeuvre' ? "Main d'œuvre" : 'Fourniture'})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -339,23 +410,20 @@ export default function Devis() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="0">Produit</SelectItem>
-                          <SelectItem value="1">Service</SelectItem>
+                          <SelectItem value="0">Fourniture</SelectItem>
+                          <SelectItem value="1">Main d'œuvre</SelectItem>
                         </SelectContent>
                       </Select>
                     )}
                     <div className="grid grid-cols-12 gap-2 items-end">
-                      <div className="col-span-5">
+                      <div className="col-span-6">
                         <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="glass border-border/50 text-xs" />
                       </div>
                       <div className="col-span-2">
                         <Input type="number" placeholder="Qté" value={l.qty} onChange={e => updateLigne(i, 'qty', Number(e.target.value))} className="glass border-border/50 text-xs" />
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-3">
                         <Input type="number" placeholder="Prix HT" value={l.subprice} onChange={e => updateLigne(i, 'subprice', Number(e.target.value))} className="glass border-border/50 text-xs" />
-                      </div>
-                      <div className="col-span-2">
-                        <Input type="number" placeholder="TVA%" value={l.tva_tx} onChange={e => updateLigne(i, 'tva_tx', Number(e.target.value))} className="glass border-border/50 text-xs" />
                       </div>
                       <div className="col-span-1">
                         {lignes.length > 1 && (
@@ -369,19 +437,15 @@ export default function Devis() {
                 ))}
               </div>
 
-              {/* Real-time totals */}
+              {/* Real-time totals HT */}
               <div className="rounded-lg bg-accent/20 border border-border/30 p-4 space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total HT</span>
-                  <span className="text-foreground font-medium">{totals.ht.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                <div className="flex justify-between text-sm font-bold">
+                  <span className="text-foreground">Total HT</span>
+                  <span className="text-primary">{totals.ht.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">TVA</span>
-                  <span className="text-foreground">{totals.tva.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
-                </div>
-                <div className="flex justify-between text-sm font-bold border-t border-border/30 pt-1">
-                  <span className="text-foreground">Total TTC</span>
-                  <span className="text-primary">{totals.ttc.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                <div className="flex justify-between text-xs">
+                  <span className="text-emerald-400">Marge brute</span>
+                  <span className="text-emerald-400">{totals.marge.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € ({totals.pctMarge.toFixed(0)}%)</span>
                 </div>
               </div>
 
@@ -406,7 +470,7 @@ export default function Devis() {
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Référence</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Client</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Date</th>
-                <th className="text-right py-3 px-2 text-muted-foreground font-medium">Montant TTC</th>
+                <th className="text-right py-3 px-2 text-muted-foreground font-medium">Montant HT</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden md:table-cell">Statut</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Acompte</th>
               </tr>
@@ -424,16 +488,16 @@ export default function Devis() {
                     <td className="py-3 px-2 font-mono text-xs text-foreground">{d.ref}</td>
                     <td className="py-3 px-2 text-foreground">{d.client}</td>
                     <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(d.date)}</td>
-                    <td className="py-3 px-2 text-right font-medium text-foreground">{d.montantTTC.toLocaleString('fr-FR')} €</td>
+                    <td className="py-3 px-2 text-right font-medium text-foreground">{d.montantHT.toLocaleString('fr-FR')} €</td>
                     <td className="py-3 px-2 hidden md:table-cell"><StatusBadge statut={d.statut} /></td>
-                    <td className="py-3 px-2"><AcompteBadge montantTTC={d.montantTTC} /></td>
+                    <td className="py-3 px-2"><AcompteBadge montantHT={d.montantHT} /></td>
                   </tr>
                   {expandedId === d.id && (
                     <DevisDetail
                       devis={d}
                       clients={clients}
                       onConvert={() => convertMutation.mutate(d.id)}
-                      onAcompte={() => acompteMutation.mutate({ socid: d.socid || '', montantTTC: d.montantTTC, devisRef: d.ref })}
+                      onAcompte={() => acompteMutation.mutate({ socid: d.socid || '', montantHT: d.montantHT, devisRef: d.ref })}
                       convertPending={convertMutation.isPending}
                       acomptePending={acompteMutation.isPending}
                     />
