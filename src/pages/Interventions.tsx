@@ -431,6 +431,36 @@ export default function Interventions() {
 
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-3 pt-2">
+                  {selectedIntervention.statut === 'brouillon' && (
+                    <>
+                      <Button
+                        onClick={() => validateMutation.mutate(selectedIntervention.id)}
+                        disabled={validateMutation.isPending}
+                        className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 px-6 text-base"
+                      >
+                        <FileCheck className="h-4 w-4" />
+                        {validateMutation.isPending ? 'Validation...' : 'Valider'}
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" className="gap-2 glass border-red-500/30 text-red-400 h-12 px-6 text-base">
+                            <Trash2 className="h-4 w-4" /> Supprimer
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Supprimer cette intervention ?</AlertDialogTitle>
+                            <AlertDialogDescription>L'intervention {selectedIntervention.ref} sera définitivement supprimée.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => { deleteMutation.mutate(selectedIntervention.id); setDetailOpen(false); }} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  )}
+
                   {selectedIntervention.statut === 'terminé' && (
                     <Button
                       onClick={handleTransformFacture}
@@ -454,7 +484,34 @@ export default function Interventions() {
                   <Button onClick={handleViewPDF} variant="outline" className="gap-2 glass border-border/50 h-12 px-6 text-base">
                     <FileDown className="h-4 w-4" /> Voir le PDF
                   </Button>
+                  <Button onClick={() => { setEmailDest(''); setEmailObjet(`Bon d'intervention ${selectedIntervention.ref}`); setEmailMessage(''); setEmailOpen(true); }} variant="outline" className="gap-2 glass border-border/50 h-12 px-6 text-base">
+                    <Send className="h-4 w-4" /> Envoyer par email
+                  </Button>
                 </div>
+
+                {/* Email dialog */}
+                <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+                  <DialogContent className="glass-strong border-border/50 max-w-lg">
+                    <DialogHeader><DialogTitle className="text-foreground">Envoyer par email</DialogTitle></DialogHeader>
+                    <div className="space-y-4 pt-2">
+                      <div className="space-y-2">
+                        <label className="text-sm text-muted-foreground">Destinataire</label>
+                        <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} className="glass border-border/50" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm text-muted-foreground">Objet</label>
+                        <Input value={emailObjet} onChange={e => setEmailObjet(e.target.value)} className="glass border-border/50" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm text-muted-foreground">Message</label>
+                        <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="glass border-border/50 min-h-[120px]" />
+                      </div>
+                      <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest} className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
+                        {sendingEmail ? 'Envoi...' : 'Envoyer'}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </>
           )}
