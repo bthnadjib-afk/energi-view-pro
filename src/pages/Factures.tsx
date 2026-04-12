@@ -11,8 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 
 interface LigneForm {
   desc: string;
@@ -30,7 +28,6 @@ export default function Factures() {
   const createFactureMutation = useCreateFacture();
   const deleteFactureMutation = useDeleteFacture();
   const validateFactureMutation = useValidateFacture();
-  const { user } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedFacture, setSelectedFacture] = useState<any>(null);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -94,15 +91,15 @@ export default function Factures() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0 h-12 px-6 text-base">
+            <Button className="gap-2 h-12 px-6 text-base">
               <Plus className="h-4 w-4" /> Créer une facture
             </Button>
           </DialogTrigger>
-          <DialogContent className="glass-strong border-border/50 max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle className="text-foreground">Nouvelle facture (Brouillon)</DialogTitle></DialogHeader>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Nouvelle facture (Brouillon)</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
               <Select value={socid} onValueChange={setSocid}>
-                <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
                 <SelectContent>
                   {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>)}
                 </SelectContent>
@@ -111,12 +108,12 @@ export default function Factures() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium text-foreground">Lignes</h3>
-                  <Button variant="outline" size="sm" onClick={addLigne} className="gap-1 glass border-border/50"><Plus className="h-3 w-3" /> Ajouter</Button>
+                  <Button variant="outline" size="sm" onClick={addLigne} className="gap-1"><Plus className="h-3 w-3" /> Ajouter</Button>
                 </div>
                 {lignes.map((l, i) => (
-                  <div key={i} className="space-y-2 p-3 rounded-lg bg-accent/10 border border-border/30">
+                  <div key={i} className="space-y-2 p-3 rounded-lg bg-muted/50 border border-border">
                     <Select value={l.productId || '__libre__'} onValueChange={(v) => selectProduct(i, v)}>
-                      <SelectTrigger className="glass border-border/50 text-xs"><SelectValue placeholder="Sélectionner un article" /></SelectTrigger>
+                      <SelectTrigger className="text-xs"><SelectValue placeholder="Sélectionner un article" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__libre__">✏️ Ligne libre</SelectItem>
                         {produits.map(p => (
@@ -126,16 +123,16 @@ export default function Factures() {
                     </Select>
                     <div className="grid grid-cols-12 gap-2 items-end">
                       <div className="col-span-5">
-                        <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="glass border-border/50 text-xs" />
+                        <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="text-xs" />
                       </div>
                       <div className="col-span-2">
-                        <Input type="number" placeholder="Qté" value={l.qty} onChange={e => updateLigne(i, 'qty', Number(e.target.value))} className="glass border-border/50 text-xs" />
+                        <Input type="number" placeholder="Qté" value={l.qty} onChange={e => updateLigne(i, 'qty', Number(e.target.value))} className="text-xs" />
                       </div>
                       <div className="col-span-2">
-                        <Input type="number" placeholder="Prix HT" value={l.subprice} onChange={e => updateLigne(i, 'subprice', Number(e.target.value))} className="glass border-border/50 text-xs" />
+                        <Input type="number" placeholder="Prix HT" value={l.subprice} onChange={e => updateLigne(i, 'subprice', Number(e.target.value))} className="text-xs" />
                       </div>
                       <div className="col-span-2">
-                        <Input type="number" placeholder="TVA%" value={l.tva_tx} onChange={e => updateLigne(i, 'tva_tx', Number(e.target.value))} className="glass border-border/50 text-xs" />
+                        <Input type="number" placeholder="TVA%" value={l.tva_tx} onChange={e => updateLigne(i, 'tva_tx', Number(e.target.value))} className="text-xs" />
                       </div>
                       <div className="col-span-1">
                         {lignes.length > 1 && (
@@ -147,7 +144,7 @@ export default function Factures() {
                 ))}
               </div>
 
-              <div className="rounded-lg bg-accent/20 border border-border/30 p-4 space-y-1">
+              <div className="rounded-lg bg-muted/50 border border-border p-4 space-y-1">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Total HT</span>
                   <span className="text-foreground font-medium">{totals.ht.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
@@ -156,13 +153,13 @@ export default function Factures() {
                   <span className="text-muted-foreground">TVA</span>
                   <span className="text-foreground">{totals.tva.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
                 </div>
-                <div className="flex justify-between text-sm font-bold border-t border-border/30 pt-1">
+                <div className="flex justify-between text-sm font-bold border-t border-border pt-1">
                   <span className="text-foreground">Total TTC</span>
                   <span className="text-primary">{totals.ttc.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
                 </div>
               </div>
 
-              <Button onClick={handleCreate} disabled={createFactureMutation.isPending || !socid} className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 text-base">
+              <Button onClick={handleCreate} disabled={createFactureMutation.isPending || !socid} className="w-full h-12 text-base">
                 {createFactureMutation.isPending ? 'Création...' : 'Créer la facture (Brouillon)'}
               </Button>
             </div>
@@ -171,16 +168,16 @@ export default function Factures() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title="Total CA TTC" value={`${totalCA.toLocaleString('fr-FR')} €`} icon={Euro} gradient="bg-gradient-to-br from-blue-500 to-indigo-600" />
-        <StatCard title="Factures payées" value={String(payees.length)} subtitle={`${payees.reduce((s, f) => s + f.montantTTC, 0).toLocaleString('fr-FR')} €`} icon={CheckCircle} gradient="bg-gradient-to-br from-emerald-500 to-green-600" />
-        <StatCard title="Factures non payées" value={String(nonPayees.length)} subtitle={`${nonPayees.reduce((s, f) => s + f.montantTTC, 0).toLocaleString('fr-FR')} €`} icon={AlertCircle} gradient="bg-gradient-to-br from-orange-500 to-amber-600" />
+        <StatCard title="Total CA TTC" value={`${totalCA.toLocaleString('fr-FR')} €`} icon={Euro} />
+        <StatCard title="Factures payées" value={String(payees.length)} subtitle={`${payees.reduce((s, f) => s + f.montantTTC, 0).toLocaleString('fr-FR')} €`} icon={CheckCircle} />
+        <StatCard title="Factures impayées" value={String(nonPayees.length)} subtitle={`${nonPayees.reduce((s, f) => s + f.montantTTC, 0).toLocaleString('fr-FR')} €`} icon={AlertCircle} />
       </div>
 
-      <div className="glass rounded-xl p-5">
+      <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border/50">
+              <tr className="border-b border-border">
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Référence</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Client</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Date</th>
@@ -191,7 +188,7 @@ export default function Factures() {
             </thead>
             <tbody>
               {factures.map((f) => (
-                <tr key={f.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors cursor-pointer" onClick={() => setSelectedFacture(f)}>
+                <tr key={f.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => setSelectedFacture(f)}>
                   <td className="py-3 px-2 font-mono text-xs text-foreground">{f.ref}</td>
                   <td className="py-3 px-2 text-foreground">{f.client}</td>
                   <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(f.date)}</td>
@@ -225,11 +222,11 @@ export default function Factures() {
 
       {/* Facture detail dialog */}
       <Dialog open={!!selectedFacture} onOpenChange={(open) => { if (!open) setSelectedFacture(null); }}>
-        <DialogContent className="glass-strong border-border/50 max-w-lg">
+        <DialogContent className="max-w-lg">
           {selectedFacture && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-foreground">{selectedFacture.ref}</DialogTitle>
+                <DialogTitle>{selectedFacture.ref}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-2">
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -243,21 +240,19 @@ export default function Factures() {
                   <StatusBadge statut={selectedFacture.statut} />
                 </div>
                 <div className="flex flex-wrap gap-3 pt-2">
-                  {/* Brouillon: Valider */}
                   {selectedFacture.fk_statut === 0 && (
                     <Button
                       onClick={() => validateFactureMutation.mutate(selectedFacture.id, { onSuccess: () => setSelectedFacture(null) })}
                       disabled={validateFactureMutation.isPending}
-                      className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0"
+                      className="gap-2"
                     >
                       <FileCheck className="h-4 w-4" />
                       {validateFactureMutation.isPending ? 'Validation...' : 'Valider'}
                     </Button>
                   )}
-                  {/* PDF always */}
                   <Button
                     variant="outline"
-                    className="gap-2 glass border-border/50"
+                    className="gap-2"
                     onClick={async () => {
                       try {
                         const url = await generatePDF('facture', selectedFacture.id, selectedFacture.ref, 'crabe');
@@ -268,11 +263,10 @@ export default function Factures() {
                   >
                     <FileDown className="h-4 w-4" /> Voir le PDF
                   </Button>
-                  {/* Email only when validated */}
                   {selectedFacture.fk_statut >= 1 && (
                     <Button
                       variant="outline"
-                      className="gap-2 glass border-border/50"
+                      className="gap-2"
                       onClick={() => {
                         const c = clients.find(cl => cl.id === selectedFacture.socid);
                         setEmailDest(c?.email || '');
@@ -293,20 +287,20 @@ export default function Factures() {
 
       {/* Email dialog */}
       <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
-        <DialogContent className="glass-strong border-border/50 max-w-lg">
-          <DialogHeader><DialogTitle className="text-foreground">Envoyer la facture par email</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Envoyer la facture par email</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
               <label className="text-sm text-muted-foreground">Destinataire</label>
-              <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} className="glass border-border/50" />
+              <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} />
             </div>
             <div className="space-y-2">
               <label className="text-sm text-muted-foreground">Objet</label>
-              <Input value={emailObjet} onChange={e => setEmailObjet(e.target.value)} className="glass border-border/50" />
+              <Input value={emailObjet} onChange={e => setEmailObjet(e.target.value)} />
             </div>
             <div className="space-y-2">
               <label className="text-sm text-muted-foreground">Message</label>
-              <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="glass border-border/50 min-h-[120px]" />
+              <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[120px]" />
             </div>
             <Button
               onClick={async () => {
@@ -315,14 +309,6 @@ export default function Factures() {
                 try {
                   await generatePDF('facture', selectedFacture.id, selectedFacture.ref, 'crabe');
                   await sendFactureByEmail(selectedFacture.id, emailDest, emailObjet, emailMessage);
-                  await supabase.from('email_history').insert({
-                    user_id: user?.id || '',
-                    client_id: selectedFacture.socid || '',
-                    document_ref: selectedFacture.ref,
-                    destinataire: emailDest,
-                    objet: emailObjet,
-                    message: emailMessage,
-                  });
                   toast.success('Facture envoyée par email via Dolibarr');
                 } catch (e: any) {
                   toast.error(`Erreur envoi : ${e.message || e}`);
@@ -331,7 +317,7 @@ export default function Factures() {
                 setEmailOpen(false);
               }}
               disabled={sendingEmail || !emailDest}
-              className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0"
+              className="w-full"
             >
               {sendingEmail ? 'Envoi via Dolibarr...' : 'Envoyer'}
             </Button>

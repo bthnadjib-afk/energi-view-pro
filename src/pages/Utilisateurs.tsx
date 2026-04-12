@@ -25,9 +25,9 @@ const roleLabels: Record<UserRole, string> = {
 };
 
 const roleColors: Record<UserRole, string> = {
-  admin: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  secretaire: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
-  technicien: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  admin: 'bg-blue-100 text-blue-700 border-blue-200',
+  secretaire: 'bg-violet-100 text-violet-700 border-violet-200',
+  technicien: 'bg-emerald-100 text-emerald-700 border-emerald-200',
 };
 
 interface UserWithRole extends Profile {
@@ -89,7 +89,7 @@ export default function Utilisateurs() {
       return;
     }
 
-    toast({ title: 'Utilisateur créé', description: `Un email de confirmation a été envoyé à ${newEmail}.` });
+    toast({ title: 'Utilisateur créé', description: `${newEmail} est actif immédiatement.` });
     
     const nameParts = newNom.trim().split(' ');
     const firstname = nameParts[0] || '';
@@ -130,25 +130,25 @@ export default function Utilisateurs() {
         {currentRole === 'admin' && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0">
+              <Button className="gap-2">
                 <UserPlus className="h-4 w-4" /> Ajouter
               </Button>
             </DialogTrigger>
-            <DialogContent className="glass-strong border-border/50">
-              <DialogHeader><DialogTitle className="text-foreground">Nouvel utilisateur</DialogTitle></DialogHeader>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Nouvel utilisateur</DialogTitle></DialogHeader>
               <div className="space-y-4 pt-2">
-                <Input placeholder="Nom complet" className="glass border-border/50" value={newNom} onChange={e => setNewNom(e.target.value)} />
-                <Input placeholder="Email" type="email" className="glass border-border/50" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
-                <Input placeholder="Mot de passe (optionnel)" type="password" className="glass border-border/50" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                <Input placeholder="Nom complet" value={newNom} onChange={e => setNewNom(e.target.value)} />
+                <Input placeholder="Email" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
+                <Input placeholder="Mot de passe (optionnel)" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
                 <Select value={newRole} onValueChange={(v) => setNewRole(v as UserRole)}>
-                  <SelectTrigger className="glass border-border/50"><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Administrateur</SelectItem>
                     <SelectItem value="secretaire">Secrétaire</SelectItem>
                     <SelectItem value="technicien">Technicien</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0" onClick={handleCreate} disabled={creating}>
+                <Button className="w-full" onClick={handleCreate} disabled={creating}>
                   {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Enregistrer
                 </Button>
@@ -158,17 +158,16 @@ export default function Utilisateurs() {
         )}
       </div>
 
-      {/* Permissions matrix */}
-      <div className="glass rounded-xl p-5">
+      <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
         <h2 className="text-sm font-semibold text-foreground mb-3">Matrice des permissions</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-border/50">
+              <tr className="border-b border-border">
                 <th className="text-left py-2 px-2 text-muted-foreground">Fonctionnalité</th>
-                <th className="text-center py-2 px-2 text-blue-400">Admin</th>
-                <th className="text-center py-2 px-2 text-violet-400">Secrétaire</th>
-                <th className="text-center py-2 px-2 text-emerald-400">Technicien</th>
+                <th className="text-center py-2 px-2 text-blue-600">Admin</th>
+                <th className="text-center py-2 px-2 text-violet-600">Secrétaire</th>
+                <th className="text-center py-2 px-2 text-emerald-600">Technicien</th>
               </tr>
             </thead>
             <tbody>
@@ -180,7 +179,7 @@ export default function Utilisateurs() {
                 ['Interventions', true, true, true],
                 ['Upload photos/signatures', true, true, true],
               ].map(([feature, admin, sec, tech], i) => (
-                <tr key={i} className="border-b border-border/30">
+                <tr key={i} className="border-b border-border/50">
                   <td className="py-2 px-2 text-foreground">{feature as string}</td>
                   <td className="py-2 px-2 text-center">{admin ? '✅' : '❌'}</td>
                   <td className="py-2 px-2 text-center">{sec ? '✅' : '❌'}</td>
@@ -192,15 +191,14 @@ export default function Utilisateurs() {
         </div>
       </div>
 
-      {/* Users list */}
-      <div className="glass rounded-xl p-5">
+      <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
         {loadingUsers ? (
           <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border/50">
+                <tr className="border-b border-border">
                   <th className="text-left py-3 px-2 text-muted-foreground font-medium">Nom</th>
                   <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Email</th>
                   <th className="text-left py-3 px-2 text-muted-foreground font-medium">Rôle</th>
@@ -212,7 +210,7 @@ export default function Utilisateurs() {
                 {users.map((u) => {
                   const Icon = roleIcons[u.role] || Shield;
                   return (
-                    <tr key={u.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors">
+                    <tr key={u.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
                       <td className="py-3 px-2 font-medium text-foreground">{u.nom || '—'}</td>
                       <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell text-xs">{u.email}</td>
                       <td className="py-3 px-2">
@@ -221,7 +219,7 @@ export default function Utilisateurs() {
                         </span>
                       </td>
                       <td className="py-3 px-2">
-                        <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs', u.actif ? 'bg-emerald-500/20 text-emerald-400' : 'bg-muted text-muted-foreground')}>
+                        <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs', u.actif ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}>
                           {u.actif ? 'Actif' : 'Inactif'}
                         </span>
                       </td>
@@ -244,11 +242,10 @@ export default function Utilisateurs() {
         )}
       </div>
 
-      {/* Delete confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <AlertDialogContent className="glass-strong border-border/50">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-foreground">Supprimer l'utilisateur</AlertDialogTitle>
+            <AlertDialogTitle>Supprimer l'utilisateur</AlertDialogTitle>
             <AlertDialogDescription>
               Êtes-vous sûr de vouloir supprimer <strong>{deleteTarget?.nom}</strong> ({deleteTarget?.email}) ? Cette action est irréversible.
             </AlertDialogDescription>

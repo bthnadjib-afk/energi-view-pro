@@ -1,6 +1,6 @@
 import { useState, Fragment, useEffect, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis } from '@/hooks/useDolibarr';
+import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis, useUpdateDevis } from '@/hooks/useDolibarr';
 import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, openPDFInNewTab, downloadPDFUrl, sendDevisByEmail, type Devis as DevisType } from '@/services/dolibarr';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown, Pencil } from 'lucide-react';
@@ -31,8 +31,8 @@ function AcompteBadge({ montantHT }: { montantHT: number }) {
     <span className={cn(
       'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
       variant === 'green'
-        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-        : 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+        ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+        : 'bg-orange-100 text-orange-700 border-orange-200'
     )}>
       {label}
     </span>
@@ -104,14 +104,6 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
     try {
       await generatePDF('propal', devis.id, devis.ref, 'azur');
       await sendDevisByEmail(devis.id, emailDest, emailObjet, emailMessage);
-      await supabase.from('email_history').insert({
-        user_id: user?.id || '',
-        client_id: devis.socid || '',
-        document_ref: devis.ref,
-        destinataire: emailDest,
-        objet: emailObjet,
-        message: emailMessage,
-      });
       toast.success('Devis envoyé par email via Dolibarr');
     } catch (e: any) {
       toast.error(`Erreur envoi email : ${e.message || e}`);
@@ -150,20 +142,18 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
     setGeneratingPDF(false);
   };
 
-  // fk_statut: 0=Brouillon, 1=Validé, 2=Signé, 3=Refusé, 4=Facturé
   const isDraft = devis.fk_statut === 0;
   const isValidated = devis.fk_statut === 1;
   const isSigned = devis.fk_statut === 2;
-  const isRefused = devis.fk_statut === 3;
 
   return (
     <tr>
       <td colSpan={7} className="p-0">
-        <div className="bg-accent/20 p-4 mx-2 mb-2 rounded-lg space-y-4">
+        <div className="bg-muted/50 p-4 mx-2 mb-2 rounded-lg space-y-4 border border-border">
           <p className="text-xs font-medium text-muted-foreground mb-2">Détail des lignes (HT)</p>
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-border/30">
+              <tr className="border-b border-border">
                 <th className="text-left py-2 px-1 text-muted-foreground">Désignation</th>
                 <th className="text-right py-2 px-1 text-muted-foreground">Qté</th>
                 <th className="text-right py-2 px-1 text-muted-foreground">Prix Unit. HT</th>
@@ -174,35 +164,33 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
             </thead>
             <tbody>
               {devis.lignes.map((l, i) => (
-                <tr key={i} className="border-b border-border/20">
+                <tr key={i} className="border-b border-border/50">
                   <td className="py-2 px-1 text-foreground">{l.designation}</td>
                   <td className="py-2 px-1 text-right text-muted-foreground">{l.quantite}</td>
                   <td className="py-2 px-1 text-right text-muted-foreground">{l.prixUnitaire.toLocaleString('fr-FR')} €</td>
                   <td className="py-2 px-1 text-right font-medium text-foreground">{l.totalHT.toLocaleString('fr-FR')} €</td>
-                  <td className="py-2 px-1 text-right text-emerald-400">{margeData[i].margeBrute.toLocaleString('fr-FR')} €</td>
-                  <td className="py-2 px-1 text-right text-emerald-400">{margeData[i].pctMarge.toFixed(0)}%</td>
+                  <td className="py-2 px-1 text-right text-emerald-600">{margeData[i].margeBrute.toLocaleString('fr-FR')} €</td>
+                  <td className="py-2 px-1 text-right text-emerald-600">{margeData[i].pctMarge.toFixed(0)}%</td>
                 </tr>
               ))}
-              <tr className="border-t-2 border-border/50 font-bold">
+              <tr className="border-t-2 border-border font-bold">
                 <td colSpan={3} className="py-2 px-1 text-foreground">TOTAL</td>
                 <td className="py-2 px-1 text-right text-foreground">{totalVenteHT.toLocaleString('fr-FR')} €</td>
-                <td className="py-2 px-1 text-right text-emerald-400">{totalMarge.toLocaleString('fr-FR')} €</td>
-                <td className="py-2 px-1 text-right text-emerald-400">{totalPctMarge.toFixed(0)}%</td>
+                <td className="py-2 px-1 text-right text-emerald-600">{totalMarge.toLocaleString('fr-FR')} €</td>
+                <td className="py-2 px-1 text-right text-emerald-600">{totalPctMarge.toFixed(0)}%</td>
               </tr>
             </tbody>
           </table>
 
-          {/* Action buttons based on fk_statut */}
-          <div className="flex flex-wrap gap-3 pt-3 border-t border-border/30">
-            {/* Brouillon: Valider + Modifier + Supprimer */}
+          <div className="flex flex-wrap gap-3 pt-3 border-t border-border">
             {isDraft && (
               <>
-                <Button onClick={() => validateMutation.mutate(devis.id)} disabled={validateMutation.isPending} className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
+                <Button onClick={() => validateMutation.mutate(devis.id)} disabled={validateMutation.isPending} className="gap-2">
                   <FileCheck className="h-4 w-4" /> {validateMutation.isPending ? 'Validation...' : 'Valider'}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="outline" className="gap-2 glass border-red-500/30 text-red-400"><Trash2 className="h-4 w-4" /> Supprimer</Button>
+                    <Button variant="outline" className="gap-2 border-destructive/30 text-destructive"><Trash2 className="h-4 w-4" /> Supprimer</Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
@@ -218,59 +206,57 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
               </>
             )}
 
-            {/* Validé: Classer Signé + Classer Refusé + Envoyer Mail + PDF */}
             {isValidated && (
               <>
-                <Button onClick={() => setShowSignature(true)} disabled={closeMutation.isPending} className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0">
+                <Button onClick={() => setShowSignature(true)} disabled={closeMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                   <CheckCircle2 className="h-4 w-4" /> Classer Signé
                 </Button>
-                <Button onClick={() => closeMutation.mutate({ id: devis.id, status: 3 })} disabled={closeMutation.isPending} variant="outline" className="gap-2 glass border-red-500/30 text-red-400">
+                <Button onClick={() => closeMutation.mutate({ id: devis.id, status: 3 })} disabled={closeMutation.isPending} variant="outline" className="gap-2 border-destructive/30 text-destructive">
                   <XCircle className="h-4 w-4" /> Classer Refusé
+                </Button>
+                <Button onClick={onConvert} disabled={convertPending} variant="outline" className="gap-2">
+                  <ArrowRightLeft className="h-4 w-4" /> {convertPending ? 'Conversion...' : 'Générer Facture'}
                 </Button>
               </>
             )}
 
-            {/* Signé: Générer Facture + Acompte */}
             {isSigned && (
               <>
-                <Button onClick={onConvert} disabled={convertPending} className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0">
+                <Button onClick={onConvert} disabled={convertPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                   <ArrowRightLeft className="h-4 w-4" /> {convertPending ? 'Conversion...' : 'Générer Facture'}
                 </Button>
-                <Button onClick={onAcompte} disabled={acomptePending} variant="outline" className="gap-2 glass border-border/50">
+                <Button onClick={onAcompte} disabled={acomptePending} variant="outline" className="gap-2">
                   <Receipt className="h-4 w-4" /> {acomptePending ? 'Création...' : 'Saisir un acompte'}
                 </Button>
               </>
             )}
 
-            {/* PDF & Email always available when not draft */}
-            <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2 glass border-border/50">
+            <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
               <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
             </Button>
             {!isDraft && (
-              <Button onClick={() => setEmailOpen(true)} variant="outline" className="gap-2 glass border-border/50">
+              <Button onClick={() => setEmailOpen(true)} variant="outline" className="gap-2">
                 <Send className="h-4 w-4" /> Envoyer par email
               </Button>
             )}
           </div>
 
-          {/* Signature pad */}
           {showSignature && (
-            <div className="p-4 rounded-lg bg-accent/30 border border-border/30 space-y-3">
+            <div className="p-4 rounded-lg bg-muted border border-border space-y-3">
               <p className="text-sm font-medium text-foreground">Signature du client pour acceptation</p>
               <SignaturePad onSave={handleAccepter} />
               <Button variant="ghost" size="sm" onClick={() => setShowSignature(false)}>Annuler</Button>
             </div>
           )}
 
-          {/* Email dialog */}
           <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
-            <DialogContent className="glass-strong border-border/50 max-w-lg">
-              <DialogHeader><DialogTitle className="text-foreground">Envoyer par email</DialogTitle></DialogHeader>
+            <DialogContent className="max-w-lg">
+              <DialogHeader><DialogTitle>Envoyer par email</DialogTitle></DialogHeader>
               <div className="space-y-4 pt-2">
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Modèle</label>
                   <Select onValueChange={applyTemplate}>
-                    <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Choisir un modèle..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Choisir un modèle..." /></SelectTrigger>
                     <SelectContent>
                       {emailTemplates.map(t => <SelectItem key={t.id} value={t.id}>{t.nom}</SelectItem>)}
                     </SelectContent>
@@ -278,17 +264,17 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Destinataire</label>
-                  <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} className="glass border-border/50" />
+                  <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Objet</label>
-                  <Input value={emailObjet} onChange={e => setEmailObjet(e.target.value)} className="glass border-border/50" />
+                  <Input value={emailObjet} onChange={e => setEmailObjet(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Message</label>
-                  <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="glass border-border/50 min-h-[120px]" />
+                  <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[120px]" />
                 </div>
-                <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest} className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
+                <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest} className="w-full">
                   {sendingEmail ? 'Envoi via Dolibarr...' : 'Envoyer'}
                 </Button>
               </div>
@@ -372,15 +358,15 @@ export default function Devis() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0 h-12 px-6 text-base">
+            <Button className="gap-2 h-12 px-6 text-base">
               <Plus className="h-4 w-4" /> Créer un devis
             </Button>
           </DialogTrigger>
-          <DialogContent className="glass-strong border-border/50 max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle className="text-foreground">Nouveau devis (Brouillon)</DialogTitle></DialogHeader>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Nouveau devis (Brouillon)</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
               <Select value={socid} onValueChange={setSocid}>
-                <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
                 <SelectContent>
                   {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>)}
                 </SelectContent>
@@ -389,14 +375,14 @@ export default function Devis() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-medium text-foreground">Lignes</h3>
-                  <Button variant="outline" size="sm" onClick={addLigne} className="gap-1 glass border-border/50">
+                  <Button variant="outline" size="sm" onClick={addLigne} className="gap-1">
                     <Plus className="h-3 w-3" /> Ajouter
                   </Button>
                 </div>
                 {lignes.map((l, i) => (
-                  <div key={i} className="space-y-2 p-3 rounded-lg bg-accent/10 border border-border/30">
+                  <div key={i} className="space-y-2 p-3 rounded-lg bg-muted/50 border border-border">
                     <Select value={l.productId || '__libre__'} onValueChange={(v) => selectProduct(i, v)}>
-                      <SelectTrigger className="glass border-border/50 text-xs"><SelectValue placeholder="Sélectionner un article" /></SelectTrigger>
+                      <SelectTrigger className="text-xs"><SelectValue placeholder="Sélectionner un article" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__libre__">✏️ Ligne libre</SelectItem>
                         {produits.map(p => (
@@ -408,13 +394,13 @@ export default function Devis() {
                     </Select>
                     <div className="grid grid-cols-12 gap-2 items-end">
                       <div className="col-span-6">
-                        <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="glass border-border/50 text-xs" />
+                        <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="text-xs" />
                       </div>
                       <div className="col-span-2">
-                        <Input type="number" placeholder="Qté" value={l.qty} onChange={e => updateLigne(i, 'qty', Number(e.target.value))} className="glass border-border/50 text-xs" />
+                        <Input type="number" placeholder="Qté" value={l.qty} onChange={e => updateLigne(i, 'qty', Number(e.target.value))} className="text-xs" />
                       </div>
                       <div className="col-span-3">
-                        <Input type="number" placeholder="Prix HT" value={l.subprice} onChange={e => updateLigne(i, 'subprice', Number(e.target.value))} className="glass border-border/50 text-xs" />
+                        <Input type="number" placeholder="Prix HT" value={l.subprice} onChange={e => updateLigne(i, 'subprice', Number(e.target.value))} className="text-xs" />
                       </div>
                       <div className="col-span-1">
                         {lignes.length > 1 && (
@@ -428,18 +414,18 @@ export default function Devis() {
                 ))}
               </div>
 
-              <div className="rounded-lg bg-accent/20 border border-border/30 p-4 space-y-1">
+              <div className="rounded-lg bg-muted/50 border border-border p-4 space-y-1">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Total HT</span>
                   <span className="text-foreground font-medium">{totals.ht.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Marge</span>
-                  <span className="text-emerald-400 font-medium">{totals.marge.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € ({totals.pctMarge.toFixed(0)}%)</span>
+                  <span className="text-emerald-600 font-medium">{totals.marge.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € ({totals.pctMarge.toFixed(0)}%)</span>
                 </div>
               </div>
 
-              <Button onClick={handleCreate} disabled={createDevisMutation.isPending || !socid} className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 text-base">
+              <Button onClick={handleCreate} disabled={createDevisMutation.isPending || !socid} className="w-full h-12 text-base">
                 {createDevisMutation.isPending ? 'Création...' : 'Créer le devis (Brouillon)'}
               </Button>
             </div>
@@ -447,11 +433,11 @@ export default function Devis() {
         </Dialog>
       </div>
 
-      <div className="glass rounded-xl p-5">
+      <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border/50">
+              <tr className="border-b border-border">
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium w-8"></th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Référence</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Client</th>
@@ -464,7 +450,7 @@ export default function Devis() {
             <tbody>
               {devis.map((d) => (
                 <Fragment key={d.id}>
-                  <tr className="border-b border-border/30 hover:bg-accent/30 transition-colors cursor-pointer" onClick={() => setExpandedId(expandedId === d.id ? null : d.id)}>
+                  <tr className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => setExpandedId(expandedId === d.id ? null : d.id)}>
                     <td className="py-3 px-2">
                       {expandedId === d.id ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                     </td>

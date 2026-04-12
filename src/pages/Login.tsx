@@ -39,8 +39,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="glass-strong rounded-2xl p-8 w-full max-w-md space-y-6 border border-border/50">
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+      <div className="bg-card rounded-xl p-8 w-full max-w-md space-y-6 border border-border shadow-lg">
         <div className="flex flex-col items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
             <Zap className="h-6 w-6 text-primary-foreground" />
@@ -61,7 +61,6 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="glass border-border/50"
             />
           </div>
 
@@ -75,14 +74,13 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="glass border-border/50"
               />
             </div>
           )}
 
           <Button
             type="submit"
-            className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0"
+            className="w-full"
             disabled={loading}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

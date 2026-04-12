@@ -14,20 +14,20 @@ export function UrgencyWidget({ interventions }: UrgencyWidgetProps) {
   if (urgences.length === 0) return null;
 
   return (
-    <div className="glass rounded-xl p-5 border-destructive/30">
+    <div className="bg-card rounded-lg border border-destructive/30 p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
         <div className="relative">
           <AlertTriangle className="h-5 w-5 text-destructive" />
           <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-destructive animate-pulse" />
         </div>
         <h2 className="text-lg font-semibold text-foreground">Urgences</h2>
-        <span className="ml-auto bg-destructive/20 text-destructive text-xs font-bold px-2 py-0.5 rounded-full">
+        <span className="ml-auto bg-destructive/10 text-destructive text-xs font-bold px-2 py-0.5 rounded-full">
           {urgences.length}
         </span>
       </div>
       <div className="space-y-2">
         {urgences.map((u) => (
-          <div key={u.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-destructive/5 border border-destructive/20">
+          <div key={u.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-red-50 border border-red-200">
             <div>
               <span className="font-mono text-xs text-foreground">{u.ref}</span>
               <span className="text-muted-foreground text-xs ml-2">{u.client}</span>
