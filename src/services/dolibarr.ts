@@ -366,6 +366,7 @@ export async function createIntervention(data: {
     technicien: data.fk_user_assign || '',
     heureDebut: startTime,
     heureFin: endTime,
+    dateIntervention: baseDate,
     notePrivee: data.note_private || '',
   });
   
@@ -832,8 +833,8 @@ function mapDolibarrIntervention(d: any): Intervention {
   const heureDebut = meta?.heureDebut || parseDolibarrTime(d.dateo) || '08:00';
   const heureFin = meta?.heureFin || parseDolibarrTime(d.datee) || '10:00';
   
-  // Date: try date field first, then datec as fallback
-  const rawDate = d.datest || d.datei || d.dateo || d.date || d.date_creation || d.datec;
+  // Date: prioritize metadata dateIntervention, then Dolibarr fields, datec as last resort
+  const rawDate = meta?.dateIntervention || d.datest || d.datei || d.dateo || d.date || d.date_creation || d.datec;
   
   return {
     id: String(d.id),
