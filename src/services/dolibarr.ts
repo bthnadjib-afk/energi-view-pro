@@ -437,7 +437,7 @@ export async function generatePDF(
   model?: string
 ): Promise<string | null> {
   const defaultModel = modulepart === 'propale' ? 'azur' : modulepart === 'facture' ? 'crabe' : 'soleil';
-  const result = await dolibarrCall<any>('/documents/builddoc', 'POST', {
+  const result = await dolibarrCall<any>('/documents/builddoc', 'PUT', {
     modulepart,
     original_file: `${ref}/${ref}.pdf`,
     doctemplate: model || defaultModel,
