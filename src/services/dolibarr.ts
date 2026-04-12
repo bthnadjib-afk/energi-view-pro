@@ -1,4 +1,4 @@
-// Dolibarr API Service — proxy through edge function, fallback to mock data
+// Dolibarr API Service — proxy through edge function, NO mock fallback
 
 import { supabase } from '@/integrations/supabase/client';
 
@@ -12,7 +12,9 @@ export interface Facture {
   date: string;
   montantHT: number;
   montantTTC: number;
-  statut: 'brouillon' | 'payée' | 'impayée' | 'en retard';
+  statut: string;
+  fk_statut: number;
+  paye: boolean;
 }
 
 export interface DevisLigne {
@@ -31,13 +33,14 @@ export interface Devis {
   date: string;
   montantHT: number;
   montantTTC: number;
-  statut: 'brouillon' | 'en attente' | 'accepté' | 'refusé';
+  statut: string;
+  fk_statut: number;
   lignes: DevisLigne[];
 }
 
 export type InterventionType = 'devis_sur_place' | 'panne' | 'sav' | 'chantier' | 'realisation';
 
-export type InterventionStatut = 'brouillon' | 'validé' | 'en cours' | 'terminé' | 'facturé' | 'annulé';
+export type InterventionStatut = string;
 
 export interface Intervention {
   id: string;
@@ -45,10 +48,12 @@ export interface Intervention {
   client: string;
   socid?: string;
   technicien: string;
+  user_author_id?: string;
   date: string;
   heureDebut: string;
   heureFin: string;
   statut: InterventionStatut;
+  fk_statut: number;
   type: InterventionType;
   description: string;
   descriptionClient?: string;
@@ -85,6 +90,15 @@ export interface Produit {
   categorie: string;
 }
 
+export interface DolibarrUser {
+  id: string;
+  login: string;
+  firstname: string;
+  lastname: string;
+  email: string;
+  statut: number;
+}
+
 // --- Proxy call ---
 
 async function dolibarrCall<T>(endpoint: string, method = 'GET', data?: unknown): Promise<T | null> {
@@ -93,21 +107,26 @@ async function dolibarrCall<T>(endpoint: string, method = 'GET', data?: unknown)
       body: { endpoint, method, data },
     });
     if (error) throw error;
-    // The proxy always returns 200 with { ok, status, data, error }
     if (result && typeof result === 'object' && 'ok' in result) {
       if (!result.ok) {
         const errMsg = typeof result.error === 'object' ? JSON.stringify(result.error) : String(result.error || `Dolibarr ${result.status}`);
-        console.warn(`Dolibarr API ${result.status}:`, result.error);
-        if (method !== 'GET') throw new Error(errMsg);
-        return null;
+        console.error(`Dolibarr API ${result.status}:`, result.error);
+        throw new Error(errMsg);
       }
       return result.data as T;
     }
-    // Fallback for legacy format
     return result as T;
   } catch (e) {
-    console.warn('Dolibarr proxy error:', e);
-    if (method !== 'GET') throw e;
+    console.error('Dolibarr proxy error:', e);
+    throw e;
+  }
+}
+
+// Safe version for GET that returns null instead of throwing
+async function dolibarrGet<T>(endpoint: string): Promise<T | null> {
+  try {
+    return await dolibarrCall<T>(endpoint, 'GET');
+  } catch {
     return null;
   }
 }
@@ -143,110 +162,58 @@ function resolveClientName(socid: string | undefined, clients: Client[], fallbac
   return c ? c.nom : fallback;
 }
 
-// --- Mock Data ---
-
-export const mockFactures: Facture[] = [
-  { id: '1', ref: 'FA-2024-001', client: 'Copropriété Les Érables', date: '2024-12-15', montantHT: 7083, montantTTC: 8500, statut: 'payée' },
-  { id: '2', ref: 'FA-2024-002', client: 'M. Dupont Jean', date: '2024-12-18', montantHT: 2667, montantTTC: 3200, statut: 'payée' },
-  { id: '3', ref: 'FA-2024-003', client: 'SCI Bâtiment Central', date: '2025-01-05', montantHT: 12833, montantTTC: 15400, statut: 'impayée' },
-  { id: '4', ref: 'FA-2024-004', client: 'Mme. Martin Sophie', date: '2025-01-10', montantHT: 1542, montantTTC: 1850, statut: 'payée' },
-  { id: '5', ref: 'FA-2024-005', client: 'Restaurant Le Provençal', date: '2025-01-20', montantHT: 5583, montantTTC: 6700, statut: 'en retard' },
-  { id: '6', ref: 'FA-2025-006', client: 'Hôtel Bellevue', date: '2025-02-01', montantHT: 10250, montantTTC: 12300, statut: 'impayée' },
-  { id: '7', ref: 'FA-2025-007', client: 'M. Bernard Luc', date: '2025-02-10', montantHT: 1750, montantTTC: 2100, statut: 'payée' },
-  { id: '8', ref: 'FA-2025-008', client: 'Copropriété Résidence du Parc', date: '2025-03-01', montantHT: 8167, montantTTC: 9800, statut: 'payée' },
-];
-
-export const mockDevis: Devis[] = [
-  {
-    id: '1', ref: 'DE-2025-001', client: 'Copropriété Les Chênes', date: '2025-03-10', montantHT: 6600, montantTTC: 7800, statut: 'en attente',
-    lignes: [
-      { designation: 'Mise aux normes NF C 15-100 - Parties communes', quantite: 1, prixUnitaire: 4200, totalHT: 4200 },
-      { designation: 'Remplacement tableau général', quantite: 1, prixUnitaire: 1800, totalHT: 1800 },
-      { designation: 'Câblage cuivre 3G2.5', quantite: 120, prixUnitaire: 5, totalHT: 600 },
-    ],
-  },
-  {
-    id: '2', ref: 'DE-2025-002', client: 'M. Leroy Pierre', date: '2025-03-12', montantHT: 2660, montantTTC: 3200, statut: 'en attente',
-    lignes: [
-      { designation: 'Installation tableau électrique complet', quantite: 1, prixUnitaire: 1500, totalHT: 1500 },
-      { designation: 'Pose prises et interrupteurs', quantite: 18, prixUnitaire: 55, totalHT: 990 },
-      { designation: 'Tirage de ligne cuisine dédiée', quantite: 2, prixUnitaire: 85, totalHT: 170 },
-    ],
-  },
-  {
-    id: '3', ref: 'DE-2025-003', client: 'SCI Immobilière du Sud', date: '2025-03-15', montantHT: 21000, montantTTC: 24500, statut: 'accepté',
-    lignes: [
-      { designation: 'Rénovation complète électricité - 6 appartements', quantite: 6, prixUnitaire: 3200, totalHT: 19200 },
-      { designation: 'Main d\'œuvre installation', quantite: 40, prixUnitaire: 45, totalHT: 1800 },
-    ],
-  },
-  {
-    id: '4', ref: 'DE-2025-004', client: 'Mme. Garcia Ana', date: '2025-03-20', montantHT: 940, montantTTC: 1950, statut: 'en attente',
-    lignes: [
-      { designation: 'Dépannage et diagnostic panne générale', quantite: 1, prixUnitaire: 250, totalHT: 250 },
-      { designation: 'Remplacement disjoncteur différentiel 30mA', quantite: 3, prixUnitaire: 180, totalHT: 540 },
-      { designation: 'Vérification et test installation', quantite: 1, prixUnitaire: 150, totalHT: 150 },
-    ],
-  },
-  {
-    id: '5', ref: 'DE-2025-005', client: 'Boulangerie Chez Paul', date: '2025-03-25', montantHT: 4400, montantTTC: 5600, statut: 'refusé',
-    lignes: [
-      { designation: 'Installation four professionnel triphasé', quantite: 1, prixUnitaire: 2800, totalHT: 2800 },
-      { designation: 'Mise en conformité local professionnel', quantite: 1, prixUnitaire: 1600, totalHT: 1600 },
-    ],
-  },
-];
-
-export const mockInterventions: Intervention[] = [
-  { id: '1', ref: 'INT-2025-001', client: 'M. Dupont Jean', technicien: 'Thomas Moreau', date: '2025-04-11', heureDebut: '08:00', heureFin: '10:00', statut: 'en cours', type: 'panne', description: 'Dépannage panne tableau électrique' },
-  { id: '2', ref: 'INT-2025-002', client: 'Copropriété Les Érables', technicien: 'Lucas Martin', date: '2025-04-11', heureDebut: '09:00', heureFin: '12:00', statut: 'validé', type: 'chantier', description: 'Mise aux normes NF C 15-100' },
-  { id: '3', ref: 'INT-2025-003', client: 'Restaurant Le Provençal', technicien: 'Thomas Moreau', date: '2025-04-12', heureDebut: '14:00', heureFin: '17:00', statut: 'validé', type: 'realisation', description: 'Installation éclairage LED salle' },
-  { id: '4', ref: 'INT-2025-004', client: 'Mme. Martin Sophie', technicien: 'Nicolas Petit', date: '2025-04-09', heureDebut: '08:00', heureFin: '11:00', statut: 'terminé', type: 'chantier', description: 'Remplacement tableau divisionnaire' },
-  { id: '5', ref: 'INT-2025-005', client: 'SCI Bâtiment Central', technicien: 'Lucas Martin', date: '2025-04-08', heureDebut: '09:00', heureFin: '16:00', statut: 'facturé', type: 'realisation', description: 'Câblage réseau RJ45 bureaux' },
-  { id: '6', ref: 'INT-2025-006', client: 'Hôtel Bellevue', technicien: 'Nicolas Petit', date: '2025-04-14', heureDebut: '10:00', heureFin: '12:00', statut: 'brouillon', type: 'devis_sur_place', description: 'Diagnostic installation générale' },
-  { id: '7', ref: 'INT-2025-007', client: 'M. Bernard Luc', technicien: 'Thomas Moreau', date: '2025-04-07', heureDebut: '13:00', heureFin: '15:00', statut: 'annulé', type: 'sav', description: 'Installation borne recharge véhicule' },
-  { id: '8', ref: 'INT-2025-008', client: 'Copropriété Résidence du Parc', technicien: 'Lucas Martin', date: '2025-04-15', heureDebut: '08:00', heureFin: '17:00', statut: 'validé', type: 'chantier', description: 'Remplacement colonnes montantes' },
-];
-
-export const mockClients: Client[] = [
-  { id: '1', nom: 'Copropriété Les Érables', ville: 'Lyon', telephone: '04 72 11 22 33', email: 'syndic@erables.fr', projetsEnCours: 2 },
-  { id: '2', nom: 'M. Dupont Jean', ville: 'Villeurbanne', telephone: '06 12 34 56 78', email: 'jean.dupont@mail.fr', projetsEnCours: 1 },
-  { id: '3', nom: 'SCI Bâtiment Central', ville: 'Lyon 3e', telephone: '04 78 55 66 77', email: 'contact@sci-central.fr', projetsEnCours: 1 },
-  { id: '4', nom: 'Mme. Martin Sophie', ville: 'Caluire', telephone: '06 98 76 54 32', email: 'sophie.martin@mail.fr', projetsEnCours: 0 },
-  { id: '5', nom: 'Restaurant Le Provençal', ville: 'Lyon 2e', telephone: '04 72 33 44 55', email: 'contact@provencal.fr', projetsEnCours: 1 },
-  { id: '6', nom: 'Hôtel Bellevue', ville: 'Lyon 5e', telephone: '04 78 22 11 00', email: 'direction@bellevue.fr', projetsEnCours: 1 },
-  { id: '7', nom: 'M. Bernard Luc', ville: 'Bron', telephone: '06 55 44 33 22', email: 'luc.bernard@mail.fr', projetsEnCours: 0 },
-  { id: '8', nom: 'Copropriété Résidence du Parc', ville: 'Écully', telephone: '04 78 99 88 77', email: 'syndic@residenceduparc.fr', projetsEnCours: 1 },
-  { id: '9', nom: 'Boulangerie Chez Paul', ville: 'Vénissieux', telephone: '04 72 88 99 00', email: 'paul@chezpaul.fr', projetsEnCours: 0 },
-  { id: '10', nom: 'SCI Immobilière du Sud', ville: 'Saint-Priest', telephone: '04 78 20 30 40', email: 'contact@sci-sud.fr', projetsEnCours: 1 },
-];
-
-export const mockProduits: Produit[] = [
-  { id: '1', ref: 'MO001', label: 'Installation tableau électrique', description: 'Fourniture et pose d\'un tableau électrique complet NF C 15-100', prixHT: 1500, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Installation' },
-  { id: '2', ref: 'MO002', label: 'Mise aux normes NF C 15-100', description: 'Diagnostic et mise en conformité de l\'installation électrique', prixHT: 4200, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Mise aux normes' },
-  { id: '3', ref: 'MO003', label: 'Forfait dépannage urgence', description: 'Intervention d\'urgence dépannage électrique (1h)', prixHT: 150, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Dépannage' },
-  { id: '4', ref: 'MO004', label: 'Tirage de câble RJ45', description: 'Tirage et raccordement câble réseau catégorie 6', prixHT: 45, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Réseau' },
-  { id: '5', ref: 'MO005', label: 'Installation borne de recharge VE', description: 'Fourniture et pose borne de recharge véhicule électrique 7kW', prixHT: 1800, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Installation' },
-  { id: '6', ref: '0001', label: 'Disjoncteur différentiel 30mA', description: 'Disjoncteur différentiel type A 30mA 40A', prixHT: 85, prixAchat: 42, tauxTVA: 0, type: 'fourniture', categorie: 'Matériel' },
-  { id: '7', ref: '0002', label: 'Câble R2V 3G2.5', description: 'Câble électrique R2V 3G2.5mm² - au mètre', prixHT: 3.5, prixAchat: 1.8, tauxTVA: 0, type: 'fourniture', categorie: 'Matériel' },
-  { id: '8', ref: 'MO006', label: 'Diagnostic électrique complet', description: 'Diagnostic de l\'installation avec rapport détaillé', prixHT: 250, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Diagnostic' },
-  { id: '9', ref: 'MO007', label: 'Installation éclairage LED', description: 'Fourniture et pose éclairage LED intérieur/extérieur', prixHT: 75, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Installation' },
-  { id: '10', ref: 'MO008', label: 'Rénovation électrique appartement', description: 'Rénovation complète installation électrique appartement T3', prixHT: 3200, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Rénovation' },
-];
-
 // --- Raw fetch (no client resolution) ---
 
 async function fetchClientsRaw(): Promise<Client[]> {
-  const result = await dolibarrCall<any[]>('/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=100');
-  if (!result) return mockClients;
+  const result = await dolibarrGet<any[]>('/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=100');
+  if (!result) return [];
   return result.map(mapDolibarrClient);
 }
 
-// --- API Fetch functions (proxy with mock fallback + client name resolution) ---
+// --- Status labels (native Dolibarr codes) ---
+
+export const DEVIS_STATUTS: Record<number, string> = {
+  0: 'Brouillon',
+  1: 'Validé',
+  2: 'Signé',
+  3: 'Refusé',
+  4: 'Facturé',
+};
+
+export const FACTURE_STATUTS: Record<number, string> = {
+  0: 'Brouillon',
+  1: 'Validée',
+  2: 'Payée',
+  3: 'Abandonnée',
+};
+
+export const INTERVENTION_STATUTS: Record<number, string> = {
+  0: 'Brouillon',
+  1: 'Validée',
+  2: 'En cours',
+  3: 'Terminée',
+  4: 'Facturée',
+  5: 'Annulée',
+};
+
+export function getDevisStatutLabel(fk_statut: number): string {
+  return DEVIS_STATUTS[fk_statut] || `Statut ${fk_statut}`;
+}
+
+export function getFactureStatutLabel(fk_statut: number, paye: boolean): string {
+  if (paye) return 'Payée';
+  return FACTURE_STATUTS[fk_statut] || `Statut ${fk_statut}`;
+}
+
+export function getInterventionStatutLabel(fk_statut: number): string {
+  return INTERVENTION_STATUTS[fk_statut] || `Statut ${fk_statut}`;
+}
+
+// --- API Fetch functions ---
 
 export async function fetchFactures(): Promise<Facture[]> {
-  const result = await dolibarrCall<any[]>('/invoices?sortfield=t.rowid&sortorder=DESC&limit=50');
-  if (!result) return mockFactures;
+  const result = await dolibarrGet<any[]>('/invoices?sortfield=t.rowid&sortorder=DESC&limit=100');
+  if (!result) return [];
   const mapped = result.map(mapDolibarrFacture);
   try {
     const clients = await getClientsCache();
@@ -255,8 +222,8 @@ export async function fetchFactures(): Promise<Facture[]> {
 }
 
 export async function fetchDevis(): Promise<Devis[]> {
-  const result = await dolibarrCall<any[]>('/proposals?sortfield=t.rowid&sortorder=DESC&limit=50');
-  if (!result) return mockDevis;
+  const result = await dolibarrGet<any[]>('/proposals?sortfield=t.rowid&sortorder=DESC&limit=100');
+  if (!result) return [];
   const mapped = result.map(mapDolibarrDevis);
   try {
     const clients = await getClientsCache();
@@ -265,8 +232,8 @@ export async function fetchDevis(): Promise<Devis[]> {
 }
 
 export async function fetchInterventions(): Promise<Intervention[]> {
-  const result = await dolibarrCall<any[]>('/interventions?sortfield=t.rowid&sortorder=DESC&limit=50');
-  if (!result) return mockInterventions;
+  const result = await dolibarrGet<any[]>('/interventions?sortfield=t.rowid&sortorder=DESC&limit=100');
+  if (!result) return [];
   const mapped = result.map(mapDolibarrIntervention);
   try {
     const clients = await getClientsCache();
@@ -279,9 +246,22 @@ export async function fetchClients(): Promise<Client[]> {
 }
 
 export async function fetchProduits(): Promise<Produit[]> {
-  const result = await dolibarrCall<any[]>('/products?sortfield=t.rowid&sortorder=DESC&limit=100');
-  if (!result) return mockProduits;
+  const result = await dolibarrGet<any[]>('/products?sortfield=t.rowid&sortorder=DESC&limit=100');
+  if (!result) return [];
   return result.map(mapDolibarrProduit);
+}
+
+export async function fetchDolibarrUsers(): Promise<DolibarrUser[]> {
+  const result = await dolibarrGet<any[]>('/users?sortfield=t.rowid&sortorder=ASC&limit=100');
+  if (!result) return [];
+  return result.map((u: any) => ({
+    id: String(u.id),
+    login: u.login || '',
+    firstname: u.firstname || '',
+    lastname: u.lastname || '',
+    email: u.email || '',
+    statut: Number(u.statut) || 0,
+  })).filter((u: DolibarrUser) => u.statut === 1);
 }
 
 // --- Mutation functions ---
@@ -323,7 +303,7 @@ export async function updateProduit(id: string, data: { label: string; descripti
   });
 }
 
-export async function updateIntervention(id: string, data: { description?: string }): Promise<string | null> {
+export async function updateIntervention(id: string, data: { description?: string; note_public?: string; note_private?: string }): Promise<string | null> {
   return dolibarrCall<string>(`/interventions/${id}`, 'PUT', data);
 }
 
@@ -341,7 +321,24 @@ export async function createIntervention(data: { socid: string; description: str
   return result || '';
 }
 
-// --- Devis status management ---
+// --- Devis ---
+
+export interface CreateDevisLine {
+  desc: string;
+  qty: number;
+  subprice: number;
+  tva_tx: number;
+  product_type?: number;
+}
+
+export async function createDevis(socid: string, lines: CreateDevisLine[]): Promise<string> {
+  const result = await dolibarrCall<string>('/proposals', 'POST', {
+    socid: parseInt(socid, 10) || socid,
+    date: toUnixTimestamp(new Date().toISOString()),
+    lines,
+  });
+  return result || '';
+}
 
 export async function updateDevis(id: string, socid: string, lines: CreateDevisLine[]): Promise<string> {
   const result = await dolibarrCall<string>(`/proposals/${id}`, 'PUT', {
@@ -363,52 +360,7 @@ export async function deleteDevis(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/proposals/${id}`, 'DELETE');
 }
 
-export async function deleteFacture(id: string): Promise<string | null> {
-  return dolibarrCall<string>(`/invoices/${id}`, 'DELETE');
-}
-
-export async function deleteProduit(id: string): Promise<string | null> {
-  return dolibarrCall<string>(`/products/${id}`, 'DELETE');
-}
-
-export async function deleteIntervention(id: string): Promise<string | null> {
-  return dolibarrCall<string>(`/interventions/${id}`, 'DELETE');
-}
-
-// --- Dolibarr user sync ---
-
-export async function createDolibarrUser(data: { login: string; firstname: string; lastname: string; email: string }): Promise<string | null> {
-  return dolibarrCall<string>('/users', 'POST', {
-    login: data.login,
-    firstname: data.firstname,
-    lastname: data.lastname,
-    email: data.email,
-    statut: 1,
-  });
-}
-
-// --- Email variable replacement ---
-
-export function replaceEmailVariables(text: string, vars: Record<string, string>): string {
-  return text.replace(/\[([A-Z_]+)\]/g, (match, key) => vars[key] || match);
-}
-
-export interface CreateDevisLine {
-  desc: string;
-  qty: number;
-  subprice: number;
-  tva_tx: number;
-  product_type?: number;
-}
-
-export async function createDevis(socid: string, lines: CreateDevisLine[]): Promise<string> {
-  const result = await dolibarrCall<string>('/proposals', 'POST', {
-    socid: parseInt(socid, 10) || socid,
-    date: toUnixTimestamp(new Date().toISOString()),
-    lines,
-  });
-  return result || '';
-}
+// --- Factures ---
 
 export async function createFacture(socid: string, lines: CreateDevisLine[]): Promise<string> {
   const result = await dolibarrCall<string>('/invoices', 'POST', {
@@ -420,18 +372,12 @@ export async function createFacture(socid: string, lines: CreateDevisLine[]): Pr
   return result || '';
 }
 
-export async function createProduit(data: { ref: string; label: string; description?: string; price: number; tva_tx: number; type: number }): Promise<string> {
-  const result = await dolibarrCall<string>('/products', 'POST', {
-    ref: data.ref,
-    label: data.label,
-    description: data.description || '',
-    price: data.price,
-    tva_tx: data.tva_tx,
-    type: data.type,
-    status: 1,
-    status_buy: 1,
-  });
-  return result || '';
+export async function validateFacture(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/invoices/${id}/validate`, 'POST');
+}
+
+export async function deleteFacture(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/invoices/${id}`, 'DELETE');
 }
 
 export async function convertDevisToFacture(devisId: string): Promise<string | null> {
@@ -456,8 +402,41 @@ export async function createAcompteFacture(socid: string, montantHT: number, dev
   return result || '';
 }
 
+// --- Products ---
+
+export async function createProduit(data: { ref: string; label: string; description?: string; price: number; tva_tx: number; type: number }): Promise<string> {
+  const result = await dolibarrCall<string>('/products', 'POST', {
+    ref: data.ref,
+    label: data.label,
+    description: data.description || '',
+    price: data.price,
+    tva_tx: data.tva_tx,
+    type: data.type,
+    status: 1,
+    status_buy: 1,
+  });
+  return result || '';
+}
+
+export async function deleteProduit(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/products/${id}`, 'DELETE');
+}
+
+export async function deleteIntervention(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${id}`, 'DELETE');
+}
+
+// --- Intervention status transitions ---
+
+export async function validateIntervention(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${id}/validate`, 'POST');
+}
+
+export async function closeIntervention(id: string, status: number): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${id}/close`, 'POST', { status });
+}
+
 // --- PDF generation via Dolibarr builddoc ---
-// Dolibarr modulepart values: 'proposal' for devis, 'invoice' for factures, 'intervention' for interventions
 
 export type DolibarrModulepart = 'propal' | 'facture' | 'ficheinter';
 
@@ -475,8 +454,6 @@ export async function generatePDF(
     langcode: 'fr_FR',
   });
   if (!result) return null;
-  // builddoc returns { filename, content-type, filesize, content, ... }
-  // If content is present, create a blob URL (NO window.open — caller decides)
   if (result.content) {
     const byteChars = atob(result.content);
     const byteArray = new Uint8Array(byteChars.length);
@@ -484,10 +461,9 @@ export async function generatePDF(
     const blob = new Blob([byteArray], { type: 'application/pdf' });
     return URL.createObjectURL(blob);
   }
-  return result?.filename || result;
+  return result?.filename || null;
 }
 
-// Helper to open PDF in a new tab via blob download (avoids ERR_BLOCKED_BY_CLIENT)
 export function openPDFInNewTab(blobUrl: string, filename: string) {
   const a = document.createElement('a');
   a.href = blobUrl;
@@ -502,9 +478,8 @@ export async function downloadPDFUrl(
   modulepart: DolibarrModulepart,
   ref: string
 ): Promise<string | null> {
-  const result = await dolibarrCall<any>(
-    `/documents/download?modulepart=${modulepart}&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`,
-    'GET'
+  const result = await dolibarrGet<any>(
+    `/documents/download?modulepart=${modulepart}&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`
   );
   if (!result?.content) return null;
   const byteChars = atob(result.content);
@@ -514,17 +489,7 @@ export async function downloadPDFUrl(
   return URL.createObjectURL(blob);
 }
 
-// --- Validation ---
-
-export async function validateFacture(id: string): Promise<string | null> {
-  return dolibarrCall<string>(`/invoices/${id}/validate`, 'POST');
-}
-
-export async function validateIntervention(id: string): Promise<string | null> {
-  return dolibarrCall<string>(`/interventions/${id}/validate`, 'POST');
-}
-
-// --- Send by email ---
+// --- Send by email via Dolibarr SMTP ---
 
 export async function sendDevisByEmail(id: string, to: string, subject: string, message: string): Promise<any> {
   return dolibarrCall<any>(`/proposals/${id}/sendByEmail`, 'POST', {
@@ -553,7 +518,7 @@ export async function sendInterventionByEmail(id: string, to: string, subject: s
   });
 }
 
-// --- Bulk delete ---
+// --- Bulk operations ---
 
 export async function bulkDeleteDevis(ids: string[]): Promise<void> {
   await Promise.allSettled(ids.map(id => dolibarrCall(`/proposals/${id}`, 'DELETE')));
@@ -563,7 +528,7 @@ export async function bulkDeleteFactures(ids: string[]): Promise<void> {
   await Promise.allSettled(ids.map(id => dolibarrCall(`/invoices/${id}`, 'DELETE')));
 }
 
-// --- Update devis/facture lines (PUT, draft only) ---
+// --- Update lines (PUT, draft only) ---
 
 export async function updateDevisLines(id: string, socid: string, lines: CreateDevisLine[]): Promise<string> {
   const result = await dolibarrCall<string>(`/proposals/${id}`, 'PUT', {
@@ -584,7 +549,7 @@ export async function updateFactureLines(id: string, socid: string, lines: Creat
 // --- Check payment status ---
 
 export async function checkAcomptePayment(factureId: string): Promise<{ paye: boolean; totalPaie: number }> {
-  const result = await dolibarrCall<any>(`/invoices/${factureId}`);
+  const result = await dolibarrGet<any>(`/invoices/${factureId}`);
   if (!result) return { paye: false, totalPaie: 0 };
   return {
     paye: result.paye === '1' || result.paye === 1,
@@ -592,13 +557,31 @@ export async function checkAcomptePayment(factureId: string): Promise<{ paye: bo
   };
 }
 
-function toast_info(msg: string) {
-  console.log(msg);
+// --- Dolibarr user sync ---
+
+export async function createDolibarrUser(data: { login: string; firstname: string; lastname: string; email: string }): Promise<string | null> {
+  return dolibarrCall<string>('/users', 'POST', {
+    login: data.login,
+    firstname: data.firstname,
+    lastname: data.lastname,
+    email: data.email,
+    statut: 1,
+  });
+}
+
+// --- Email variable replacement ---
+
+export function replaceEmailVariables(text: string, vars: Record<string, string>): string {
+  return text.replace(/\[([A-Z_]+)\]/g, (match, key) => vars[key] || match);
 }
 
 export async function testDolibarrConnection(): Promise<boolean> {
-  const result = await dolibarrCall<any>('/status');
-  return result !== null;
+  try {
+    const result = await dolibarrCall<any>('/status');
+    return result !== null;
+  } catch {
+    return false;
+  }
 }
 
 // --- Helpers ---
@@ -617,18 +600,8 @@ function parseDolibarrDate(val: any): string {
 // --- Mapping Dolibarr → App types ---
 
 function mapDolibarrFacture(d: any): Facture {
-  let statut: Facture['statut'];
-  if (d.paye === '1' || d.paye === 1) {
-    statut = 'payée';
-  } else if (String(d.fk_statut) === '0') {
-    statut = 'brouillon';
-  } else if (String(d.fk_statut) === '1') {
-    statut = 'impayée';
-  } else if (String(d.fk_statut) === '2') {
-    statut = 'payée';
-  } else {
-    statut = 'en retard';
-  }
+  const fk_statut = Number(d.fk_statut) || 0;
+  const paye = d.paye === '1' || d.paye === 1;
   return {
     id: String(d.id),
     ref: d.ref || `FA-${d.id}`,
@@ -637,13 +610,14 @@ function mapDolibarrFacture(d: any): Facture {
     date: parseDolibarrDate(d.date || d.datef || d.date_creation),
     montantHT: parseFloat(d.total_ht) || 0,
     montantTTC: parseFloat(d.total_ttc) || 0,
-    statut,
+    statut: getFactureStatutLabel(fk_statut, paye),
+    fk_statut,
+    paye,
   };
 }
 
 function mapDolibarrDevis(d: any): Devis {
-  const statutMap: Record<string, Devis['statut']> = { '0': 'brouillon', '1': 'en attente', '2': 'accepté', '3': 'refusé' };
-  const statut = statutMap[String(d.fk_statut)] || 'brouillon';
+  const fk_statut = Number(d.fk_statut) || 0;
   return {
     id: String(d.id),
     ref: d.ref || `DE-${d.id}`,
@@ -652,7 +626,8 @@ function mapDolibarrDevis(d: any): Devis {
     date: parseDolibarrDate(d.date || d.datep || d.date_creation),
     montantHT: parseFloat(d.total_ht) || 0,
     montantTTC: parseFloat(d.total_ttc) || 0,
-    statut,
+    statut: getDevisStatutLabel(fk_statut),
+    fk_statut,
     lignes: (d.lines || []).map((l: any) => ({
       designation: l.desc || l.label || '',
       quantite: parseFloat(l.qty) || 0,
@@ -664,25 +639,20 @@ function mapDolibarrDevis(d: any): Devis {
 }
 
 function mapDolibarrIntervention(d: any): Intervention {
-  const statutMap: Record<string, InterventionStatut> = {
-    '0': 'brouillon',
-    '1': 'validé',
-    '2': 'en cours',
-    '3': 'terminé',
-    '4': 'facturé',
-    '5': 'annulé',
-  };
-  const technicien = d.array_options?.options_technicien || d.user_author?.firstname && `${d.user_author.firstname} ${d.user_author.lastname || ''}`.trim() || '';
+  const fk_statut = Number(d.fk_statut) || 0;
+  const technicien = d.array_options?.options_technicien || (d.user_author?.firstname ? `${d.user_author.firstname} ${d.user_author.lastname || ''}`.trim() : '');
   return {
     id: String(d.id),
     ref: d.ref || `INT-${d.id}`,
     client: d.thirdparty?.name || d.nom || `Client #${d.socid}`,
     socid: String(d.socid || ''),
     technicien,
+    user_author_id: d.user_author_id ? String(d.user_author_id) : undefined,
     date: parseDolibarrDate(d.datei || d.dateo || d.date || d.date_creation),
     heureDebut: '08:00',
     heureFin: '10:00',
-    statut: statutMap[String(d.fk_statut)] || 'brouillon',
+    statut: getInterventionStatutLabel(fk_statut),
+    fk_statut,
     type: 'chantier',
     description: d.description || '',
     descriptionClient: d.note_public || '',
@@ -727,8 +697,7 @@ export function getAcompteBadge(montantHT: number): { label: string; variant: 'g
   };
 }
 
-export const techniciens = ['Thomas Moreau', 'Lucas Martin', 'Nicolas Petit'];
-export const statutsIntervention: InterventionStatut[] = ['brouillon', 'validé', 'en cours', 'terminé', 'facturé', 'annulé'];
+export const statutsIntervention: string[] = ['Brouillon', 'Validée', 'En cours', 'Terminée', 'Facturée', 'Annulée'];
 export const typesIntervention: { value: InterventionType; label: string }[] = [
   { value: 'devis_sur_place', label: 'Devis sur place' },
   { value: 'panne', label: 'Panne' },

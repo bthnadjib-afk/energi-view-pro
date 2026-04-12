@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Euro, FileText, ClipboardList, TrendingUp, Users, AlertTriangle, Clock, Receipt, Wallet, CalendarDays } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PeriodSelector, type Period } from '@/components/PeriodSelector';
 import { UrgencyWidget } from '@/components/UrgencyWidget';
 import { useFactures, useDevis, useInterventions } from '@/hooks/useDolibarr';
-import { techniciens, formatDateFR } from '@/services/dolibarr';
+import { formatDateFR } from '@/services/dolibarr';
 
 export default function Dashboard() {
   const { data: factures = [] } = useFactures();
@@ -26,14 +26,22 @@ export default function Dashboard() {
   });
 
   const totalCA = filteredFactures.reduce((s, f) => s + f.montantHT, 0);
-  const devisEnAttente = devis.filter(d => d.statut === 'en attente').length;
-  const interventionsActives = interventions.filter(i => i.statut === 'validé' || i.statut === 'en cours').length;
-  const devisAcceptes = devis.filter(d => d.statut === 'accepté').length;
-  const tauxConversion = devis.length > 0 ? Math.round((devisAcceptes / devis.length) * 100) : 0;
+  const devisValides = devis.filter(d => d.fk_statut === 1).length;
+  const interventionsActives = interventions.filter(i => i.fk_statut === 1 || i.fk_statut === 2).length;
+  const devisSignes = devis.filter(d => d.fk_statut === 2).length;
+  const tauxConversion = devis.length > 0 ? Math.round((devisSignes / devis.length) * 100) : 0;
 
   const today = now.toISOString().slice(0, 10);
   const todayInterventions = interventions.filter(i => i.date === today);
-  const byTechnician = techniciens.map(t => ({
+
+  // Group by unique technicians from today's interventions
+  const techNames = useMemo(() => {
+    const names = new Set<string>();
+    todayInterventions.forEach(i => { if (i.technicien) names.add(i.technicien); });
+    return Array.from(names);
+  }, [todayInterventions]);
+
+  const byTechnician = techNames.map(t => ({
     name: t,
     interventions: todayInterventions.filter(i => i.technicien === t),
   }));
@@ -41,13 +49,13 @@ export default function Dashboard() {
   // Priority items
   const sevenDaysAgo = new Date(now);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const devisRelances = devis.filter(d => d.statut === 'en attente' && new Date(d.date) <= sevenDaysAgo);
-  const facturesImpayees = factures.filter(f => f.statut === 'impayée' || f.statut === 'en retard');
-  const interventionsAValider = interventions.filter(i => i.statut === 'brouillon' || i.statut === 'validé');
+  const devisRelances = devis.filter(d => d.fk_statut === 1 && new Date(d.date) <= sevenDaysAgo);
+  const facturesImpayees = factures.filter(f => f.fk_statut === 1 && !f.paye);
+  const interventionsAValider = interventions.filter(i => i.fk_statut === 0);
 
   // CASH widget
   const totalImpaye = facturesImpayees.reduce((s, f) => s + f.montantHT, 0);
-  const interventionsTerminees = interventions.filter(i => i.statut === 'terminé');
+  const interventionsTerminees = interventions.filter(i => i.fk_statut === 3);
   const aFacturer = interventionsTerminees.length;
 
   const hasPriorities = devisRelances.length > 0 || facturesImpayees.length > 0 || interventionsAValider.length > 0;
@@ -71,8 +79,8 @@ export default function Dashboard() {
           gradient="bg-gradient-to-br from-blue-500 to-indigo-600"
         />
         <StatCard
-          title="Devis en attente"
-          value={String(devisEnAttente)}
+          title="Devis validés"
+          value={String(devisValides)}
           subtitle={`${devis.length} devis total`}
           icon={ClipboardList}
           gradient="bg-gradient-to-br from-violet-500 to-purple-600"
@@ -182,7 +190,7 @@ export default function Dashboard() {
             {interventionsAValider.length > 0 && (
               <div className="glass rounded-lg p-4 border-l-4 border-l-amber-500">
                 <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-amber-400" /> Interventions à valider ({interventionsAValider.length})
+                  <Clock className="h-4 w-4 text-amber-400" /> Interventions brouillon ({interventionsAValider.length})
                 </h3>
                 <div className="space-y-2">
                   {interventionsAValider.slice(0, 5).map(i => (
@@ -201,17 +209,15 @@ export default function Dashboard() {
       <UrgencyWidget interventions={interventions} />
 
       {/* Today view by technician */}
-      <div className="glass rounded-xl p-5">
-        <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-          <Users className="h-5 w-5 text-primary" /> Aujourd'hui — par technicien
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {byTechnician.map(({ name, interventions: ints }) => (
-            <div key={name} className="glass rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-foreground mb-2">{name}</h3>
-              {ints.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Aucune intervention</p>
-              ) : (
+      {byTechnician.length > 0 && (
+        <div className="glass rounded-xl p-5">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" /> Aujourd'hui — par technicien
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {byTechnician.map(({ name, interventions: ints }) => (
+              <div key={name} className="glass rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-foreground mb-2">{name}</h3>
                 <div className="space-y-2">
                   {ints.map(i => (
                     <div key={i.id} className="flex items-center justify-between text-xs">
@@ -223,11 +229,11 @@ export default function Dashboard() {
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="glass rounded-xl p-5">
         <h2 className="text-lg font-semibold text-foreground mb-4">Interventions récentes</h2>
