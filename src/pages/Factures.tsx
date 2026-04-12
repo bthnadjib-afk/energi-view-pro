@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react';
-import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send } from 'lucide-react';
+import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture } from '@/hooks/useDolibarr';
-import { formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendFactureByEmail } from '@/services/dolibarr';
+import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines } from '@/hooks/useDolibarr';
+import { formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendFactureByEmail, type CreateDevisLine } from '@/services/dolibarr';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,6 +28,8 @@ export default function Factures() {
   const createFactureMutation = useCreateFacture();
   const deleteFactureMutation = useDeleteFacture();
   const validateFactureMutation = useValidateFacture();
+  const addPaymentMutation = useAddPayment();
+  const updateLinesMutation = useUpdateFactureLines();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedFacture, setSelectedFacture] = useState<any>(null);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -37,6 +39,16 @@ export default function Factures() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [socid, setSocid] = useState('');
   const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '' }]);
+
+  // Payment state
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentMode, setPaymentMode] = useState(4); // 4=CB, 6=Virement, 7=Chèque
+
+  // Edit draft state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editLines, setEditLines] = useState<LigneForm[]>([]);
 
   const totalCA = factures.reduce((s, f) => s + f.montantTTC, 0);
   const payees = factures.filter(f => f.paye);
@@ -53,7 +65,7 @@ export default function Factures() {
     } else {
       const p = produits.find(pr => pr.id === productId);
       if (p) {
-        updated[i] = { ...updated[i], productId, desc: `[${p.ref}] ${p.label}`, subprice: p.prixHT, tva_tx: 20, product_type: p.type === 'main_oeuvre' ? 1 : 0 };
+        updated[i] = { ...updated[i], productId, desc: `[${p.ref}] ${p.label}`, subprice: p.prixHT, tva_tx: p.tauxTVA || 20, product_type: p.type === 'main_oeuvre' ? 1 : 0 };
       }
     }
     setLignes(updated);
@@ -82,6 +94,36 @@ export default function Factures() {
     setLignes([emptyLigne()]);
   };
 
+  const handlePayment = async () => {
+    if (!selectedFacture || paymentAmount <= 0) return;
+    await addPaymentMutation.mutateAsync({
+      invoiceId: selectedFacture.id,
+      datepaye: paymentDate,
+      paymentid: paymentMode,
+      closepaidinvoices: paymentAmount >= selectedFacture.montantTTC ? 'yes' : 'no',
+      amount: paymentAmount,
+    });
+    setPaymentOpen(false);
+    setSelectedFacture(null);
+  };
+
+  const openEditDraft = (f: any) => {
+    // We don't have lines from the list view, start with a placeholder
+    setEditLines([{ desc: 'Chargement...', qty: 1, subprice: f.montantHT, tva_tx: 20, product_type: 1, productId: '' }]);
+    setEditOpen(true);
+  };
+
+  const handleSaveEditLines = async () => {
+    if (!selectedFacture) return;
+    await updateLinesMutation.mutateAsync({
+      id: selectedFacture.id,
+      socid: selectedFacture.socid || '',
+      lines: editLines.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type })),
+    });
+    setEditOpen(false);
+    setSelectedFacture(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -96,7 +138,10 @@ export default function Factures() {
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Nouvelle facture (Brouillon)</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Nouvelle facture (Brouillon)</DialogTitle>
+              <DialogDescription className="sr-only">Formulaire de création de facture</DialogDescription>
+            </DialogHeader>
             <div className="space-y-4 pt-2">
               <Select value={socid} onValueChange={setSocid}>
                 <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
@@ -227,6 +272,7 @@ export default function Factures() {
             <>
               <DialogHeader>
                 <DialogTitle>{selectedFacture.ref}</DialogTitle>
+                <DialogDescription className="sr-only">Détails de la facture</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-2">
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -241,15 +287,40 @@ export default function Factures() {
                 </div>
                 <div className="flex flex-wrap gap-3 pt-2">
                   {selectedFacture.fk_statut === 0 && (
+                    <>
+                      <Button
+                        onClick={() => validateFactureMutation.mutate(selectedFacture.id, { onSuccess: () => setSelectedFacture(null) })}
+                        disabled={validateFactureMutation.isPending}
+                        className="gap-2"
+                      >
+                        <FileCheck className="h-4 w-4" />
+                        {validateFactureMutation.isPending ? 'Validation...' : 'Valider'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => openEditDraft(selectedFacture)}
+                      >
+                        <Pencil className="h-4 w-4" /> Modifier les lignes
+                      </Button>
+                    </>
+                  )}
+
+                  {/* Payment button for validated unpaid invoices */}
+                  {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && (
                     <Button
-                      onClick={() => validateFactureMutation.mutate(selectedFacture.id, { onSuccess: () => setSelectedFacture(null) })}
-                      disabled={validateFactureMutation.isPending}
+                      variant="outline"
                       className="gap-2"
+                      onClick={() => {
+                        setPaymentAmount(selectedFacture.montantTTC);
+                        setPaymentDate(new Date().toISOString().slice(0, 10));
+                        setPaymentOpen(true);
+                      }}
                     >
-                      <FileCheck className="h-4 w-4" />
-                      {validateFactureMutation.isPending ? 'Validation...' : 'Valider'}
+                      <CreditCard className="h-4 w-4" /> Enregistrer un paiement
                     </Button>
                   )}
+
                   <Button
                     variant="outline"
                     className="gap-2"
@@ -285,10 +356,90 @@ export default function Factures() {
         </DialogContent>
       </Dialog>
 
+      {/* Payment dialog */}
+      <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Enregistrer un paiement</DialogTitle>
+            <DialogDescription className="sr-only">Formulaire de paiement</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Montant (€)</label>
+              <Input type="number" value={paymentAmount} onChange={e => setPaymentAmount(Number(e.target.value))} step="0.01" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Date du paiement</label>
+              <Input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Mode de paiement</label>
+              <Select value={String(paymentMode)} onValueChange={v => setPaymentMode(Number(v))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="4">Carte bancaire</SelectItem>
+                  <SelectItem value="6">Virement</SelectItem>
+                  <SelectItem value="7">Chèque</SelectItem>
+                  <SelectItem value="2">Espèces</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handlePayment} disabled={addPaymentMutation.isPending || paymentAmount <= 0} className="w-full">
+              {addPaymentMutation.isPending ? 'Enregistrement...' : 'Enregistrer le paiement'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit draft lines dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Modifier les lignes (Brouillon)</DialogTitle>
+            <DialogDescription className="sr-only">Modification des lignes de facture</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-foreground">Lignes</h3>
+              <Button variant="outline" size="sm" onClick={() => setEditLines([...editLines, emptyLigne()])} className="gap-1"><Plus className="h-3 w-3" /> Ajouter</Button>
+            </div>
+            {editLines.map((l, i) => (
+              <div key={i} className="space-y-2 p-3 rounded-lg bg-muted/50 border border-border">
+                <div className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-5">
+                    <Input placeholder="Désignation" value={l.desc} onChange={e => { const u = [...editLines]; u[i] = { ...u[i], desc: e.target.value }; setEditLines(u); }} className="text-xs" />
+                  </div>
+                  <div className="col-span-2">
+                    <Input type="number" placeholder="Qté" value={l.qty} onChange={e => { const u = [...editLines]; u[i] = { ...u[i], qty: Number(e.target.value) }; setEditLines(u); }} className="text-xs" />
+                  </div>
+                  <div className="col-span-2">
+                    <Input type="number" placeholder="Prix HT" value={l.subprice} onChange={e => { const u = [...editLines]; u[i] = { ...u[i], subprice: Number(e.target.value) }; setEditLines(u); }} className="text-xs" />
+                  </div>
+                  <div className="col-span-2">
+                    <Input type="number" placeholder="TVA%" value={l.tva_tx} onChange={e => { const u = [...editLines]; u[i] = { ...u[i], tva_tx: Number(e.target.value) }; setEditLines(u); }} className="text-xs" />
+                  </div>
+                  <div className="col-span-1">
+                    {editLines.length > 1 && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditLines(editLines.filter((_, idx) => idx !== i))}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <Button onClick={handleSaveEditLines} disabled={updateLinesMutation.isPending} className="w-full">
+              {updateLinesMutation.isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Email dialog */}
       <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Envoyer la facture par email</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Envoyer la facture par email</DialogTitle>
+            <DialogDescription className="sr-only">Formulaire d'envoi par email</DialogDescription>
+          </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
               <label className="text-sm text-muted-foreground">Destinataire</label>
