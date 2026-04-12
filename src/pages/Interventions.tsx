@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture } from '@/hooks/useDolibarr';
-import { techniciens, statutsIntervention, typesIntervention, formatDateFR, generatePDF, downloadPDFUrl, sendInterventionByEmail, validateIntervention, type InterventionType, type Intervention, type InterventionStatut } from '@/services/dolibarr';
+import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention } from '@/hooks/useDolibarr';
+import { techniciens, statutsIntervention, typesIntervention, formatDateFR, generatePDF, downloadPDFUrl, sendInterventionByEmail, type InterventionType, type Intervention, type InterventionStatut } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
 import { SignaturePad } from '@/components/SignaturePad';
-import { Plus, FileText, Receipt, Camera, Clock, ArrowRightLeft, Lock, FileDown } from 'lucide-react';
+import { Plus, FileText, Receipt, Camera, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 const typeLabels: Record<InterventionType, string> = {
   devis_sur_place: 'Devis sur place',
