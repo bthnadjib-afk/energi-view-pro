@@ -3,7 +3,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis } from '@/hooks/useDolibarr';
 import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, openPDFInNewTab, downloadPDFUrl, sendDevisByEmail, type Devis as DevisType } from '@/services/dolibarr';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -102,11 +102,8 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
     if (!emailDest || !emailObjet) return;
     setSendingEmail(true);
     try {
-      // First generate PDF so Dolibarr can attach it
       await generatePDF('propal', devis.id, devis.ref, 'azur');
-      // Send via Dolibarr API
       await sendDevisByEmail(devis.id, emailDest, emailObjet, emailMessage);
-      // Also log in local history
       await supabase.from('email_history').insert({
         user_id: user?.id || '',
         client_id: devis.socid || '',
@@ -117,17 +114,7 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
       });
       toast.success('Devis envoyé par email via Dolibarr');
     } catch (e: any) {
-      console.warn('Email send error:', e);
-      // Fallback: at least save in history
-      await supabase.from('email_history').insert({
-        user_id: user?.id || '',
-        client_id: devis.socid || '',
-        document_ref: devis.ref,
-        destinataire: emailDest,
-        objet: emailObjet,
-        message: emailMessage,
-      });
-      toast.warning('Email enregistré localement — l\'envoi Dolibarr a échoué');
+      toast.error(`Erreur envoi email : ${e.message || e}`);
     }
     setSendingEmail(false);
     setEmailOpen(false);
@@ -136,7 +123,7 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
   const handleAccepter = (signatureDataUrl: string) => {
     closeMutation.mutate({ id: devis.id, status: 2 }, {
       onSuccess: () => {
-        toast.success('Devis accepté — Créer une facture d\'acompte ?', {
+        toast.success('Devis signé — Créer une facture d\'acompte ?', {
           action: { label: 'Créer acompte', onClick: onAcompte },
           duration: 8000,
         });
@@ -151,22 +138,23 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
       const url = await generatePDF('propal', devis.id, devis.ref, 'azur');
       if (url) {
         openPDFInNewTab(url, `${devis.ref}.pdf`);
-        toast.success(`PDF du devis ${devis.ref} téléchargé`);
+        toast.success(`PDF ${devis.ref} téléchargé`);
       } else {
-        // Fallback: try download endpoint
         const dlUrl = await downloadPDFUrl('propal', devis.ref);
-        if (dlUrl) {
-          openPDFInNewTab(dlUrl, `${devis.ref}.pdf`);
-          toast.success(`PDF du devis ${devis.ref} téléchargé`);
-        } else {
-          toast.success(`PDF du devis ${devis.ref} généré`);
-        }
+        if (dlUrl) openPDFInNewTab(dlUrl, `${devis.ref}.pdf`);
+        else toast.error('PDF non disponible');
       }
-    } catch {
-      toast.error('Erreur lors de la génération du PDF');
+    } catch (e: any) {
+      toast.error(`Erreur PDF : ${e.message || e}`);
     }
     setGeneratingPDF(false);
   };
+
+  // fk_statut: 0=Brouillon, 1=Validé, 2=Signé, 3=Refusé, 4=Facturé
+  const isDraft = devis.fk_statut === 0;
+  const isValidated = devis.fk_statut === 1;
+  const isSigned = devis.fk_statut === 2;
+  const isRefused = devis.fk_statut === 3;
 
   return (
     <tr>
@@ -204,28 +192,22 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
             </tbody>
           </table>
 
-          {/* Status action buttons */}
+          {/* Action buttons based on fk_statut */}
           <div className="flex flex-wrap gap-3 pt-3 border-t border-border/30">
-            {devis.statut === 'brouillon' && (
+            {/* Brouillon: Valider + Modifier + Supprimer */}
+            {isDraft && (
               <>
-                <Button
-                  onClick={() => validateMutation.mutate(devis.id)}
-                  disabled={validateMutation.isPending}
-                  className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0"
-                >
-                  <FileCheck className="h-4 w-4" />
-                  {validateMutation.isPending ? 'Validation...' : 'Valider le devis'}
+                <Button onClick={() => validateMutation.mutate(devis.id)} disabled={validateMutation.isPending} className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
+                  <FileCheck className="h-4 w-4" /> {validateMutation.isPending ? 'Validation...' : 'Valider'}
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="outline" className="gap-2 glass border-red-500/30 text-red-400">
-                      <Trash2 className="h-4 w-4" /> Supprimer
-                    </Button>
+                    <Button variant="outline" className="gap-2 glass border-red-500/30 text-red-400"><Trash2 className="h-4 w-4" /> Supprimer</Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Supprimer ce devis ?</AlertDialogTitle>
-                      <AlertDialogDescription>Le devis {devis.ref} sera définitivement supprimé.</AlertDialogDescription>
+                      <AlertDialogTitle>Supprimer {devis.ref} ?</AlertDialogTitle>
+                      <AlertDialogDescription>Suppression définitive.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Annuler</AlertDialogCancel>
@@ -236,51 +218,42 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
               </>
             )}
 
-            {devis.statut === 'en attente' && (
+            {/* Validé: Classer Signé + Classer Refusé + Envoyer Mail + PDF */}
+            {isValidated && (
               <>
-                <Button
-                  onClick={() => setShowSignature(true)}
-                  disabled={closeMutation.isPending}
-                  className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0"
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  Accepter (Signé)
+                <Button onClick={() => setShowSignature(true)} disabled={closeMutation.isPending} className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0">
+                  <CheckCircle2 className="h-4 w-4" /> Classer Signé
                 </Button>
-                <Button
-                  onClick={() => closeMutation.mutate({ id: devis.id, status: 3 })}
-                  disabled={closeMutation.isPending}
-                  variant="outline"
-                  className="gap-2 glass border-red-500/30 text-red-400 hover:text-red-300"
-                >
-                  <XCircle className="h-4 w-4" />
-                  Refuser
+                <Button onClick={() => closeMutation.mutate({ id: devis.id, status: 3 })} disabled={closeMutation.isPending} variant="outline" className="gap-2 glass border-red-500/30 text-red-400">
+                  <XCircle className="h-4 w-4" /> Classer Refusé
                 </Button>
               </>
             )}
 
-            {devis.statut === 'accepté' && (
+            {/* Signé: Générer Facture + Acompte */}
+            {isSigned && (
               <>
                 <Button onClick={onConvert} disabled={convertPending} className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0">
-                  <ArrowRightLeft className="h-4 w-4" />
-                  {convertPending ? 'Conversion...' : 'Convertir en Facture'}
+                  <ArrowRightLeft className="h-4 w-4" /> {convertPending ? 'Conversion...' : 'Générer Facture'}
                 </Button>
                 <Button onClick={onAcompte} disabled={acomptePending} variant="outline" className="gap-2 glass border-border/50">
-                  <Receipt className="h-4 w-4" />
-                  {acomptePending ? 'Création...' : 'Saisir un acompte'}
+                  <Receipt className="h-4 w-4" /> {acomptePending ? 'Création...' : 'Saisir un acompte'}
                 </Button>
               </>
             )}
 
+            {/* PDF & Email always available when not draft */}
             <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2 glass border-border/50">
               <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
             </Button>
-
-            <Button onClick={() => setEmailOpen(true)} variant="outline" className="gap-2 glass border-border/50">
-              <Send className="h-4 w-4" /> Envoyer par email
-            </Button>
+            {!isDraft && (
+              <Button onClick={() => setEmailOpen(true)} variant="outline" className="gap-2 glass border-border/50">
+                <Send className="h-4 w-4" /> Envoyer par email
+              </Button>
+            )}
           </div>
 
-          {/* Signature pad for acceptance */}
+          {/* Signature pad */}
           {showSignature && (
             <div className="p-4 rounded-lg bg-accent/30 border border-border/30 space-y-3">
               <p className="text-sm font-medium text-foreground">Signature du client pour acceptation</p>
@@ -316,7 +289,7 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
                   <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="glass border-border/50 min-h-[120px]" />
                 </div>
                 <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest} className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
-                  {sendingEmail ? 'Envoi...' : 'Envoyer'}
+                  {sendingEmail ? 'Envoi via Dolibarr...' : 'Envoyer'}
                 </Button>
               </div>
             </DialogContent>
@@ -371,7 +344,6 @@ export default function Devis() {
     setLignes(updated);
   };
 
-  // Real-time totals (HT only, no TVA)
   const totals = useMemo(() => {
     const ht = lignes.reduce((s, l) => s + l.qty * l.subprice, 0);
     const achat = lignes.reduce((s, l) => s + l.qty * l.prixAchat, 0);
@@ -396,7 +368,7 @@ export default function Devis() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Devis</h1>
-          <p className="text-muted-foreground text-sm">Propositions commerciales HT — TVA sur facture finale uniquement</p>
+          <p className="text-muted-foreground text-sm">Propositions commerciales — statuts natifs Dolibarr</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -405,7 +377,7 @@ export default function Devis() {
             </Button>
           </DialogTrigger>
           <DialogContent className="glass-strong border-border/50 max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle className="text-foreground">Nouveau devis (HT)</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-foreground">Nouveau devis (Brouillon)</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
               <Select value={socid} onValueChange={setSocid}>
                 <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
@@ -424,9 +396,7 @@ export default function Devis() {
                 {lignes.map((l, i) => (
                   <div key={i} className="space-y-2 p-3 rounded-lg bg-accent/10 border border-border/30">
                     <Select value={l.productId || '__libre__'} onValueChange={(v) => selectProduct(i, v)}>
-                      <SelectTrigger className="glass border-border/50 text-xs">
-                        <SelectValue placeholder="Sélectionner un article" />
-                      </SelectTrigger>
+                      <SelectTrigger className="glass border-border/50 text-xs"><SelectValue placeholder="Sélectionner un article" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__libre__">✏️ Ligne libre</SelectItem>
                         {produits.map(p => (
@@ -436,17 +406,6 @@ export default function Devis() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {!l.productId && (
-                      <Select value={String(l.product_type)} onValueChange={v => updateLigne(i, 'product_type', Number(v))}>
-                        <SelectTrigger className="glass border-border/50 text-xs w-40">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">Fourniture</SelectItem>
-                          <SelectItem value="1">Main d'œuvre</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
                     <div className="grid grid-cols-12 gap-2 items-end">
                       <div className="col-span-6">
                         <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="glass border-border/50 text-xs" />
@@ -469,24 +428,19 @@ export default function Devis() {
                 ))}
               </div>
 
-              {/* Real-time totals HT */}
               <div className="rounded-lg bg-accent/20 border border-border/30 p-4 space-y-1">
-                <div className="flex justify-between text-sm font-bold">
-                  <span className="text-foreground">Total HT</span>
-                  <span className="text-primary">{totals.ht.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total HT</span>
+                  <span className="text-foreground font-medium">{totals.ht.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
                 </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-emerald-400">Marge brute</span>
-                  <span className="text-emerald-400">{totals.marge.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € ({totals.pctMarge.toFixed(0)}%)</span>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Marge</span>
+                  <span className="text-emerald-400 font-medium">{totals.marge.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € ({totals.pctMarge.toFixed(0)}%)</span>
                 </div>
               </div>
 
-              <Button
-                onClick={handleCreate}
-                disabled={createDevisMutation.isPending || !socid}
-                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 text-base"
-              >
-                {createDevisMutation.isPending ? 'Création...' : 'Créer le devis'}
+              <Button onClick={handleCreate} disabled={createDevisMutation.isPending || !socid} className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 text-base">
+                {createDevisMutation.isPending ? 'Création...' : 'Créer le devis (Brouillon)'}
               </Button>
             </div>
           </DialogContent>
@@ -503,39 +457,32 @@ export default function Devis() {
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Client</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Date</th>
                 <th className="text-right py-3 px-2 text-muted-foreground font-medium">Montant HT</th>
-                <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden md:table-cell">Statut</th>
-                <th className="text-left py-3 px-2 text-muted-foreground font-medium">Acompte</th>
+                <th className="text-left py-3 px-2 text-muted-foreground font-medium">Statut</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium w-10"></th>
               </tr>
             </thead>
             <tbody>
               {devis.map((d) => (
                 <Fragment key={d.id}>
-                  <tr
-                    className="border-b border-border/30 hover:bg-accent/30 transition-colors cursor-pointer"
-                    onClick={() => setExpandedId(expandedId === d.id ? null : d.id)}
-                  >
+                  <tr className="border-b border-border/30 hover:bg-accent/30 transition-colors cursor-pointer" onClick={() => setExpandedId(expandedId === d.id ? null : d.id)}>
                     <td className="py-3 px-2">
                       {expandedId === d.id ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                     </td>
                     <td className="py-3 px-2 font-mono text-xs text-foreground">{d.ref}</td>
                     <td className="py-3 px-2 text-foreground">{d.client}</td>
                     <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(d.date)}</td>
-                    <td className="py-3 px-2 text-right font-medium text-foreground">{(d.montantHT ?? 0).toLocaleString('fr-FR')} €</td>
-                    <td className="py-3 px-2 hidden md:table-cell"><StatusBadge statut={d.statut} /></td>
-                    <td className="py-3 px-2"><AcompteBadge montantHT={d.montantHT} /></td>
+                    <td className="py-3 px-2 text-right font-medium text-foreground">{d.montantHT.toLocaleString('fr-FR')} €</td>
+                    <td className="py-3 px-2"><StatusBadge statut={d.statut} /></td>
                     <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
-                      {d.statut === 'brouillon' && (
+                      {d.fk_statut === 0 && (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Supprimer ce devis ?</AlertDialogTitle>
-                              <AlertDialogDescription>Le devis {d.ref} sera définitivement supprimé.</AlertDialogDescription>
+                              <AlertDialogTitle>Supprimer {d.ref} ?</AlertDialogTitle>
+                              <AlertDialogDescription>Suppression définitive.</AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Annuler</AlertDialogCancel>

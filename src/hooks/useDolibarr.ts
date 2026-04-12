@@ -1,6 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, deleteClient, updateClient, createIntervention, createDevis, createFacture, createProduit, convertDevisToFacture, createAcompteFacture, updateDevis, validateDevis, closeDevis, deleteDevis, deleteFacture, deleteProduit, deleteIntervention, createDolibarrUser, validateFacture, validateIntervention, bulkDeleteDevis, bulkDeleteFactures, updateDevisLines, updateFactureLines, updateProduit, updateIntervention, type CreateDevisLine } from '@/services/dolibarr';
+import {
+  fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, fetchDolibarrUsers,
+  createClient, deleteClient, updateClient,
+  createIntervention, updateIntervention, deleteIntervention, validateIntervention, closeIntervention,
+  createDevis, updateDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
+  createFacture, validateFacture, deleteFacture, updateFactureLines,
+  convertDevisToFacture, createAcompteFacture,
+  createProduit, deleteProduit, updateProduit,
+  bulkDeleteDevis, bulkDeleteFactures,
+  createDolibarrUser,
+  type CreateDevisLine,
+} from '@/services/dolibarr';
 import { toast } from 'sonner';
+
+// --- Queries ---
 
 export function useFactures() {
   return useQuery({ queryKey: ['factures'], queryFn: fetchFactures });
@@ -22,12 +35,27 @@ export function useProduits() {
   return useQuery({ queryKey: ['produits'], queryFn: fetchProduits });
 }
 
+export function useDolibarrUsers() {
+  return useQuery({ queryKey: ['dolibarr-users'], queryFn: fetchDolibarrUsers });
+}
+
+// --- Client mutations ---
+
 export function useCreateClient() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: { nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }) => createClient(data),
-    onSuccess: () => { toast.success('Client créé avec succès'); qc.invalidateQueries({ queryKey: ['clients'] }); },
-    onError: (e: any) => toast.error(`Erreur création client : ${e.message || e}`),
+    onSuccess: () => { toast.success('Client créé'); qc.invalidateQueries({ queryKey: ['clients'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useUpdateClient() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { id: string; nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }) => updateClient(data.id, data),
+    onSuccess: () => { toast.success('Client modifié'); qc.invalidateQueries({ queryKey: ['clients'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
@@ -36,70 +64,65 @@ export function useDeleteClient() {
   return useMutation({
     mutationFn: (id: string) => deleteClient(id),
     onSuccess: () => { toast.success('Client supprimé'); qc.invalidateQueries({ queryKey: ['clients'] }); },
-    onError: (e: any) => toast.error(`Erreur suppression client : ${e.message || e}`),
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
+
+// --- Intervention mutations ---
 
 export function useCreateIntervention() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: { socid: string; description: string; date: string }) => createIntervention(data),
-    onSuccess: () => { toast.success('Intervention créée avec succès'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
-    onError: (e: any) => toast.error(`Erreur création intervention : ${e.message || e}`),
+    onSuccess: () => { toast.success('Intervention créée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
+
+export function useValidateIntervention() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => validateIntervention(id),
+    onSuccess: () => { toast.success('Intervention validée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useCloseIntervention() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { id: string; status: number }) => closeIntervention(data.id, data.status),
+    onSuccess: () => { toast.success('Statut intervention mis à jour'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useUpdateIntervention() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { id: string; description?: string; note_public?: string; note_private?: string }) => updateIntervention(data.id, data),
+    onSuccess: () => { toast.success('Intervention modifiée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useDeleteIntervention() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteIntervention(id),
+    onSuccess: () => { toast.success('Intervention supprimée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+// --- Devis mutations ---
 
 export function useCreateDevis() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: { socid: string; lines: CreateDevisLine[] }) => createDevis(data.socid, data.lines),
-    onSuccess: () => { toast.success('Devis créé avec succès'); qc.invalidateQueries({ queryKey: ['devis'] }); },
-    onError: (e: any) => toast.error(`Erreur création devis : ${e.message || e}`),
-  });
-}
-
-export function useCreateFacture() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data: { socid: string; lines: CreateDevisLine[] }) => createFacture(data.socid, data.lines),
-    onSuccess: () => { toast.success('Facture créée avec succès'); qc.invalidateQueries({ queryKey: ['factures'] }); },
-    onError: (e: any) => toast.error(`Erreur création facture : ${e.message || e}`),
-  });
-}
-
-export function useCreateProduit() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data: { ref: string; label: string; description?: string; price: number; tva_tx: number; type: number }) => createProduit(data),
-    onSuccess: () => { toast.success('Article créé avec succès'); qc.invalidateQueries({ queryKey: ['produits'] }); },
-    onError: (e: any) => toast.error(`Erreur création article : ${e.message || e}`),
-  });
-}
-
-export function useDeleteProduit() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => deleteProduit(id),
-    onSuccess: () => { toast.success('Article supprimé'); qc.invalidateQueries({ queryKey: ['produits'] }); },
-    onError: (e: any) => toast.error(`Erreur suppression : ${e.message || e}`),
-  });
-}
-
-export function useConvertDevisToFacture() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (devisId: string) => convertDevisToFacture(devisId),
-    onSuccess: () => { toast.success('Devis converti en facture'); qc.invalidateQueries({ queryKey: ['devis'] }); qc.invalidateQueries({ queryKey: ['factures'] }); },
-    onError: (e: any) => toast.error(`Erreur conversion : ${e.message || e}`),
-  });
-}
-
-export function useCreateAcompte() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data: { socid: string; montantHT: number; devisRef: string }) => createAcompteFacture(data.socid, data.montantHT, data.devisRef),
-    onSuccess: () => { toast.success('Facture d\'acompte créée'); qc.invalidateQueries({ queryKey: ['factures'] }); },
-    onError: (e: any) => toast.error(`Erreur acompte : ${e.message || e}`),
+    onSuccess: () => { toast.success('Devis créé'); qc.invalidateQueries({ queryKey: ['devis'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
@@ -108,7 +131,7 @@ export function useUpdateDevis() {
   return useMutation({
     mutationFn: (data: { id: string; socid: string; lines: CreateDevisLine[] }) => updateDevis(data.id, data.socid, data.lines),
     onSuccess: () => { toast.success('Devis modifié'); qc.invalidateQueries({ queryKey: ['devis'] }); },
-    onError: (e: any) => toast.error(`Erreur modification devis : ${e.message || e}`),
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
@@ -126,10 +149,10 @@ export function useCloseDevis() {
   return useMutation({
     mutationFn: (data: { id: string; status: number }) => closeDevis(data.id, data.status),
     onSuccess: (_, vars) => {
-      toast.success(vars.status === 2 ? 'Devis accepté (signé)' : 'Devis refusé');
+      toast.success(vars.status === 2 ? 'Devis signé' : 'Devis refusé');
       qc.invalidateQueries({ queryKey: ['devis'] });
     },
-    onError: (e: any) => toast.error(`Erreur changement statut : ${e.message || e}`),
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
@@ -138,24 +161,27 @@ export function useDeleteDevis() {
   return useMutation({
     mutationFn: (id: string) => deleteDevis(id),
     onSuccess: () => { toast.success('Devis supprimé'); qc.invalidateQueries({ queryKey: ['devis'] }); },
-    onError: (e: any) => toast.error(`Erreur suppression devis : ${e.message || e}`),
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
-export function useDeleteFacture() {
+export function useUpdateDevisLines() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => deleteFacture(id),
-    onSuccess: () => { toast.success('Facture supprimée'); qc.invalidateQueries({ queryKey: ['factures'] }); },
-    onError: (e: any) => toast.error(`Erreur suppression facture : ${e.message || e}`),
+    mutationFn: (data: { id: string; socid: string; lines: CreateDevisLine[] }) => updateDevisLines(data.id, data.socid, data.lines),
+    onSuccess: () => { toast.success('Lignes modifiées'); qc.invalidateQueries({ queryKey: ['devis'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
-export function useCreateDolibarrUser() {
+// --- Facture mutations ---
+
+export function useCreateFacture() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { login: string; firstname: string; lastname: string; email: string }) => createDolibarrUser(data),
-    onSuccess: () => { toast.success('Utilisateur synchronisé avec Dolibarr'); },
-    onError: () => { toast.warning('Utilisateur créé localement mais la synchro Dolibarr a échoué'); },
+    mutationFn: (data: { socid: string; lines: CreateDevisLine[] }) => createFacture(data.socid, data.lines),
+    onSuccess: () => { toast.success('Facture créée'); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
@@ -164,61 +190,47 @@ export function useValidateFacture() {
   return useMutation({
     mutationFn: (id: string) => validateFacture(id),
     onSuccess: () => { toast.success('Facture validée'); qc.invalidateQueries({ queryKey: ['factures'] }); },
-    onError: (e: any) => toast.error(`Erreur validation facture : ${e.message || e}`),
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
-export function useValidateIntervention() {
+export function useDeleteFacture() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => validateIntervention(id),
-    onSuccess: () => { toast.success('Intervention validée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
-    onError: (e: any) => toast.error(`Erreur validation intervention : ${e.message || e}`),
+    mutationFn: (id: string) => deleteFacture(id),
+    onSuccess: () => { toast.success('Facture supprimée'); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
-export function useDeleteIntervention() {
+// --- Convert & Acompte ---
+
+export function useConvertDevisToFacture() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => deleteIntervention(id),
-    onSuccess: () => { toast.success('Intervention supprimée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
-    onError: (e: any) => toast.error(`Erreur suppression intervention : ${e.message || e}`),
+    mutationFn: (devisId: string) => convertDevisToFacture(devisId),
+    onSuccess: () => { toast.success('Facture générée depuis le devis'); qc.invalidateQueries({ queryKey: ['devis'] }); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
-export function useBulkDeleteDevis() {
+export function useCreateAcompte() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (ids: string[]) => bulkDeleteDevis(ids),
-    onSuccess: () => { toast.success('Devis supprimés'); qc.invalidateQueries({ queryKey: ['devis'] }); },
-    onError: (e: any) => toast.error(`Erreur suppression : ${e.message || e}`),
+    mutationFn: (data: { socid: string; montantHT: number; devisRef: string }) => createAcompteFacture(data.socid, data.montantHT, data.devisRef),
+    onSuccess: () => { toast.success("Facture d'acompte créée"); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
-export function useBulkDeleteFactures() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (ids: string[]) => bulkDeleteFactures(ids),
-    onSuccess: () => { toast.success('Factures supprimées'); qc.invalidateQueries({ queryKey: ['factures'] }); },
-    onError: (e: any) => toast.error(`Erreur suppression : ${e.message || e}`),
-  });
-}
+// --- Produit mutations ---
 
-export function useUpdateDevisLines() {
+export function useCreateProduit() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { id: string; socid: string; lines: CreateDevisLine[] }) => updateDevisLines(data.id, data.socid, data.lines),
-    onSuccess: () => { toast.success('Lignes du devis modifiées'); qc.invalidateQueries({ queryKey: ['devis'] }); },
-    onError: (e: any) => toast.error(`Erreur modification : ${e.message || e}`),
-  });
-}
-
-export function useUpdateClient() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (data: { id: string; nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }) => updateClient(data.id, data),
-    onSuccess: () => { toast.success('Client modifié'); qc.invalidateQueries({ queryKey: ['clients'] }); },
-    onError: (e: any) => toast.error(`Erreur modification client : ${e.message || e}`),
+    mutationFn: (data: { ref: string; label: string; description?: string; price: number; tva_tx: number; type: number }) => createProduit(data),
+    onSuccess: () => { toast.success('Article créé'); qc.invalidateQueries({ queryKey: ['produits'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
@@ -227,15 +239,45 @@ export function useUpdateProduit() {
   return useMutation({
     mutationFn: (data: { id: string; label: string; description?: string; price: number; type: number }) => updateProduit(data.id, data),
     onSuccess: () => { toast.success('Article modifié'); qc.invalidateQueries({ queryKey: ['produits'] }); },
-    onError: (e: any) => toast.error(`Erreur modification article : ${e.message || e}`),
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
-export function useUpdateIntervention() {
+export function useDeleteProduit() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { id: string; description?: string }) => updateIntervention(data.id, data),
-    onSuccess: () => { toast.success('Intervention modifiée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
-    onError: (e: any) => toast.error(`Erreur modification intervention : ${e.message || e}`),
+    mutationFn: (id: string) => deleteProduit(id),
+    onSuccess: () => { toast.success('Article supprimé'); qc.invalidateQueries({ queryKey: ['produits'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+// --- Bulk ---
+
+export function useBulkDeleteDevis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => bulkDeleteDevis(ids),
+    onSuccess: () => { toast.success('Devis supprimés'); qc.invalidateQueries({ queryKey: ['devis'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useBulkDeleteFactures() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => bulkDeleteFactures(ids),
+    onSuccess: () => { toast.success('Factures supprimées'); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+// --- Dolibarr user sync ---
+
+export function useCreateDolibarrUser() {
+  return useMutation({
+    mutationFn: (data: { login: string; firstname: string; lastname: string; email: string }) => createDolibarrUser(data),
+    onSuccess: () => { toast.success('Utilisateur synchronisé avec Dolibarr'); },
+    onError: () => { toast.warning('Synchro Dolibarr échouée'); },
   });
 }

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention } from '@/hooks/useDolibarr';
-import { techniciens, statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, type InterventionType, type Intervention, type InterventionStatut } from '@/services/dolibarr';
+import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useDolibarrUsers } from '@/hooks/useDolibarr';
+import { statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
 import { SignaturePad } from '@/components/SignaturePad';
-import { Plus, FileText, Receipt, Camera, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send } from 'lucide-react';
+import { Plus, FileText, Receipt, Camera, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send, Play, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -35,11 +35,13 @@ const typeColors: Record<InterventionType, string> = {
 export default function Interventions() {
   const { data: interventions = [] } = useInterventions();
   const { data: clients = [] } = useClients();
+  const { data: dolibarrUsers = [] } = useDolibarrUsers();
   const createInterventionMutation = useCreateIntervention();
   const createDevisMutation = useCreateDevis();
   const createFactureMutation = useCreateFacture();
   const validateMutation = useValidateIntervention();
   const deleteMutation = useDeleteIntervention();
+  const closeMutation = useCloseIntervention();
   const { role, user } = useAuth();
   const [techFilter, setTechFilter] = useState('all');
   const [statutFilter, setStatutFilter] = useState('all');
@@ -48,7 +50,6 @@ export default function Interventions() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedIntervention, setSelectedIntervention] = useState<Intervention | null>(null);
 
-  // New intervention form
   const [newTech, setNewTech] = useState('');
   const [newDate, setNewDate] = useState('');
   const [newHeureDebut, setNewHeureDebut] = useState('08:00');
@@ -57,23 +58,22 @@ export default function Interventions() {
   const [newDescription, setNewDescription] = useState('');
   const [newClientId, setNewClientId] = useState('');
   const [descriptionClient, setDescriptionClient] = useState('');
-  const [compteRendu, setCompteRendu] = useState('');
   const [notePrivee, setNotePrivee] = useState('');
 
-  // Anti-collision
   const [collisionOpen, setCollisionOpen] = useState(false);
   const [collisionInfo, setCollisionInfo] = useState({ technicien: '', creneauExistant: '' });
 
-  // Email
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailDest, setEmailDest] = useState('');
   const [emailObjet, setEmailObjet] = useState('');
   const [emailMessage, setEmailMessage] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
 
-  // Signatures
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signatureTechData, setSignatureTechData] = useState<string | null>(null);
+
+  // Technician names from Dolibarr users
+  const technicienNames = dolibarrUsers.map(u => `${u.firstname} ${u.lastname}`.trim()).filter(Boolean);
 
   const filtered = interventions.filter((i) => {
     if (techFilter !== 'all' && i.technicien !== techFilter) return false;
@@ -83,8 +83,8 @@ export default function Interventions() {
   });
 
   const handleCreate = async () => {
-    if (!newClientId || !newDescription || !newDate) {
-      toast.error('Veuillez remplir client, description et date');
+    if (!newClientId || !newDate) {
+      toast.error('Veuillez remplir client et date');
       return;
     }
 
@@ -112,11 +112,11 @@ export default function Interventions() {
 
     await createInterventionMutation.mutateAsync({
       socid: newClientId,
-      description: newDescription,
+      description: newDescription || ' ',
       date: newDate,
     });
     setDialogOpen(false);
-    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee(''); setDescriptionClient(''); setCompteRendu('');
+    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee(''); setDescriptionClient('');
   };
 
   const openDetail = (inter: Intervention) => {
@@ -132,7 +132,7 @@ export default function Interventions() {
       socid,
       lines: [{ desc: selectedIntervention.description, qty: 1, subprice: 0, tva_tx: 0, product_type: 1 }],
     });
-    toast.success('Devis créé à partir de l\'intervention');
+    toast.success('Devis créé depuis l\'intervention');
   };
 
   const handleTransformFacture = async () => {
@@ -143,7 +143,7 @@ export default function Interventions() {
       socid,
       lines: [{ desc: selectedIntervention.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
     });
-    toast.success('Facture créée à partir de l\'intervention');
+    toast.success('Facture créée depuis l\'intervention');
   };
 
   const handleViewPDF = async () => {
@@ -152,18 +152,14 @@ export default function Interventions() {
       const url = await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
       if (url) {
         openPDFInNewTab(url, `${selectedIntervention.ref}.pdf`);
-        toast.success(`Bon d'intervention ${selectedIntervention.ref} téléchargé`);
+        toast.success(`PDF ${selectedIntervention.ref} téléchargé`);
       } else {
         const dlUrl = await downloadPDFUrl('ficheinter', selectedIntervention.ref);
-        if (dlUrl) {
-          openPDFInNewTab(dlUrl, `${selectedIntervention.ref}.pdf`);
-          toast.success(`Bon d'intervention ${selectedIntervention.ref} téléchargé`);
-        } else {
-          toast.success(`Bon d'intervention ${selectedIntervention.ref} généré`);
-        }
+        if (dlUrl) openPDFInNewTab(dlUrl, `${selectedIntervention.ref}.pdf`);
+        else toast.error('PDF non disponible');
       }
-    } catch {
-      toast.error('Erreur lors de la génération du PDF');
+    } catch (e: any) {
+      toast.error(`Erreur PDF : ${e.message || e}`);
     }
   };
 
@@ -181,17 +177,9 @@ export default function Interventions() {
         objet: emailObjet,
         message: emailMessage,
       });
-      toast.success('Bon d\'intervention envoyé par email');
+      toast.success('Bon d\'intervention envoyé par email via Dolibarr');
     } catch (e: any) {
-      await supabase.from('email_history').insert({
-        user_id: user?.id || '',
-        client_id: selectedIntervention.socid || '',
-        document_ref: selectedIntervention.ref,
-        destinataire: emailDest,
-        objet: emailObjet,
-        message: emailMessage,
-      });
-      toast.warning('Email enregistré localement — l\'envoi Dolibarr a échoué');
+      toast.error(`Erreur envoi : ${e.message || e}`);
     }
     setSendingEmail(false);
     setEmailOpen(false);
@@ -202,7 +190,7 @@ export default function Interventions() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Interventions</h1>
-          <p className="text-muted-foreground text-sm">Planning et suivi des interventions terrain</p>
+          <p className="text-muted-foreground text-sm">Planning et suivi — statuts natifs Dolibarr</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -211,7 +199,7 @@ export default function Interventions() {
             </Button>
           </DialogTrigger>
           <DialogContent className="glass-strong border-border/50 max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle className="text-foreground">Nouvelle intervention</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-foreground">Nouvelle intervention (Brouillon)</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
               <Select value={newClientId} onValueChange={setNewClientId}>
                 <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
@@ -226,9 +214,10 @@ export default function Interventions() {
                 </SelectContent>
               </Select>
               <Select value={newTech} onValueChange={setNewTech}>
-                <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Technicien" /></SelectTrigger>
+                <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Technicien (Dolibarr)" /></SelectTrigger>
                 <SelectContent>
-                  {techniciens.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {technicienNames.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {technicienNames.length === 0 && <SelectItem value="none" disabled>Aucun utilisateur Dolibarr</SelectItem>}
                 </SelectContent>
               </Select>
               <Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="glass border-border/50" />
@@ -244,31 +233,17 @@ export default function Interventions() {
               </div>
               <Input placeholder="Description technique" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="glass border-border/50" />
 
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-foreground">📋 Description Client</h3>
-                <Textarea placeholder="Description visible par le client (devis, bon d'intervention)..." value={descriptionClient} onChange={(e) => setDescriptionClient(e.target.value)} className="glass border-border/50 min-h-[60px]" />
-              </div>
-
               {role === 'admin' && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                     <Lock className="h-3.5 w-3.5" /> Note privée (admin)
                   </h3>
-                  <Textarea
-                    placeholder="Note visible uniquement par les administrateurs..."
-                    value={notePrivee}
-                    onChange={(e) => setNotePrivee(e.target.value)}
-                    className="glass border-border/50 min-h-[60px]"
-                  />
+                  <Textarea placeholder="Note visible uniquement par les administrateurs..." value={notePrivee} onChange={(e) => setNotePrivee(e.target.value)} className="glass border-border/50 min-h-[60px]" />
                 </div>
               )}
 
-              <Button
-                onClick={handleCreate}
-                disabled={createInterventionMutation.isPending}
-                className="w-full bg-gradient-to-r from-emerald-500 to-green-600 border-0 h-12 text-base"
-              >
-                {createInterventionMutation.isPending ? 'Création...' : "Créer l'intervention"}
+              <Button onClick={handleCreate} disabled={createInterventionMutation.isPending} className="w-full bg-gradient-to-r from-emerald-500 to-green-600 border-0 h-12 text-base">
+                {createInterventionMutation.isPending ? 'Création...' : "Créer (Brouillon)"}
               </Button>
             </div>
           </DialogContent>
@@ -280,14 +255,14 @@ export default function Interventions() {
           <SelectTrigger className="w-full sm:w-[220px] glass border-border/50"><SelectValue placeholder="Technicien" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les techniciens</SelectItem>
-            {techniciens.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            {technicienNames.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={statutFilter} onValueChange={setStatutFilter}>
           <SelectTrigger className="w-full sm:w-[180px] glass border-border/50"><SelectValue placeholder="Statut" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les statuts</SelectItem>
-            {statutsIntervention.map(s => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+            {statutsIntervention.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -335,12 +310,12 @@ export default function Interventions() {
                     <td className="py-3 px-2"><StatusBadge statut={i.statut} /></td>
                     <td className="py-3 px-2">
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                        {i.statut === 'terminé' && (
+                        {i.fk_statut === 3 && (
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Générer facture" onClick={() => { setSelectedIntervention(i); handleTransformFacture(); }}>
                             <Receipt className="h-3.5 w-3.5 text-emerald-400" />
                           </Button>
                         )}
-                        {(i.statut === 'brouillon' || i.statut === 'validé' || i.statut === 'en cours') && (
+                        {(i.fk_statut <= 2) && (
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => { setSelectedIntervention(i); handleTransformDevis(); }}>
                             <FileText className="h-3.5 w-3.5" />
                           </Button>
@@ -376,52 +351,30 @@ export default function Interventions() {
                   <div><span className="text-muted-foreground">Horaire :</span> <span className="text-foreground ml-1">{selectedIntervention.heureDebut} – {selectedIntervention.heureFin}</span></div>
                 </div>
 
-                {/* Description Client */}
                 <div className="text-sm space-y-1">
-                  <span className="text-muted-foreground font-medium">Description Client :</span>
-                  <p className="text-foreground bg-accent/10 p-2 rounded">{selectedIntervention.descriptionClient || selectedIntervention.description || '—'}</p>
+                  <span className="text-muted-foreground font-medium">Description :</span>
+                  <p className="text-foreground bg-accent/10 p-2 rounded">{selectedIntervention.description || '—'}</p>
                 </div>
 
-                {/* Compte-rendu Technique */}
-                <div className="text-sm space-y-1">
-                  <span className="text-muted-foreground font-medium">Compte-rendu Technique :</span>
-                  <Textarea
-                    placeholder="Compte-rendu technique (visible en interne)..."
-                    defaultValue={selectedIntervention.compteRendu || ''}
-                    className="glass border-border/50 min-h-[60px] text-sm"
-                  />
-                </div>
-
-                {/* Notes privées (admin only) */}
-                {role === 'admin' && (
-                  <div className="space-y-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
-                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                      <Lock className="h-3.5 w-3.5 text-orange-400" /> Note privée (admin)
-                    </h3>
-                    <Textarea
-                      placeholder="Ajouter une note privée..."
-                      defaultValue={selectedIntervention.notePrivee || ''}
-                      className="glass border-border/50 min-h-[60px] text-sm"
-                    />
+                {selectedIntervention.descriptionClient && (
+                  <div className="text-sm space-y-1">
+                    <span className="text-muted-foreground font-medium">Note publique :</span>
+                    <p className="text-foreground bg-accent/10 p-2 rounded">{selectedIntervention.descriptionClient}</p>
                   </div>
                 )}
 
-                {/* Section Pendant */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground">📸 Pendant l'intervention</h3>
-                  <div>
-                    <label className="flex items-center gap-2 cursor-pointer glass rounded-lg px-4 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                      <Camera className="h-4 w-4" /> Ajouter une photo depuis le mobile
-                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={() => toast.success('Photo ajoutée (mode démo)')} />
-                    </label>
+                {role === 'admin' && (
+                  <div className="space-y-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <Lock className="h-3.5 w-3.5 text-orange-400" /> Note privée
+                    </h3>
+                    <p className="text-sm text-foreground">{selectedIntervention.compteRendu || '—'}</p>
                   </div>
-                </div>
+                )}
 
-                {/* Section Après */}
+                {/* Signatures */}
                 <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-foreground">✅ Fin d'intervention</h3>
-                  <Input placeholder="Note de fin de chantier..." className="glass border-border/50" />
-                  
+                  <h3 className="text-sm font-semibold text-foreground">✅ Signatures</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-muted-foreground mb-2">Signature du client</p>
@@ -434,28 +387,22 @@ export default function Interventions() {
                   </div>
                 </div>
 
-                {/* Action buttons */}
+                {/* Action buttons based on fk_statut */}
                 <div className="flex flex-wrap gap-3 pt-2">
-                  {selectedIntervention.statut === 'brouillon' && (
+                  {/* fk_statut 0: Brouillon → Valider + Supprimer */}
+                  {selectedIntervention.fk_statut === 0 && (
                     <>
-                      <Button
-                        onClick={() => validateMutation.mutate(selectedIntervention.id)}
-                        disabled={validateMutation.isPending}
-                        className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 px-6 text-base"
-                      >
-                        <FileCheck className="h-4 w-4" />
-                        {validateMutation.isPending ? 'Validation...' : 'Valider'}
+                      <Button onClick={() => validateMutation.mutate(selectedIntervention.id)} disabled={validateMutation.isPending} className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
+                        <FileCheck className="h-4 w-4" /> {validateMutation.isPending ? 'Validation...' : 'Valider'}
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" className="gap-2 glass border-red-500/30 text-red-400 h-12 px-6 text-base">
-                            <Trash2 className="h-4 w-4" /> Supprimer
-                          </Button>
+                          <Button variant="outline" className="gap-2 glass border-red-500/30 text-red-400"><Trash2 className="h-4 w-4" /> Supprimer</Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Supprimer cette intervention ?</AlertDialogTitle>
-                            <AlertDialogDescription>L'intervention {selectedIntervention.ref} sera définitivement supprimée.</AlertDialogDescription>
+                            <AlertDialogTitle>Supprimer {selectedIntervention.ref} ?</AlertDialogTitle>
+                            <AlertDialogDescription>Suppression définitive.</AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Annuler</AlertDialogCancel>
@@ -466,30 +413,45 @@ export default function Interventions() {
                     </>
                   )}
 
-                  {selectedIntervention.statut === 'terminé' && (
-                    <Button
-                      onClick={handleTransformFacture}
-                      disabled={createFactureMutation.isPending}
-                      className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0 h-12 px-6 text-base"
-                    >
-                      <Receipt className="h-4 w-4" />
-                      {createFactureMutation.isPending ? 'Création...' : 'Générer une facture'}
+                  {/* fk_statut 1: Validée → Démarrer (En cours) */}
+                  {selectedIntervention.fk_statut === 1 && (
+                    <Button onClick={() => closeMutation.mutate({ id: selectedIntervention.id, status: 2 })} disabled={closeMutation.isPending} className="gap-2 bg-gradient-to-r from-orange-500 to-amber-600 border-0">
+                      <Play className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Démarrer (En cours)'}
                     </Button>
                   )}
-                  {(selectedIntervention.statut === 'brouillon' || selectedIntervention.statut === 'validé' || selectedIntervention.statut === 'en cours') && (
-                    <Button
-                      onClick={handleTransformDevis}
-                      disabled={createDevisMutation.isPending}
-                      className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 px-6 text-base"
-                    >
-                      <ArrowRightLeft className="h-4 w-4" />
-                      {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
+
+                  {/* fk_statut 2: En cours → Terminer */}
+                  {selectedIntervention.fk_statut === 2 && (
+                    <Button onClick={() => closeMutation.mutate({ id: selectedIntervention.id, status: 3 })} disabled={closeMutation.isPending} className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0">
+                      <CheckCircle2 className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Terminer'}
                     </Button>
                   )}
-                  <Button onClick={handleViewPDF} variant="outline" className="gap-2 glass border-border/50 h-12 px-6 text-base">
+
+                  {/* fk_statut 3: Terminée → Facturer */}
+                  {selectedIntervention.fk_statut === 3 && (
+                    <Button onClick={handleTransformFacture} disabled={createFactureMutation.isPending} className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0">
+                      <Receipt className="h-4 w-4" /> {createFactureMutation.isPending ? 'Création...' : 'Générer une facture'}
+                    </Button>
+                  )}
+
+                  {/* Transformer en devis (brouillon/validée/en cours) */}
+                  {selectedIntervention.fk_statut <= 2 && (
+                    <Button onClick={handleTransformDevis} disabled={createDevisMutation.isPending} variant="outline" className="gap-2 glass border-border/50">
+                      <ArrowRightLeft className="h-4 w-4" /> {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
+                    </Button>
+                  )}
+
+                  {/* PDF & Email always */}
+                  <Button onClick={handleViewPDF} variant="outline" className="gap-2 glass border-border/50">
                     <FileDown className="h-4 w-4" /> Voir le PDF
                   </Button>
-                  <Button onClick={() => { setEmailDest(''); setEmailObjet(`Bon d'intervention ${selectedIntervention.ref}`); setEmailMessage(''); setEmailOpen(true); }} variant="outline" className="gap-2 glass border-border/50 h-12 px-6 text-base">
+                  <Button onClick={() => {
+                    const c = clients.find(cl => cl.id === selectedIntervention.socid);
+                    setEmailDest(c?.email || '');
+                    setEmailObjet(`Bon d'intervention ${selectedIntervention.ref}`);
+                    setEmailMessage('');
+                    setEmailOpen(true);
+                  }} variant="outline" className="gap-2 glass border-border/50">
                     <Send className="h-4 w-4" /> Envoyer par email
                   </Button>
                 </div>
@@ -512,7 +474,7 @@ export default function Interventions() {
                         <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="glass border-border/50 min-h-[120px]" />
                       </div>
                       <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest} className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
-                        {sendingEmail ? 'Envoi...' : 'Envoyer'}
+                        {sendingEmail ? 'Envoi via Dolibarr...' : 'Envoyer'}
                       </Button>
                     </div>
                   </DialogContent>
