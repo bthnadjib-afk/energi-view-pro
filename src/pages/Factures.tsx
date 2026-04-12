@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil, Search, XCircle } from 'lucide-react';
+import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil, Search, XCircle, Zap } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines } from '@/hooks/useDolibarr';
@@ -318,7 +318,24 @@ export default function Factures() {
             <tbody>
               {filteredFactures.map((f) => (
                 <tr key={f.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => setSelectedFacture(f)}>
-                  <td className="py-3 px-2 font-mono text-xs text-foreground">{f.ref}</td>
+                  <td className="py-3 px-2 font-mono text-xs text-foreground">
+                    <div className="flex items-center gap-1.5">
+                      {f.ref}
+                      {(() => {
+                        try {
+                          const meta = f.note_private ? JSON.parse(f.note_private) : null;
+                          if (meta?.from_intervention) {
+                            return (
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200 px-1.5 py-0.5 text-[10px] font-medium" title={`Depuis intervention ${meta.from_intervention}`}>
+                                <Zap className="h-2.5 w-2.5" />↩ {meta.from_intervention}
+                              </span>
+                            );
+                          }
+                        } catch {}
+                        return null;
+                      })()}
+                    </div>
+                  </td>
                   <td className="py-3 px-2 text-foreground">{f.client}</td>
                   <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(f.date)}</td>
                   <td className="py-3 px-2 text-right font-medium text-foreground">{f.montantTTC.toLocaleString('fr-FR')} €</td>
