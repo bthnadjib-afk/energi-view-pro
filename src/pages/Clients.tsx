@@ -118,8 +118,8 @@ export default function Clients() {
               <Input placeholder="Nom du client *" value={nom} onChange={e => setNom(e.target.value)} className="glass border-border/50" />
               <AddressAutocomplete
                 value={adresse}
-                onSelect={({ adresse: a, codePostal: cp, ville: v }) => {
-                  setAdresse(a);
+                onSelect={({ rue, codePostal: cp, ville: v }) => {
+                  setAdresse(rue);
                   setCodePostal(cp);
                   setVille(v);
                 }}
