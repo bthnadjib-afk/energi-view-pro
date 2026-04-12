@@ -138,8 +138,8 @@ export default function Interventions() {
   const handleViewPDF = async () => {
     if (!selectedIntervention) return;
     try {
-      await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
-      const url = await downloadPDFUrl('ficheinter', selectedIntervention.ref);
+      await generatePDF('intervention', selectedIntervention.id, selectedIntervention.ref, 'soleil');
+      const url = await downloadPDFUrl('intervention', selectedIntervention.ref);
       if (url) {
         window.open(url, '_blank');
         toast.success(`Bon d'intervention ${selectedIntervention.ref} ouvert`);
