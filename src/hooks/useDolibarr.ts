@@ -247,7 +247,7 @@ export function useCreateAcompte() {
 export function useCreateProduit() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { ref: string; label: string; description?: string; price: number; tva_tx: number; type: number }) => createProduit(data),
+    mutationFn: (data: { ref: string; label: string; description?: string; price: number; tva_tx: number; type: number; cost_price?: number }) => createProduit(data),
     onSuccess: () => { toast.success('Article créé'); qc.invalidateQueries({ queryKey: ['produits'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
@@ -256,7 +256,7 @@ export function useCreateProduit() {
 export function useUpdateProduit() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { id: string; label: string; description?: string; price: number; type: number }) => updateProduit(data.id, data),
+    mutationFn: (data: { id: string; label: string; description?: string; price: number; type: number; tva_tx?: number; cost_price?: number }) => updateProduit(data.id, data),
     onSuccess: () => { toast.success('Article modifié'); qc.invalidateQueries({ queryKey: ['produits'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
