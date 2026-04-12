@@ -1,92 +1,85 @@
 
 
-# Audit complet — Onglet Devis
+# Audit complet — Onglet Interventions
 
 ## Ce qui fonctionne
 
 | Action | API Dolibarr | Status |
 |--------|-------------|--------|
-| Créer devis brouillon | `POST /proposals` | ✅ |
-| Supprimer brouillon | `DELETE /proposals/{id}` | ✅ |
-| Valider devis | `POST /proposals/{id}/validate` | ✅ |
-| Classer signé/refusé | `POST /proposals/{id}/close` | ✅ |
-| Convertir en facture | Conversion mutation | ✅ |
-| Créer acompte | Acompte mutation | ✅ |
-| Voir PDF | `PUT /documents/builddoc` propal | ✅ |
-| Envoyer par email | `sendDevisByEmail` | ✅ |
-| Lignes avec marges | Mapping `pa_ht` | ✅ |
-| Signature client | `SignaturePad` | ✅ |
+| Créer intervention brouillon | `POST /interventions` | ✅ |
+| Supprimer brouillon | `DELETE /interventions/{id}` | ✅ |
+| Valider | `POST /interventions/{id}/validate` | ✅ |
+| Démarrer (En cours) | `POST /interventions/{id}/close` status=2 | ✅ |
+| Terminer | `POST /interventions/{id}/close` status=3 | ✅ |
+| Transformer en Devis | `POST /proposals` | ✅ |
+| Générer Facture | `POST /invoices` | ✅ |
+| Anti-collision planning | `checkCollision()` | ✅ |
+| Voir PDF | `PUT /documents/builddoc` ficheinter | ✅ |
+| Envoyer email | `sendInterventionByEmail` | ✅ |
+| Filtres (technicien/statut/type) | — | ✅ |
+| Signatures client + technicien | `useSaveSignatures` | ✅ |
+| Note privée admin | `note_private` | ✅ |
 
 ## Problèmes identifiés
 
-### P1 — Pas de rafraîchissement live après validation/signature/refus
-`validateMutation.mutate(devis.id)` et `closeMutation.mutate(...)` utilisent `mutate` sans `await`. Le statut dans `selectedFacture` locale n'est pas mis à jour immédiatement. L'utilisateur voit l'ancien statut s'il re-clique avant le refetch.
+### P1 — Pas de rafraîchissement live après validation/démarrage/terminaison
+Lignes 410, 432, 438 : `validateMutation.mutate(id, { onSuccess })` et `closeMutation.mutate(...)` utilisent `mutate` avec un callback `onSuccess` qui ferme le dialog. Mais le cache React Query est invalidé en parallèle dans le hook. Si l'utilisateur rouvre le détail avant le refetch, il voit l'ancien statut.
 
-**Correction** : `mutateAsync` + `await` + fermer le détail expandé après succès.
+**Correction** : `await mutateAsync(...)` puis `setDetailOpen(false)`.
 
-### P2 — Pas de filtres ni recherche
-Aucun filtre par statut, client ou recherche texte. Contrairement à Factures qui vient d'être corrigé.
+### P2 — Suppression et transformation ne sont pas `await`
+Ligne 424 : `deleteMutation.mutate(id); setDetailOpen(false)` — pas séquencé. Idem pour `handleTransformDevis` et `handleTransformFacture` qui sont async mais appelés via `onClick` direct dans les actions de table (lignes 318, 323) sans `await` et avec un bug : `setSelectedIntervention(i)` suivi immédiatement de `handleTransformDevis()` — mais `selectedIntervention` n'est pas encore mis à jour (setState est async).
 
-**Correction** : Ajouter `filterStatut`, `filterClient`, `searchQuery` identiques à Factures.
+**Correction** : Passer l'intervention en paramètre aux fonctions de transformation au lieu de dépendre de `selectedIntervention`.
 
-### P3 — Pas d'éditeur de lignes pour brouillons existants
-Le bouton "Modifier" (icône Pencil) n'existe pas dans `DevisDetail`. On peut seulement créer un nouveau devis, pas modifier les lignes d'un brouillon existant. Le hook `useUpdateDevis` est importé mais jamais utilisé dans le composant.
+### P3 — Pas de recherche texte
+Contrairement aux Factures et Devis corrigés, pas de barre de recherche par ref/client.
 
-**Correction** : Ajouter un dialog d'édition de lignes dans `DevisDetail` pour les brouillons (`fk_statut === 0`), pré-rempli avec les lignes existantes.
+**Correction** : Ajouter un `searchQuery` filtrant par ref et client.
 
-### P4 — Conversion et acompte ne sont pas `await`
-`onConvert={() => convertMutation.mutate(d.id)}` et `onAcompte(...)` utilisent `mutate` sans attendre. Pas de feedback séquencé.
+### P4 — Pas d'édition d'intervention existante (brouillon)
+`useUpdateIntervention` est importé dans `useDolibarr.ts` mais jamais utilisé dans la page. Un brouillon ne peut pas être modifié (description, technicien, horaires, type).
 
-**Correction** : Passer à `mutateAsync` avec try/catch.
+**Correction** : Ajouter un bouton "Modifier" dans le détail pour les brouillons (fk_statut=0), ouvrant un dialog d'édition pré-rempli.
 
-### P5 — Pas de date de validité / fin de validité
-Le type `Devis` ne contient pas `fin_validite` (champ Dolibarr `fin_validite`). Cette info est utile pour savoir si un devis est expiré.
+### P5 — Signatures utilisent `mutate` au lieu de `mutateAsync`
+Lignes 388, 398 : `saveSignaturesMutation.mutate(...)` sans await. Le toast "Signature enregistrée" s'affiche avant la confirmation Dolibarr.
 
-**Correction** : Ajouter `finValidite` au type et au mapping, afficher un badge "Expiré" si la date est passée.
-
-### P6 — `prixAchat` non transmis à Dolibarr lors de la création
-Ligne 345 : les lignes envoyées à `createDevis` ne contiennent pas `pa_ht` (prix d'achat). La marge ne sera pas stockée côté Dolibarr.
-
-**Correction** : Ajouter `pa_ht: l.prixAchat` dans le mapping des lignes envoyées.
+**Correction** : `await saveSignaturesMutation.mutateAsync(...)`.
 
 ## Plan de correction
 
+### `src/pages/Interventions.tsx`
+
+1. **Async séquencé** : remplacer tous les `.mutate()` par `await .mutateAsync()` pour valider, démarrer, terminer, supprimer, signatures
+2. **Bug transformation** : passer l'intervention en paramètre à `handleTransformDevis(inter)` et `handleTransformFacture(inter)` au lieu de dépendre de `selectedIntervention`
+3. **Recherche texte** : ajouter `searchQuery` + input de recherche, filtrant par `ref` et `client`
+4. **Édition brouillon** : ajouter un dialog de modification pour fk_statut=0 (description, technicien, type, date, horaires) utilisant `useUpdateIntervention`
+5. **Importer useUpdateIntervention** dans la page
+
 ### `src/services/dolibarr.ts`
-1. Ajouter `finValidite: string` au type `Devis`
-2. Mapper `d.fin_validite` dans `mapDolibarrDevis`
-3. Vérifier que `CreateDevisLine` inclut `pa_ht`
 
-### `src/pages/Devis.tsx`
-1. **Async séquencé** : `validateMutation.mutate` → `await validateMutation.mutateAsync` + collapse expanded row
-2. **Async pour close** : idem pour `closeMutation` (signé/refusé)
-3. **Async pour convert/acompte** : `mutateAsync` avec try/catch
-4. **Filtres** : ajouter `filterStatut` (Tous/Brouillon/Validé/Signé/Refusé/Facturé), `searchQuery`, `filterClient`
-5. **Éditeur brouillon** : dialog de modification de lignes pour `fk_statut === 0`, pré-rempli avec `devis.lignes`, utilisant `useUpdateDevis`
-6. **Prix d'achat** : ajouter `pa_ht: l.prixAchat` dans `handleCreate`
-7. **Badge expiré** : afficher un indicateur si `finValidite < today`
-
-### `src/components/StatusBadge.tsx`
-Vérifier que "Facturé" a un style distinct (violet — déjà présent ✅).
+Aucune modification nécessaire — le type `Intervention` et `updateIntervention` existent déjà.
 
 ## Fichiers impactés
 
 | Fichier | Modifications |
 |---------|--------------|
-| `src/services/dolibarr.ts` | Type Devis + mapping finValidite + CreateDevisLine pa_ht |
-| `src/pages/Devis.tsx` | Séquençage async, filtres, éditeur brouillon, pa_ht, badge expiré |
+| `src/pages/Interventions.tsx` | Séquençage async, recherche texte, édition brouillon, fix transformation |
 
 ## Comportement attendu de chaque action sur Dolibarr
 
 | Action ElectroPro | Appel API | Effet Dolibarr |
 |---|---|---|
-| **Créer devis** | `POST /proposals` | Crée un brouillon (fk_statut=0). Ref provisoire. |
-| **Modifier lignes** | `PUT /proposals/{id}` | Remplace les lignes. Uniquement fk_statut=0. |
-| **Valider** | `POST /proposals/{id}/validate` | Passe en Validé (fk_statut=1). Ref définitive. Irréversible. |
-| **Classer Signé** | `POST /proposals/{id}/close` status=2 | Passe en Signé (fk_statut=2). Permet conversion en facture. |
-| **Classer Refusé** | `POST /proposals/{id}/close` status=3 | Passe en Refusé (fk_statut=3). Archivé. |
-| **Convertir en facture** | Crée facture brouillon depuis le devis | Facture liée au devis dans Dolibarr. Devis passe en Facturé (fk_statut=4). |
-| **Créer acompte** | `POST /invoices` type=3 | Facture d'acompte liée. |
-| **Voir PDF** | `PUT /documents/builddoc` modulepart=propal | Génère PDF côté Dolibarr avec template azur. |
-| **Envoyer email** | `POST /proposals/{id}/sendByEmail` | Mail via SMTP Dolibarr avec PDF en PJ. |
-| **Supprimer** | `DELETE /proposals/{id}` | Suppression définitive. Brouillons uniquement. |
+| **Créer** | `POST /interventions` | Brouillon (fk_statut=0). Ref provisoire. |
+| **Modifier** | `PUT /interventions/{id}` | Met à jour description, technicien, horaires. Brouillons uniquement. |
+| **Valider** | `POST /interventions/{id}/validate` | Passe en Validée (fk_statut=1). Ref définitive. |
+| **Démarrer** | `POST /interventions/{id}/close` status=2 | Passe en En cours (fk_statut=2). |
+| **Terminer** | `POST /interventions/{id}/close` status=3 | Passe en Terminée (fk_statut=3). Irréversible. |
+| **Transformer Devis** | `POST /proposals` | Crée un devis brouillon avec la description de l'intervention. |
+| **Générer Facture** | `POST /invoices` | Crée une facture brouillon depuis l'intervention terminée. |
+| **Signatures** | `PUT /interventions/{id}` array_options | Stocke les signatures base64 dans les champs extrafields Dolibarr. |
+| **PDF** | `PUT /documents/builddoc` ficheinter | Génère le PDF template "soleil" côté Dolibarr. |
+| **Email** | `POST /interventions/{id}/sendByEmail` | Envoie via SMTP Dolibarr avec PDF en PJ. |
+| **Supprimer** | `DELETE /interventions/{id}` | Suppression définitive. Brouillons uniquement. |
 
