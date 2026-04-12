@@ -38,7 +38,9 @@ export default function Interventions() {
   const createInterventionMutation = useCreateIntervention();
   const createDevisMutation = useCreateDevis();
   const createFactureMutation = useCreateFacture();
-  const { role } = useAuth();
+  const validateMutation = useValidateIntervention();
+  const deleteMutation = useDeleteIntervention();
+  const { role, user } = useAuth();
   const [techFilter, setTechFilter] = useState('all');
   const [statutFilter, setStatutFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
