@@ -1,77 +1,100 @@
 
 
-# Audit complet — Onglet Catalogue
+# Audit complet — Onglet Interventions (données Dolibarr)
 
-## Ce qui fonctionne
+## Diagnostic par appel API brut
 
-| Action | API Dolibarr | Status |
-|--------|-------------|--------|
-| Créer produit | `POST /products` | ✅ (async) |
-| Modifier produit | `PUT /products/{id}` | ✅ (async) |
-| Supprimer produit | `DELETE /products/{id}` | ⚠️ pas async |
-| Affichage grille | Cards avec type/ref/prix | ✅ |
-| Référence auto | MO001 / 0001 | ✅ |
+J'ai interrogé directement l'API Dolibarr (`GET /interventions`) et voici ce que retourne Dolibarr pour chaque intervention créée :
 
-## Problèmes identifiés
+```text
+dateo: ""          ← vide, pas de timestamp
+datee: ""          ← vide, pas de timestamp  
+datec: 1775999590  ← seul timestamp présent (date création)
+array_options: []  ← tableau vide, pas d'objet
+user_author_id: null
+fk_statut: absent  ← le champ s'appelle "statut" ou "status"
+description: null
+```
 
-### P1 — Suppression utilise `mutate` au lieu de `mutateAsync`
-Ligne 121 : `deleteProduitMutation.mutate(p.id)` dans le `AlertDialogAction`. Pas séquencé.
+## Causes racines identifiées
 
-**Correction** : `await deleteProduitMutation.mutateAsync(p.id)`.
+### P1 — `dateo`/`datee` ne sont pas sauvegardés
+**Cause** : `createIntervention` envoie `datei`, `dateo`, `datee` comme timestamps Unix. Dolibarr Fichinter attend `date` (pas `datei`) pour la date principale. Les champs `dateo`/`datee` ne sont probablement pas des champs natifs de l'API REST Fichinter — Dolibarr les ignore silencieusement.
+**Impact** : Date toujours vide, horaires toujours 08:00–10:00 par défaut.
+**Fix** : Envoyer `date` comme timestamp Unix pour la date. Stocker les heures dans `array_options` (`options_heure_debut`, `options_heure_fin`) puisque Fichinter n'a pas de champs horaires natifs. Utiliser `datec` comme fallback pour l'affichage de date.
 
-### P2 — Pas de recherche / filtre
-Aucun filtre par type (Main d'œuvre / Fourniture) ni recherche texte (libellé, ref, description).
+### P2 — `array_options` revient en `[]` au lieu d'un objet
+**Cause** : Les extrafields (`options_type`, `options_technicien`, etc.) ne sont **pas configurés** dans l'instance Dolibarr. Quand aucun extrafield n'existe, Dolibarr retourne `[]` au lieu de `{}`.
+**Impact** : Type toujours "chantier", technicien toujours vide.
+**Fix** : Ne pas dépendre des extrafields. Stocker type/technicien/horaires dans `description` ou `note_private` en JSON sérialisé, et les parser au retour. Alternative : utiliser `duration` pour encoder les heures.
 
-**Correction** : Ajouter `searchQuery` + `filterType` (Tous / Main d'œuvre / Fourniture).
+### P3 — `fk_statut` absent de la réponse API
+**Cause** : Dolibarr retourne `statut` et `status` (les deux à "0"), pas `fk_statut`. Le mapping lit `d.fk_statut` qui est toujours undefined → 0 → "Brouillon".
+**Impact** : Statut toujours affiché "Brouillon" même après validation.
+**Fix** : Lire `d.statut || d.status` au lieu de `d.fk_statut`.
 
-### P3 — Pas de TVA modifiable en édition
-Le formulaire de création envoie `tva_tx: 20` (fixe), et l'édition ne transmet pas du tout `tva_tx`. Si un produit a un taux différent, impossible de le modifier.
+### P4 — Technicien non résolu
+**Cause** : `user_author_id` est null dans la réponse. `user_creation_id` contient "1" mais n'est pas utilisé. L'assignation `fk_user_assign` n'est pas retournée par l'API GET.
+**Impact** : Technicien toujours vide.
+**Fix** : Utiliser `user_creation_id` comme fallback dans `resolveTechnicianName`. Sérialiser aussi le technicien dans les métadonnées stockées.
 
-**Correction** : Ajouter un champ TVA dans les deux formulaires (création + édition), pré-rempli à 20%.
+### P5 — Description null
+**Cause** : `description` est transmis comme `' '` (espace) mais Dolibarr retourne `null`.
+**Impact** : Mineur, mais empêche d'afficher la description.
+**Fix** : Fallback sur `''`.
 
-### P4 — Pas de prix d'achat (marge)
-Le type `Produit` contient `prixAchat` et le mapping lit `cost_price`, mais ni le formulaire de création ni celui d'édition ne permettent de saisir le prix d'achat. La marge ne peut pas être gérée.
+## Stratégie de stockage des métadonnées
 
-**Correction** : Ajouter un champ `prixAchat` dans les deux formulaires, et l'envoyer comme `cost_price` à Dolibarr.
+Puisque les extrafields ne sont pas configurés dans Dolibarr, la solution fiable est de sérialiser les métadonnées (type, technicien, heures) dans le champ `note_private` sous forme JSON :
 
-### P5 — Référence auto potentiellement dupliquée
-`generateRef` compte le nombre de produits existants du même type +1. Si un produit est supprimé au milieu, la référence va être dupliquée (ex: 3 produits MO001-MO003, on supprime MO002, le suivant sera MO003 → collision).
+```text
+note_private = JSON.stringify({
+  type: "panne",
+  technicien: "yassine",
+  heureDebut: "09:00",
+  heureFin: "12:00",
+  notePrivee: "texte libre admin"
+})
+```
 
-**Correction** : Extraire le max numérique des refs existantes +1 au lieu de compter.
-
-### P6 — Édition ne permet pas de changer le type
-Le dialog d'édition ne contient pas le `Select` de type. Si on a classé un produit en fourniture par erreur, impossible de corriger.
-
-**Correction** : Ajouter le Select type dans le dialog d'édition.
+Au retour, on parse `note_private` pour extraire ces valeurs. Si le parse échoue (ancienne intervention sans JSON), on utilise les fallbacks actuels.
 
 ## Plan de correction
 
-### `src/pages/Catalogue.tsx`
-
-1. **Suppression async** : `await deleteProduitMutation.mutateAsync(p.id)`
-2. **Recherche + filtre type** : `searchQuery` + `filterType` avec Input + Select
-3. **TVA modifiable** : champ TVA dans création et édition, envoyé à Dolibarr
-4. **Prix d'achat** : champ `prixAchat` dans les deux formulaires
-5. **Ref auto robuste** : max numérique des refs existantes +1
-6. **Type en édition** : ajouter le Select type dans le dialog d'édition
-
 ### `src/services/dolibarr.ts`
 
-1. Ajouter `cost_price` dans `createProduit` et `updateProduit`
-2. Ajouter `tva_tx` dans `updateProduit`
+1. **`createIntervention`** : Envoyer `date` (pas `datei`/`dateo`/`datee`) comme timestamp Unix. Sérialiser type, technicien, heures dans `note_private` en JSON.
+
+2. **`mapDolibarrIntervention`** : 
+   - Lire `fk_statut` depuis `d.statut || d.status` au lieu de `d.fk_statut`
+   - Parser `note_private` comme JSON pour extraire type, technicien, heures
+   - Fallback sur `datec` pour la date si `dateo` est vide
+   - Fallback sur `user_creation_id` pour le technicien
+
+3. **`updateIntervention`** : Re-sérialiser les métadonnées dans `note_private` lors de l'édition.
+
+### `src/pages/Interventions.tsx`
+
+4. **`handleEditSave`** : Passer les métadonnées complètes (type, tech, heures) au `updateMutation` pour qu'elles soient sérialisées dans `note_private`.
+
+### `src/pages/Agenda.tsx`
+
+5. Aucun changement nécessaire — les corrections dans le service suffisent.
 
 ## Fichiers impactés
 
 | Fichier | Modifications |
 |---------|--------------|
-| `src/pages/Catalogue.tsx` | Async suppression, recherche, filtres, TVA, prix d'achat, ref robuste, type en édition |
-| `src/services/dolibarr.ts` | `cost_price` + `tva_tx` dans create/update produit |
+| `src/services/dolibarr.ts` | `createIntervention`, `updateIntervention`, `mapDolibarrIntervention` — stockage JSON dans note_private, fix fk_statut, fix date |
+| `src/pages/Interventions.tsx` | `handleEditSave` — passer les métadonnées au update |
 
-## Comportement attendu de chaque action sur Dolibarr
+## Comportement attendu après correction
 
-| Action ElectroPro | Appel API | Effet Dolibarr |
-|---|---|---|
-| **Créer** | `POST /products` | Crée un produit/service (type 0=fourniture, 1=service). Ref unique obligatoire. status=1 (en vente), status_buy=1 (achetable). |
-| **Modifier** | `PUT /products/{id}` | Met à jour label, description, prix, TVA, type, prix d'achat. |
-| **Supprimer** | `DELETE /products/{id}` | Suppression définitive. Échoue si le produit est utilisé dans des lignes de devis/factures. |
+| Champ | Avant | Après |
+|-------|-------|-------|
+| Technicien | Toujours "—" | Nom du technicien assigné |
+| Type | Toujours "Chantier" | Type choisi à la création |
+| Horaire | Toujours 08:00–10:00 | Heures choisies |
+| Date | Toujours "—" | Date de l'intervention |
+| Statut | Toujours "Brouillon" | Statut réel Dolibarr (Validée, En cours, etc.) |
 
