@@ -18,6 +18,7 @@ export interface Facture {
   resteAPayer: number;
   totalPaye: number;
   lignes: DevisLigne[];
+  note_private?: string;
 }
 
 export interface DevisLigne {
