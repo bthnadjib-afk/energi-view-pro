@@ -347,6 +347,10 @@ export async function deleteProduit(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/products/${id}`, 'DELETE');
 }
 
+export async function deleteIntervention(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${id}`, 'DELETE');
+}
+
 // --- Dolibarr user sync ---
 
 export async function createDolibarrUser(data: { login: string; firstname: string; lastname: string; email: string }): Promise<string | null> {

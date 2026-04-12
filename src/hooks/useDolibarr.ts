@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, deleteClient, createIntervention, createDevis, createFacture, createProduit, convertDevisToFacture, createAcompteFacture, updateDevis, validateDevis, closeDevis, deleteDevis, deleteFacture, deleteProduit, createDolibarrUser, validateFacture, validateIntervention, bulkDeleteDevis, bulkDeleteFactures, updateDevisLines, updateFactureLines, type CreateDevisLine } from '@/services/dolibarr';
+import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, deleteClient, createIntervention, createDevis, createFacture, createProduit, convertDevisToFacture, createAcompteFacture, updateDevis, validateDevis, closeDevis, deleteDevis, deleteFacture, deleteProduit, deleteIntervention, createDolibarrUser, validateFacture, validateIntervention, bulkDeleteDevis, bulkDeleteFactures, updateDevisLines, updateFactureLines, type CreateDevisLine } from '@/services/dolibarr';
 import { toast } from 'sonner';
 
 export function useFactures() {
