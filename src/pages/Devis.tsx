@@ -342,7 +342,7 @@ export default function Devis() {
     if (!socid || lignes.length === 0 || !lignes[0].desc) return;
     await createDevisMutation.mutateAsync({
       socid,
-      lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: 0, product_type: l.product_type })),
+      lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx || 20, product_type: l.product_type })),
     });
     setDialogOpen(false);
     setSocid('');
