@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useClients, useCreateClient, useDeleteClient, useUpdateClient, useDevis, useInterventions } from '@/hooks/useDolibarr';
+import { useState, useMemo } from 'react';
+import { useClients, useCreateClient, useDeleteClient, useUpdateClient, useDevis, useInterventions, useFactures } from '@/hooks/useDolibarr';
 import { UserPlus, Search, Mail, History, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +23,7 @@ interface EmailRecord {
 
 interface HistoryEntry {
   date: string;
-  type: 'devis' | 'intervention' | 'email';
+  type: 'devis' | 'intervention' | 'email' | 'facture';
   ref: string;
   label: string;
   statut?: string;
@@ -33,6 +33,7 @@ export default function Clients() {
   const { data: clients = [] } = useClients();
   const { data: allDevis = [] } = useDevis();
   const { data: allInterventions = [] } = useInterventions();
+  const { data: allFactures = [] } = useFactures();
   const createClientMutation = useCreateClient();
   const deleteClientMutation = useDeleteClient();
   const updateClientMutation = useUpdateClient();
@@ -49,10 +50,31 @@ export default function Clients() {
   const [adresse, setAdresse] = useState('');
   const [codePostal, setCodePostal] = useState('');
 
-  const filtered = clients.filter((c) =>
-    c.nom.toLowerCase().includes(search.toLowerCase()) ||
-    c.ville.toLowerCase().includes(search.toLowerCase())
-  );
+  // P4 — Calculer projetsEnCours côté client
+  const projetsParClient = useMemo(() => {
+    const map: Record<string, number> = {};
+    allDevis.forEach(d => {
+      if (d.socid && ['brouillon', 'validé', 'signé'].includes(d.statut?.toLowerCase() || '')) {
+        map[d.socid] = (map[d.socid] || 0) + 1;
+      }
+    });
+    allInterventions.forEach(i => {
+      if (i.socid && ['brouillon', 'validée', 'en cours'].includes(i.statut?.toLowerCase() || '')) {
+        map[i.socid] = (map[i.socid] || 0) + 1;
+      }
+    });
+    return map;
+  }, [allDevis, allInterventions]);
+
+  // P3 — Recherche étendue
+  const filtered = clients.filter((c) => {
+    const q = search.toLowerCase();
+    return c.nom.toLowerCase().includes(q) ||
+      c.ville.toLowerCase().includes(q) ||
+      (c.email || '').toLowerCase().includes(q) ||
+      (c.telephone || '').toLowerCase().includes(q) ||
+      (c.codePostal || '').toLowerCase().includes(q);
+  });
 
   const handleCreate = async () => {
     if (!nom.trim()) return;
@@ -87,12 +109,21 @@ export default function Clients() {
     setDetailClient(null);
   };
 
+  // P1 — Suppression async
+  const handleDelete = async (id: string) => {
+    await deleteClientMutation.mutateAsync(id);
+  };
+
+  // P6 — Factures dans historique
   const clientHistory: HistoryEntry[] = detailClient ? [
     ...allDevis.filter(d => d.socid === detailClient.id).map(d => ({
       date: d.date, type: 'devis' as const, ref: d.ref, label: `Devis — ${d.montantHT.toLocaleString('fr-FR')} € HT`, statut: d.statut,
     })),
     ...allInterventions.filter(i => i.socid === detailClient.id).map(i => ({
       date: i.date, type: 'intervention' as const, ref: i.ref, label: `Intervention — ${i.description}`, statut: i.statut,
+    })),
+    ...allFactures.filter(f => f.socid === detailClient.id).map(f => ({
+      date: f.date, type: 'facture' as const, ref: f.ref, label: `Facture — ${f.montantHT.toLocaleString('fr-FR')} € HT`, statut: f.statut,
     })),
     ...emailHistory.map(e => ({
       date: e.created_at, type: 'email' as const, ref: e.document_ref || '', label: `Email — ${e.objet}`,
@@ -103,6 +134,7 @@ export default function Clients() {
     devis: 'bg-blue-100 text-blue-700 border-blue-200',
     intervention: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     email: 'bg-violet-100 text-violet-700 border-violet-200',
+    facture: 'bg-amber-100 text-amber-700 border-amber-200',
   };
 
   return (
@@ -156,36 +188,39 @@ export default function Clients() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => (
-                <tr key={c.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => openDetail(c)}>
-                  <td className="py-3 px-2 font-medium text-foreground">{c.nom}</td>
-                  <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{c.ville}</td>
-                  <td className="py-3 px-2 text-muted-foreground hidden md:table-cell font-mono text-xs">{c.telephone}</td>
-                  <td className="py-3 px-2 text-muted-foreground hidden lg:table-cell text-xs">{c.email}</td>
-                  <td className="py-3 px-2">
-                    <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', c.projetsEnCours > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-muted text-muted-foreground border-border')}>
-                      {c.projetsEnCours} en cours
-                    </span>
-                  </td>
-                  <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Supprimer ce client ?</AlertDialogTitle>
-                          <AlertDialogDescription>Le client "{c.nom}" sera définitivement supprimé de Dolibarr.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Annuler</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteClientMutation.mutate(c.id)} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map((c) => {
+                const nbProjets = projetsParClient[c.id] || 0;
+                return (
+                  <tr key={c.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => openDetail(c)}>
+                    <td className="py-3 px-2 font-medium text-foreground">{c.nom}</td>
+                    <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{c.ville}</td>
+                    <td className="py-3 px-2 text-muted-foreground hidden md:table-cell font-mono text-xs">{c.telephone}</td>
+                    <td className="py-3 px-2 text-muted-foreground hidden lg:table-cell text-xs">{c.email}</td>
+                    <td className="py-3 px-2">
+                      <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', nbProjets > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-muted text-muted-foreground border-border')}>
+                        {nbProjets} en cours
+                      </span>
+                    </td>
+                    <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Supprimer ce client ?</AlertDialogTitle>
+                            <AlertDialogDescription>Le client "{c.nom}" sera définitivement supprimé de Dolibarr.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(c.id)} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -216,7 +251,8 @@ export default function Clients() {
                   {editMode ? (
                     <div className="space-y-4 pt-3">
                       <Input placeholder="Nom *" value={nom} onChange={e => setNom(e.target.value)} />
-                      <Input placeholder="Adresse" value={adresse} onChange={e => setAdresse(e.target.value)} />
+                      {/* P2 — Autocomplétion en mode édition */}
+                      <AddressAutocomplete value={adresse} onSelect={({ rue, codePostal: cp, ville: v }) => { setAdresse(rue); setCodePostal(cp); setVille(v); }} placeholder="Adresse (autocomplétion)" />
                       <div className="grid grid-cols-2 gap-3">
                         <Input placeholder="Code postal" value={codePostal} onChange={e => setCodePostal(e.target.value)} />
                         <Input placeholder="Ville" value={ville} onChange={e => setVille(e.target.value)} />
@@ -233,6 +269,8 @@ export default function Clients() {
                   ) : (
                     <div className="grid grid-cols-2 gap-4 text-sm pt-3">
                       <div><span className="text-muted-foreground">Adresse :</span> <span className="text-foreground ml-1">{detailClient.adresse || '—'}</span></div>
+                      {/* P5 — Code postal dans le détail */}
+                      <div><span className="text-muted-foreground">Code postal :</span> <span className="text-foreground ml-1">{detailClient.codePostal || '—'}</span></div>
                       <div><span className="text-muted-foreground">Ville :</span> <span className="text-foreground ml-1">{detailClient.ville}</span></div>
                       <div><span className="text-muted-foreground">Téléphone :</span> <span className="text-foreground ml-1 font-mono">{detailClient.telephone}</span></div>
                       <div><span className="text-muted-foreground">Email :</span> <span className="text-foreground ml-1">{detailClient.email}</span></div>
