@@ -1,4 +1,4 @@
-import { useState, Fragment, useEffect } from 'react';
+import { useState, Fragment, useEffect, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis } from '@/hooks/useDolibarr';
 import { getAcompteBadge, formatDateFR, replaceEmailVariables, type Devis as DevisType } from '@/services/dolibarr';
@@ -98,9 +98,15 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
   };
 
   const handleAccepter = (signatureDataUrl: string) => {
-    closeMutation.mutate({ id: devis.id, status: 2 });
+    closeMutation.mutate({ id: devis.id, status: 2 }, {
+      onSuccess: () => {
+        toast.success('Devis accepté — Créer une facture d\'acompte ?', {
+          action: { label: 'Créer acompte', onClick: onAcompte },
+          duration: 8000,
+        });
+      }
+    });
     setShowSignature(false);
-    toast.success('Signature client enregistrée');
   };
 
   return (
@@ -131,7 +137,7 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
 
           {/* Status action buttons */}
           <div className="flex flex-wrap gap-3 pt-3 border-t border-border/30">
-            {devis.statut === 'en attente' && (
+            {devis.statut === 'brouillon' && (
               <Button
                 onClick={() => validateMutation.mutate(devis.id)}
                 disabled={validateMutation.isPending}
@@ -142,7 +148,7 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
               </Button>
             )}
 
-            {(devis.statut === 'en attente') && (
+            {devis.statut === 'en attente' && (
               <>
                 <Button
                   onClick={() => setShowSignature(true)}
@@ -264,6 +270,13 @@ export default function Devis() {
     setLignes(updated);
   };
 
+  // Real-time totals
+  const totals = useMemo(() => {
+    const ht = lignes.reduce((s, l) => s + l.qty * l.subprice, 0);
+    const tva = lignes.reduce((s, l) => s + l.qty * l.subprice * l.tva_tx / 100, 0);
+    return { ht, tva, ttc: ht + tva };
+  }, [lignes]);
+
   const handleCreate = async () => {
     if (!socid || lignes.length === 0 || !lignes[0].desc) return;
     await createDevisMutation.mutateAsync({
@@ -354,6 +367,22 @@ export default function Devis() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Real-time totals */}
+              <div className="rounded-lg bg-accent/20 border border-border/30 p-4 space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total HT</span>
+                  <span className="text-foreground font-medium">{totals.ht.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">TVA</span>
+                  <span className="text-foreground">{totals.tva.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                </div>
+                <div className="flex justify-between text-sm font-bold border-t border-border/30 pt-1">
+                  <span className="text-foreground">Total TTC</span>
+                  <span className="text-primary">{totals.ttc.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                </div>
               </div>
 
               <Button

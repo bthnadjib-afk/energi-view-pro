@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Euro, FileText, ClipboardList, TrendingUp, Users } from 'lucide-react';
+import { Euro, FileText, ClipboardList, TrendingUp, Users, AlertTriangle, Clock, Receipt } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PeriodSelector, type Period } from '@/components/PeriodSelector';
@@ -42,6 +42,15 @@ export default function Dashboard() {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
 
+  // Priority items
+  const sevenDaysAgo = new Date(now);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const devisRelances = devis.filter(d => d.statut === 'en attente' && new Date(d.date) <= sevenDaysAgo);
+  const facturesImpayees = factures.filter(f => f.statut === 'impayée' || f.statut === 'en retard');
+  const interventionsAValider = interventions.filter(i => i.statut === 'planifié');
+
+  const hasPriorities = devisRelances.length > 0 || facturesImpayees.length > 0 || interventionsAValider.length > 0;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -83,6 +92,62 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* Priority section */}
+      {hasPriorities && (
+        <div className="glass rounded-xl p-5">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-orange-400" /> À faire en priorité
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {devisRelances.length > 0 && (
+              <div className="glass rounded-lg p-4 border-l-4 border-l-blue-500">
+                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-blue-400" /> Relances devis ({devisRelances.length})
+                </h3>
+                <div className="space-y-2">
+                  {devisRelances.slice(0, 5).map(d => (
+                    <div key={d.id} className="flex items-center justify-between text-xs">
+                      <span className="text-foreground truncate mr-2">{d.ref} — {d.client}</span>
+                      <span className="text-muted-foreground whitespace-nowrap">{d.montantTTC.toLocaleString('fr-FR')} €</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {facturesImpayees.length > 0 && (
+              <div className="glass rounded-lg p-4 border-l-4 border-l-red-500">
+                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-red-400" /> Factures impayées ({facturesImpayees.length})
+                </h3>
+                <div className="space-y-2">
+                  {facturesImpayees.slice(0, 5).map(f => (
+                    <div key={f.id} className="flex items-center justify-between text-xs">
+                      <span className="text-foreground truncate mr-2">{f.ref} — {f.client}</span>
+                      <StatusBadge statut={f.statut} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {interventionsAValider.length > 0 && (
+              <div className="glass rounded-lg p-4 border-l-4 border-l-amber-500">
+                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-amber-400" /> Interventions planifiées ({interventionsAValider.length})
+                </h3>
+                <div className="space-y-2">
+                  {interventionsAValider.slice(0, 5).map(i => (
+                    <div key={i.id} className="flex items-center justify-between text-xs">
+                      <span className="text-foreground truncate mr-2">{i.ref} — {i.description}</span>
+                      <span className="text-muted-foreground whitespace-nowrap">{i.date}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <UrgencyWidget interventions={interventions} />
 
       {/* Today view */}
@@ -100,7 +165,10 @@ export default function Dashboard() {
                 <div className="space-y-2">
                   {ints.map(i => (
                     <div key={i.id} className="flex items-center justify-between text-xs">
-                      <span className="text-foreground truncate mr-2">{i.description}</span>
+                      <div className="flex items-center gap-2 truncate mr-2">
+                        <span className="text-muted-foreground">{i.heureDebut}–{i.heureFin}</span>
+                        <span className="text-foreground truncate">{i.description}</span>
+                      </div>
                       <StatusBadge statut={i.statut} />
                     </div>
                   ))}

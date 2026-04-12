@@ -261,7 +261,7 @@ export default function Interventions() {
                   <tr key={i.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors cursor-pointer" onClick={() => openDetail(i)}>
                     <td className="py-3 px-2 font-mono text-xs text-foreground">{i.ref}</td>
                     <td className="py-3 px-2 text-foreground">{i.client}</td>
-                    <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{i.technicien}</td>
+                    <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{i.technicien || '—'}</td>
                     <td className="py-3 px-2 hidden md:table-cell">
                       <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs', typeColors[i.type] || 'bg-muted text-muted-foreground')}>
                         {typeLabels[i.type] || i.type}
@@ -274,12 +274,16 @@ export default function Interventions() {
                     <td className="py-3 px-2"><StatusBadge statut={i.statut} /></td>
                     <td className="py-3 px-2">
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => { setSelectedIntervention(i); handleTransformDevis(); }}>
-                          <FileText className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Facture" onClick={() => { setSelectedIntervention(i); handleTransformFacture(); }}>
-                          <Receipt className="h-3.5 w-3.5" />
-                        </Button>
+                        {i.statut === 'terminé' && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Générer facture" onClick={() => { setSelectedIntervention(i); handleTransformFacture(); }}>
+                            <Receipt className="h-3.5 w-3.5 text-emerald-400" />
+                          </Button>
+                        )}
+                        {(i.statut === 'planifié' || i.statut === 'en cours') && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => { setSelectedIntervention(i); handleTransformDevis(); }}>
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -306,7 +310,7 @@ export default function Interventions() {
               <div className="space-y-6 pt-2">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div><span className="text-muted-foreground">Client :</span> <span className="text-foreground ml-1">{selectedIntervention.client}</span></div>
-                  <div><span className="text-muted-foreground">Technicien :</span> <span className="text-foreground ml-1">{selectedIntervention.technicien}</span></div>
+                  <div><span className="text-muted-foreground">Technicien :</span> <span className="text-foreground ml-1">{selectedIntervention.technicien || '—'}</span></div>
                   <div><span className="text-muted-foreground">Date :</span> <span className="text-foreground ml-1">{formatDateFR(selectedIntervention.date)}</span></div>
                   <div><span className="text-muted-foreground">Horaire :</span> <span className="text-foreground ml-1">{selectedIntervention.heureDebut} – {selectedIntervention.heureFin}</span></div>
                 </div>
@@ -356,22 +360,26 @@ export default function Interventions() {
 
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-3 pt-2">
-                  <Button
-                    onClick={handleTransformDevis}
-                    disabled={createDevisMutation.isPending}
-                    className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 px-6 text-base"
-                  >
-                    <ArrowRightLeft className="h-4 w-4" />
-                    {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
-                  </Button>
-                  <Button
-                    onClick={handleTransformFacture}
-                    disabled={createFactureMutation.isPending}
-                    className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0 h-12 px-6 text-base"
-                  >
-                    <Receipt className="h-4 w-4" />
-                    {createFactureMutation.isPending ? 'Création...' : 'Transformer en Facture'}
-                  </Button>
+                  {selectedIntervention.statut === 'terminé' && (
+                    <Button
+                      onClick={handleTransformFacture}
+                      disabled={createFactureMutation.isPending}
+                      className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0 h-12 px-6 text-base"
+                    >
+                      <Receipt className="h-4 w-4" />
+                      {createFactureMutation.isPending ? 'Création...' : 'Générer une facture'}
+                    </Button>
+                  )}
+                  {(selectedIntervention.statut === 'planifié' || selectedIntervention.statut === 'en cours') && (
+                    <Button
+                      onClick={handleTransformDevis}
+                      disabled={createDevisMutation.isPending}
+                      className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 px-6 text-base"
+                    >
+                      <ArrowRightLeft className="h-4 w-4" />
+                      {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
+                    </Button>
+                  )}
                   <Button variant="outline" className="gap-2 glass border-border/50 h-12 px-6 text-base">
                     <FileText className="h-4 w-4" /> Générer Bon d'Intervention
                   </Button>
