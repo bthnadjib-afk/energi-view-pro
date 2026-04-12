@@ -429,14 +429,17 @@ export async function createAcompteFacture(socid: string, montantHT: number, dev
 }
 
 // --- PDF generation via Dolibarr builddoc ---
+// Dolibarr modulepart values: 'proposal' for devis, 'invoice' for factures, 'intervention' for interventions
+
+export type DolibarrModulepart = 'proposal' | 'invoice' | 'intervention';
 
 export async function generatePDF(
-  modulepart: 'propale' | 'facture' | 'ficheinter',
+  modulepart: DolibarrModulepart,
   id: string,
   ref: string,
   model?: string
 ): Promise<string | null> {
-  const defaultModel = modulepart === 'propale' ? 'azur' : modulepart === 'facture' ? 'crabe' : 'soleil';
+  const defaultModel = modulepart === 'proposal' ? 'azur' : modulepart === 'invoice' ? 'crabe' : 'soleil';
   const result = await dolibarrCall<any>('/documents/builddoc', 'PUT', {
     modulepart,
     original_file: `${ref}/${ref}.pdf`,
@@ -444,11 +447,22 @@ export async function generatePDF(
     langcode: 'fr_FR',
   });
   if (!result) return null;
+  // builddoc returns { filename, content-type, filesize, content, ... }
+  // If content is present, open it directly
+  if (result.content) {
+    const byteChars = atob(result.content);
+    const byteArray = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([byteArray], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    return url;
+  }
   return result?.filename || result;
 }
 
 export async function downloadPDFUrl(
-  modulepart: 'propale' | 'facture' | 'ficheinter',
+  modulepart: DolibarrModulepart,
   ref: string
 ): Promise<string | null> {
   const result = await dolibarrCall<any>(
@@ -456,7 +470,6 @@ export async function downloadPDFUrl(
     'GET'
   );
   if (!result?.content) return null;
-  // result.content is base64 encoded
   const byteChars = atob(result.content);
   const byteArray = new Uint8Array(byteChars.length);
   for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
