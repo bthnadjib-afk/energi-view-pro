@@ -1,7 +1,7 @@
 import { useState, Fragment, useEffect, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis } from '@/hooks/useDolibarr';
-import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, type Devis as DevisType } from '@/services/dolibarr';
+import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, downloadPDFUrl, sendDevisByEmail, type Devis as DevisType } from '@/services/dolibarr';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -101,17 +101,36 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
   const handleSendEmail = async () => {
     if (!emailDest || !emailObjet) return;
     setSendingEmail(true);
-    await supabase.from('email_history').insert({
-      user_id: user?.id || '',
-      client_id: devis.socid || '',
-      document_ref: devis.ref,
-      destinataire: emailDest,
-      objet: emailObjet,
-      message: emailMessage,
-    });
+    try {
+      // First generate PDF so Dolibarr can attach it
+      await generatePDF('propal', devis.id, devis.ref, 'azur');
+      // Send via Dolibarr API
+      await sendDevisByEmail(devis.id, emailDest, emailObjet, emailMessage);
+      // Also log in local history
+      await supabase.from('email_history').insert({
+        user_id: user?.id || '',
+        client_id: devis.socid || '',
+        document_ref: devis.ref,
+        destinataire: emailDest,
+        objet: emailObjet,
+        message: emailMessage,
+      });
+      toast.success('Devis envoyé par email via Dolibarr');
+    } catch (e: any) {
+      console.warn('Email send error:', e);
+      // Fallback: at least save in history
+      await supabase.from('email_history').insert({
+        user_id: user?.id || '',
+        client_id: devis.socid || '',
+        document_ref: devis.ref,
+        destinataire: emailDest,
+        objet: emailObjet,
+        message: emailMessage,
+      });
+      toast.warning('Email enregistré localement — l\'envoi Dolibarr a échoué');
+    }
     setSendingEmail(false);
     setEmailOpen(false);
-    toast.success('Email enregistré dans l\'historique');
   };
 
   const handleAccepter = (signatureDataUrl: string) => {
@@ -129,8 +148,14 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
   const handleViewPDF = async () => {
     setGeneratingPDF(true);
     try {
-      await generatePDF('proposals', devis.id);
-      toast.success(`PDF du devis ${devis.ref} généré`);
+      await generatePDF('propal', devis.id, devis.ref, 'azur');
+      const url = await downloadPDFUrl('propal', devis.ref);
+      if (url) {
+        window.open(url, '_blank');
+        toast.success(`PDF du devis ${devis.ref} ouvert`);
+      } else {
+        toast.success(`PDF du devis ${devis.ref} généré`);
+      }
     } catch {
       toast.error('Erreur lors de la génération du PDF');
     }

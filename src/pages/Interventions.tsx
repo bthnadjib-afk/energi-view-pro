@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture } from '@/hooks/useDolibarr';
-import { techniciens, statutsIntervention, typesIntervention, formatDateFR, generatePDF, type InterventionType, type Intervention, type InterventionStatut } from '@/services/dolibarr';
+import { techniciens, statutsIntervention, typesIntervention, formatDateFR, generatePDF, downloadPDFUrl, sendInterventionByEmail, validateIntervention, type InterventionType, type Intervention, type InterventionStatut } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -138,8 +138,14 @@ export default function Interventions() {
   const handleViewPDF = async () => {
     if (!selectedIntervention) return;
     try {
-      await generatePDF('interventions', selectedIntervention.id);
-      toast.success(`Bon d'intervention ${selectedIntervention.ref} généré`);
+      await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
+      const url = await downloadPDFUrl('ficheinter', selectedIntervention.ref);
+      if (url) {
+        window.open(url, '_blank');
+        toast.success(`Bon d'intervention ${selectedIntervention.ref} ouvert`);
+      } else {
+        toast.success(`Bon d'intervention ${selectedIntervention.ref} généré`);
+      }
     } catch {
       toast.error('Erreur lors de la génération du PDF');
     }

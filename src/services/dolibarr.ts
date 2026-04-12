@@ -429,24 +429,130 @@ export async function createAcompteFacture(socid: string, montantHT: number, dev
 }
 
 // --- PDF generation via Dolibarr builddoc ---
+// Dolibarr modulepart values: 'proposal' for devis, 'invoice' for factures, 'intervention' for interventions
 
-export async function generatePDF(module: 'proposals' | 'invoices' | 'interventions', id: string): Promise<string | null> {
-  const result = await dolibarrCall<any>(`/${module}/${id}/builddoc`, 'PUT', {
+export type DolibarrModulepart = 'propal' | 'facture' | 'ficheinter';
+
+export async function generatePDF(
+  modulepart: DolibarrModulepart,
+  id: string,
+  ref: string,
+  model?: string
+): Promise<string | null> {
+  const defaultModel = modulepart === 'propal' ? 'azur' : modulepart === 'facture' ? 'crabe' : 'soleil';
+  const result = await dolibarrCall<any>('/documents/builddoc', 'PUT', {
+    modulepart,
+    original_file: `${ref}/${ref}.pdf`,
+    doctemplate: model || defaultModel,
     langcode: 'fr_FR',
-    outputlangs: 'fr_FR',
   });
   if (!result) return null;
-  // Return document download URL
+  // builddoc returns { filename, content-type, filesize, content, ... }
+  // If content is present, open it directly
+  if (result.content) {
+    const byteChars = atob(result.content);
+    const byteArray = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([byteArray], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    return url;
+  }
   return result?.filename || result;
 }
 
-export async function downloadPDF(module: 'proposals' | 'invoices' | 'interventions', id: string, ref: string): Promise<void> {
-  const result = await dolibarrCall<any>(`/documents/download`, 'GET');
-  // Fallback: open builddoc and try to get the file
-  const built = await generatePDF(module, id);
-  if (built) {
-    toast_info(`PDF généré : ${ref}`);
-  }
+export async function downloadPDFUrl(
+  modulepart: DolibarrModulepart,
+  ref: string
+): Promise<string | null> {
+  const result = await dolibarrCall<any>(
+    `/documents/download?modulepart=${modulepart}&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`,
+    'GET'
+  );
+  if (!result?.content) return null;
+  const byteChars = atob(result.content);
+  const byteArray = new Uint8Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+  const blob = new Blob([byteArray], { type: 'application/pdf' });
+  return URL.createObjectURL(blob);
+}
+
+// --- Validation ---
+
+export async function validateFacture(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/invoices/${id}/validate`, 'POST');
+}
+
+export async function validateIntervention(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${id}/validate`, 'POST');
+}
+
+// --- Send by email ---
+
+export async function sendDevisByEmail(id: string, to: string, subject: string, message: string): Promise<any> {
+  return dolibarrCall<any>(`/proposals/${id}/sendByEmail`, 'POST', {
+    sendto: to,
+    subject,
+    message,
+    model: 'azur',
+  });
+}
+
+export async function sendFactureByEmail(id: string, to: string, subject: string, message: string): Promise<any> {
+  return dolibarrCall<any>(`/invoices/${id}/sendByEmail`, 'POST', {
+    sendto: to,
+    subject,
+    message,
+    model: 'crabe',
+  });
+}
+
+export async function sendInterventionByEmail(id: string, to: string, subject: string, message: string): Promise<any> {
+  return dolibarrCall<any>(`/interventions/${id}/sendByEmail`, 'POST', {
+    sendto: to,
+    subject,
+    message,
+    model: 'soleil',
+  });
+}
+
+// --- Bulk delete ---
+
+export async function bulkDeleteDevis(ids: string[]): Promise<void> {
+  await Promise.allSettled(ids.map(id => dolibarrCall(`/proposals/${id}`, 'DELETE')));
+}
+
+export async function bulkDeleteFactures(ids: string[]): Promise<void> {
+  await Promise.allSettled(ids.map(id => dolibarrCall(`/invoices/${id}`, 'DELETE')));
+}
+
+// --- Update devis/facture lines (PUT, draft only) ---
+
+export async function updateDevisLines(id: string, socid: string, lines: CreateDevisLine[]): Promise<string> {
+  const result = await dolibarrCall<string>(`/proposals/${id}`, 'PUT', {
+    socid: parseInt(socid, 10) || socid,
+    lines,
+  });
+  return result || '';
+}
+
+export async function updateFactureLines(id: string, socid: string, lines: CreateDevisLine[]): Promise<string> {
+  const result = await dolibarrCall<string>(`/invoices/${id}`, 'PUT', {
+    socid: parseInt(socid, 10) || socid,
+    lines,
+  });
+  return result || '';
+}
+
+// --- Check payment status ---
+
+export async function checkAcomptePayment(factureId: string): Promise<{ paye: boolean; totalPaie: number }> {
+  const result = await dolibarrCall<any>(`/invoices/${factureId}`);
+  if (!result) return { paye: false, totalPaie: 0 };
+  return {
+    paye: result.paye === '1' || result.paye === 1,
+    totalPaie: parseFloat(result.sumpayed || result.total_paye || '0') || 0,
+  };
 }
 
 function toast_info(msg: string) {
