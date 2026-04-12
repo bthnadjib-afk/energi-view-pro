@@ -41,6 +41,7 @@ export interface Devis {
   fk_statut: number;
   lignes: DevisLigne[];
   finValidite: string;
+  note_private?: string;
 }
 
 export type InterventionType = 'devis_sur_place' | 'panne' | 'sav' | 'chantier' | 'realisation';
@@ -394,12 +395,14 @@ export interface CreateDevisLine {
   pa_ht?: number;
 }
 
-export async function createDevis(socid: string, lines: CreateDevisLine[]): Promise<string> {
-  const result = await dolibarrCall<string>('/proposals', 'POST', {
+export async function createDevis(socid: string, lines: CreateDevisLine[], note_private?: string): Promise<string> {
+  const body: any = {
     socid: parseInt(socid, 10) || socid,
     date: toUnixTimestamp(new Date().toISOString()),
     lines,
-  });
+  };
+  if (note_private) body.note_private = note_private;
+  const result = await dolibarrCall<string>('/proposals', 'POST', body);
   return result || '';
 }
 
@@ -425,13 +428,15 @@ export async function deleteDevis(id: string): Promise<string | null> {
 
 // --- Factures ---
 
-export async function createFacture(socid: string, lines: CreateDevisLine[]): Promise<string> {
-  const result = await dolibarrCall<string>('/invoices', 'POST', {
+export async function createFacture(socid: string, lines: CreateDevisLine[], note_private?: string): Promise<string> {
+  const body: any = {
     socid: parseInt(socid, 10) || socid,
     type: 0,
     date: toUnixTimestamp(new Date().toISOString()),
     lines,
-  });
+  };
+  if (note_private) body.note_private = note_private;
+  const result = await dolibarrCall<string>('/invoices', 'POST', body);
   return result || '';
 }
 
