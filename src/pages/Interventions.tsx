@@ -162,6 +162,36 @@ export default function Interventions() {
     }
   };
 
+  const handleSendEmail = async () => {
+    if (!selectedIntervention || !emailDest || !emailObjet) return;
+    setSendingEmail(true);
+    try {
+      await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
+      await sendInterventionByEmail(selectedIntervention.id, emailDest, emailObjet, emailMessage);
+      await supabase.from('email_history').insert({
+        user_id: user?.id || '',
+        client_id: selectedIntervention.socid || '',
+        document_ref: selectedIntervention.ref,
+        destinataire: emailDest,
+        objet: emailObjet,
+        message: emailMessage,
+      });
+      toast.success('Bon d\'intervention envoyé par email');
+    } catch (e: any) {
+      await supabase.from('email_history').insert({
+        user_id: user?.id || '',
+        client_id: selectedIntervention.socid || '',
+        document_ref: selectedIntervention.ref,
+        destinataire: emailDest,
+        objet: emailObjet,
+        message: emailMessage,
+      });
+      toast.warning('Email enregistré localement — l\'envoi Dolibarr a échoué');
+    }
+    setSendingEmail(false);
+    setEmailOpen(false);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
