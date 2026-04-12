@@ -14,8 +14,8 @@ Deno.serve(async (req) => {
 
     if (!DOLIBARR_API_URL || !DOLIBARR_API_KEY) {
       return new Response(
-        JSON.stringify({ error: 'Dolibarr API non configurée. Ajoutez DOLIBARR_API_URL et DOLIBARR_API_KEY dans les secrets.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ ok: false, status: 500, error: 'Dolibarr API non configurée. Ajoutez DOLIBARR_API_URL et DOLIBARR_API_KEY dans les secrets.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -23,8 +23,8 @@ Deno.serve(async (req) => {
 
     if (!endpoint || typeof endpoint !== 'string') {
       return new Response(
-        JSON.stringify({ error: 'Le champ "endpoint" est requis (ex: /thirdparties)' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ ok: false, status: 400, error: 'Le champ "endpoint" est requis (ex: /thirdparties)' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -52,17 +52,24 @@ Deno.serve(async (req) => {
       responseData = responseText
     }
 
+    // Always return HTTP 200 so supabase.functions.invoke() doesn't throw.
+    // The real Dolibarr status is in the JSON body.
     return new Response(
-      JSON.stringify(responseData),
-      {
+      JSON.stringify({
+        ok: response.ok,
         status: response.status,
+        data: response.ok ? responseData : undefined,
+        error: response.ok ? undefined : responseData,
+      }),
+      {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: error.message || 'Erreur proxy Dolibarr' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ ok: false, status: 500, error: error.message || 'Erreur proxy Dolibarr' }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })

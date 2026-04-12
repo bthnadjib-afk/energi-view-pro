@@ -93,6 +93,17 @@ async function dolibarrCall<T>(endpoint: string, method = 'GET', data?: unknown)
       body: { endpoint, method, data },
     });
     if (error) throw error;
+    // The proxy always returns 200 with { ok, status, data, error }
+    if (result && typeof result === 'object' && 'ok' in result) {
+      if (!result.ok) {
+        const errMsg = typeof result.error === 'object' ? JSON.stringify(result.error) : String(result.error || `Dolibarr ${result.status}`);
+        console.warn(`Dolibarr API ${result.status}:`, result.error);
+        if (method !== 'GET') throw new Error(errMsg);
+        return null;
+      }
+      return result.data as T;
+    }
+    // Fallback for legacy format
     return result as T;
   } catch (e) {
     console.warn('Dolibarr proxy error:', e);
