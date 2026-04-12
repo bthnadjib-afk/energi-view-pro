@@ -177,6 +177,15 @@ export function useValidateIntervention() {
   });
 }
 
+export function useDeleteIntervention() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteIntervention(id),
+    onSuccess: () => { toast.success('Intervention supprimée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    onError: (e: any) => toast.error(`Erreur suppression intervention : ${e.message || e}`),
+  });
+}
+
 export function useBulkDeleteDevis() {
   const qc = useQueryClient();
   return useMutation({
