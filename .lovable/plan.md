@@ -1,62 +1,50 @@
 
 
-# Audit P1–P11 — Résultat
+# Correction: Synchronisation Utilisateurs ElectroPro ↔ Dolibarr
 
-## Matrice de couverture mise à jour
+## Problèmes identifiés
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ MODULE          │ CREATE │ READ │ UPDATE │ DELETE │ VALIDATE │ EMAIL │ PDF  │
-├─────────────────┼────────┼──────┼────────┼────────┼──────────┼───────┼──────┤
-│ Clients         │  ✅    │  ✅  │  ✅    │  ✅    │   N/A    │  N/A  │ N/A  │
-│ Devis           │  ✅    │  ✅  │  ✅    │  ✅    │  ✅      │  ✅   │  ✅  │
-│ Factures        │  ✅    │  ✅  │  ✅    │  ✅    │  ✅      │  ✅   │  ✅  │
-│ Interventions   │  ✅    │  ✅  │  ✅    │  ✅    │  ✅      │  ✅   │  ✅  │
-│ Produits        │  ✅    │  ✅  │  ✅    │  ✅    │   N/A    │  N/A  │ N/A  │
-│ Utilisateurs    │  ✅    │  ✅  │  ✅    │  ✅    │   N/A    │  N/A  │ N/A  │
-│ Agenda          │  ✅    │  ✅  │  N/A   │  N/A   │   N/A    │  N/A  │ N/A  │
-│ Dashboard       │  N/A   │  ✅  │  N/A   │  N/A   │   N/A    │  N/A  │ N/A  │
-│ Config          │  N/A   │  ✅  │  ✅    │  N/A   │   N/A    │  N/A  │ N/A  │
-│ Paiements       │  ✅    │  N/A │  N/A   │  N/A   │   N/A    │  N/A  │ N/A  │
-│ Signatures      │  ✅    │  N/A │  N/A   │  N/A   │   N/A    │  N/A  │ N/A  │
-│ Devis→Facture   │  ✅    │  N/A │  N/A   │  N/A   │   N/A    │  N/A  │ N/A  │
-└─────────────────────────────────────────────────────────────────────────────┘
+### 1. Création — `dolibarr_user_id` jamais persisté
+Dans `Utilisateurs.tsx` ligne 105, `dolibarrUserMutation.mutate(...)` est appelé en **fire-and-forget** : le dialog se ferme et `fetchUsers()` est appelé **avant** que la mutation Dolibarr ne termine. Le hook `useCreateDolibarrUser` tente de mettre à jour `profiles.dolibarr_user_id` via `.eq('email', data.email)`, mais cela échoue silencieusement car la **politique RLS** sur `profiles` ne permet à un utilisateur que de mettre à jour **son propre profil** (`auth.uid() = id`). L'admin qui crée l'utilisateur n'est pas le propriétaire du profil cible → UPDATE bloqué par RLS → `dolibarr_user_id` reste `null`.
+
+**Preuve** : Dans les données réseau, le profil admin a `"dolibarr_user_id": null`.
+
+### 2. Suppression — Edge Function dépend de `dolibarr_user_id` 
+L'Edge Function `delete-user` cherche `dolibarr_user_id` dans `profiles`. Comme il est toujours `null` (problème #1), elle fait un fallback par email. Mais l'email du profil Supabase ne correspond pas forcément au login Dolibarr, donc l'utilisateur Dolibarr n'est jamais trouvé ni supprimé.
+
+## Corrections
+
+### A. RLS — Permettre aux admins de mettre à jour les profils
+Ajouter une politique RLS `UPDATE` sur `profiles` pour les admins :
+```sql
+CREATE POLICY "Admins can update any profile"
+ON public.profiles FOR UPDATE TO authenticated
+USING (has_role(auth.uid(), 'admin'::app_role))
+WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
 ```
 
-## Résultat de l'audit point par point
+### B. Création — Attendre la synchro Dolibarr avant de fermer
+Dans `Utilisateurs.tsx`, remplacer le `mutate` fire-and-forget par `mutateAsync` avec `await`, pour que `dolibarr_user_id` soit persisté avant le refresh :
+```typescript
+try {
+  await dolibarrUserMutation.mutateAsync({ login, firstname, lastname, email });
+} catch { /* non-bloquant */ }
+setDialogOpen(false);
+fetchUsers();
+```
 
-| Point | Statut | Détail |
-|-------|--------|--------|
-| **P1** Interventions: données non envoyées | ✅ CORRIGÉ | `createIntervention` envoie `fk_user_assign`, `array_options.options_type`, `dateo/datee` (heures réelles), `note_private` |
-| **P2** Interventions: PUT complet | ✅ CORRIGÉ | `updateIntervention` accepte `socid`, `dateo`, `datee`, `fk_user_assign`, `array_options` |
-| **P3** Factures: UPDATE lignes brouillon | ✅ CORRIGÉ | Bouton "Modifier les lignes" visible sur factures `fk_statut === 0`, appelle `updateFactureLines` |
-| **P4** Factures: paiement | ✅ CORRIGÉ | `addPayment()` → `POST /invoices/{id}/payments`. Bouton "Enregistrer un paiement" avec montant, date, mode |
-| **P5** Utilisateurs: modification rôle/profil | ✅ CORRIGÉ | Bouton "Modifier" → met à jour nom + rôle dans Supabase + Dolibarr |
-| **P6** Agenda: interactif | ✅ CORRIGÉ | Clic jour vide → dialog création pré-rempli. Clic intervention → detail |
-| **P7** Signatures: persistées | ✅ CORRIGÉ | `saveInterventionSignatures` → `PUT /interventions/{id}` avec signature base64 dans `note_public` |
-| **P8** Heures statiques | ✅ CORRIGÉ | `parseDolibarrTime(d.dateo)` / `parseDolibarrTime(d.datee)` remplace le hardcode, fallback `08:00`/`10:00` si absent |
-| **P9** Devis: TVA 0% | ✅ CORRIGÉ | Default `tva_tx: 20` dans `Devis.tsx`. **⚠️ RESTE 2 occurrences à corriger** (voir ci-dessous) |
-| **P10** Clients: projetsEnCours | ❌ NON CORRIGÉ | Toujours `projetsEnCours: 0` hardcodé dans `mapDolibarrClient` |
-| **P11** Limite 100 résultats | ✅ CORRIGÉ | Toutes les requêtes GET utilisent `limit=500` |
+### C. Edge Function `create-user` — Persister `dolibarr_user_id` côté serveur
+Alternative plus robuste : dans l'Edge Function `create-user`, après la création Supabase, appeler directement l'API Dolibarr `POST /users` avec le `DOLIBARR_API_KEY` serveur, puis stocker le `dolibarr_user_id` retourné dans `profiles` via le `adminClient` (qui bypass RLS). Cela garantit la synchro même si le client plante.
 
-## Problèmes résiduels à corriger (3 points)
+### D. Edge Function `delete-user` — Améliorer le fallback
+Actuellement le fallback cherche par email. Ajouter aussi une recherche par login (`email.split('@')[0]`) au cas où l'email ne matche pas.
 
-### 1. TVA 0% dans `Interventions.tsx` (ligne 145)
-Lors de la transformation d'une intervention en devis, `tva_tx: 0` est forcé. Doit être `tva_tx: 20`.
+## Fichiers impactés
 
-### 2. TVA 0% dans `Catalogue.tsx` (ligne 36)
-Lors de la création d'un produit, `tva_tx: 0` est envoyé. Doit être `tva_tx: 20` (ou utiliser la TVA configurée).
-
-### 3. `projetsEnCours` toujours à 0 (P10)
-`mapDolibarrClient` force `projetsEnCours: 0` sans jamais calculer depuis les données Dolibarr.
-
-## Plan de correction
-
-| Fichier | Ligne | Correction |
-|---------|-------|------------|
-| `src/pages/Interventions.tsx` | 145 | `tva_tx: 0` → `tva_tx: 20` |
-| `src/pages/Catalogue.tsx` | 36 | `tva_tx: 0` → `tva_tx: 20` |
-| `src/services/dolibarr.ts` | 801 | Calculer `projetsEnCours` en comptant les devis/interventions actifs pour le client, ou laisser à 0 si non utilisé dans l'UI |
-
-Corrections mineures, applicables en une passe.
+| Fichier | Modification |
+|---------|-------------|
+| Migration SQL | Ajouter politique RLS admin UPDATE sur `profiles` |
+| `supabase/functions/create-user/index.ts` | Appeler Dolibarr `POST /users` + stocker `dolibarr_user_id` dans profiles |
+| `src/pages/Utilisateurs.tsx` | `mutate` → `mutateAsync` avec await |
+| `supabase/functions/delete-user/index.ts` | Fallback recherche par login en plus de l'email |
 
