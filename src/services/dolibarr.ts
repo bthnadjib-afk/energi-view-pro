@@ -585,6 +585,19 @@ export async function createDolibarrUser(data: { login: string; firstname: strin
   }
 }
 
+export async function deleteDolibarrUser(dolibarrUserId: string): Promise<string | null> {
+  return dolibarrCall<string>(`/users/${dolibarrUserId}`, 'DELETE');
+}
+
+export async function disableDolibarrUser(dolibarrUserId: string): Promise<string | null> {
+  return dolibarrCall<string>(`/users/${dolibarrUserId}`, 'PUT', { statut: 0 });
+}
+
+export async function getDolibarrUserByEmail(email: string): Promise<any | null> {
+  const users = await dolibarrGet<any[]>(`/users?sqlfilters=(t.email='${encodeURIComponent(email)}')`);
+  return users && users.length > 0 ? users[0] : null;
+}
+
 // --- Email variable replacement ---
 
 export function replaceEmailVariables(text: string, vars: Record<string, string>): string {
