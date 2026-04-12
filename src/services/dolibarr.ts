@@ -431,7 +431,7 @@ export async function createAcompteFacture(socid: string, montantHT: number, dev
 // --- PDF generation via Dolibarr builddoc ---
 // Dolibarr modulepart values: 'proposal' for devis, 'invoice' for factures, 'intervention' for interventions
 
-export type DolibarrModulepart = 'proposal' | 'invoice' | 'intervention';
+export type DolibarrModulepart = 'propal' | 'facture' | 'ficheinter';
 
 export async function generatePDF(
   modulepart: DolibarrModulepart,
@@ -439,7 +439,7 @@ export async function generatePDF(
   ref: string,
   model?: string
 ): Promise<string | null> {
-  const defaultModel = modulepart === 'proposal' ? 'azur' : modulepart === 'invoice' ? 'crabe' : 'soleil';
+  const defaultModel = modulepart === 'propal' ? 'azur' : modulepart === 'facture' ? 'crabe' : 'soleil';
   const result = await dolibarrCall<any>('/documents/builddoc', 'PUT', {
     modulepart,
     original_file: `${ref}/${ref}.pdf`,

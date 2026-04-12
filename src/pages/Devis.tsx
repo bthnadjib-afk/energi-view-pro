@@ -103,7 +103,7 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
     setSendingEmail(true);
     try {
       // First generate PDF so Dolibarr can attach it
-      await generatePDF('proposal', devis.id, devis.ref, 'azur');
+      await generatePDF('propal', devis.id, devis.ref, 'azur');
       // Send via Dolibarr API
       await sendDevisByEmail(devis.id, emailDest, emailObjet, emailMessage);
       // Also log in local history
@@ -148,8 +148,8 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
   const handleViewPDF = async () => {
     setGeneratingPDF(true);
     try {
-      await generatePDF('proposal', devis.id, devis.ref, 'azur');
-      const url = await downloadPDFUrl('proposal', devis.ref);
+      await generatePDF('propal', devis.id, devis.ref, 'azur');
+      const url = await downloadPDFUrl('propal', devis.ref);
       if (url) {
         window.open(url, '_blank');
         toast.success(`PDF du devis ${devis.ref} ouvert`);
