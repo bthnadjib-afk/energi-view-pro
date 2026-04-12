@@ -42,7 +42,7 @@ function AcompteBadge({ montantHT }: { montantHT: number }) {
 function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPending, acomptePending, onCollapse }: {
   devis: DevisType;
   clients: { id: string; nom: string; email: string }[];
-  produits: { id: string; ref: string; label: string; prixHT: number; tauxTVA: number; type: string; prixAchat: number }[];
+  produits: { id: string; ref: string; label: string; prixHT: number; tauxTVA: number; type: string; prixAchat?: number }[];
   onConvert: () => void;
   onAcompte: () => void;
   convertPending: boolean;
