@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
-import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil } from 'lucide-react';
+import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil, Search, XCircle } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines } from '@/hooks/useDolibarr';
-import { formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendFactureByEmail, type CreateDevisLine } from '@/services/dolibarr';
+import { formatDateFR, generatePDF, openPDFInNewTab, sendFactureByEmail, type CreateDevisLine, type Facture } from '@/services/dolibarr';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
@@ -31,7 +31,7 @@ export default function Factures() {
   const addPaymentMutation = useAddPayment();
   const updateLinesMutation = useUpdateFactureLines();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedFacture, setSelectedFacture] = useState<any>(null);
+  const [selectedFacture, setSelectedFacture] = useState<Facture | null>(null);
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailDest, setEmailDest] = useState('');
   const [emailObjet, setEmailObjet] = useState('');
@@ -44,11 +44,35 @@ export default function Factures() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
-  const [paymentMode, setPaymentMode] = useState(4); // 4=CB, 6=Virement, 7=Chèque
+  const [paymentMode, setPaymentMode] = useState(4);
 
   // Edit draft state
   const [editOpen, setEditOpen] = useState(false);
   const [editLines, setEditLines] = useState<LigneForm[]>([]);
+
+  // Filters
+  const [filterStatut, setFilterStatut] = useState('all');
+  const [filterClient, setFilterClient] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filtered factures
+  const filteredFactures = useMemo(() => {
+    return factures.filter(f => {
+      if (filterStatut !== 'all') {
+        if (filterStatut === 'brouillon' && f.fk_statut !== 0) return false;
+        if (filterStatut === 'impayee' && (f.fk_statut < 1 || f.paye || f.totalPaye > 0)) return false;
+        if (filterStatut === 'partielle' && !(f.fk_statut >= 1 && !f.paye && f.totalPaye > 0)) return false;
+        if (filterStatut === 'payee' && !f.paye) return false;
+        if (filterStatut === 'abandonnee' && f.fk_statut !== 3) return false;
+      }
+      if (filterClient !== 'all' && f.socid !== filterClient) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        if (!f.ref.toLowerCase().includes(q) && !f.client.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [factures, filterStatut, filterClient, searchQuery]);
 
   const totalCA = factures.reduce((s, f) => s + f.montantTTC, 0);
   const payees = factures.filter(f => f.paye);
@@ -94,35 +118,66 @@ export default function Factures() {
     setLignes([emptyLigne()]);
   };
 
-  const handlePayment = async () => {
-    if (!selectedFacture || paymentAmount <= 0) return;
-    await addPaymentMutation.mutateAsync({
-      invoiceId: selectedFacture.id,
-      datepaye: paymentDate,
-      paymentid: paymentMode,
-      closepaidinvoices: paymentAmount >= selectedFacture.montantTTC ? 'yes' : 'no',
-      amount: paymentAmount,
-    });
-    setPaymentOpen(false);
-    setSelectedFacture(null);
+  const handleValidate = async () => {
+    if (!selectedFacture) return;
+    try {
+      await validateFactureMutation.mutateAsync(selectedFacture.id);
+      setSelectedFacture(null);
+    } catch {}
   };
 
-  const openEditDraft = (f: any) => {
-    // We don't have lines from the list view, start with a placeholder
-    setEditLines([{ desc: 'Chargement...', qty: 1, subprice: f.montantHT, tva_tx: 20, product_type: 1, productId: '' }]);
+  const handlePayment = async () => {
+    if (!selectedFacture || paymentAmount <= 0) return;
+    const reste = selectedFacture.resteAPayer;
+    try {
+      await addPaymentMutation.mutateAsync({
+        invoiceId: selectedFacture.id,
+        datepaye: paymentDate,
+        paymentid: paymentMode,
+        closepaidinvoices: (reste - paymentAmount) <= 0.01 ? 'yes' : 'no',
+        amount: paymentAmount,
+      });
+      setPaymentOpen(false);
+      setSelectedFacture(null);
+    } catch {}
+  };
+
+  const openEditDraft = (f: Facture) => {
+    // Load real lines from the facture
+    if (f.lignes && f.lignes.length > 0) {
+      setEditLines(f.lignes.map(l => ({
+        desc: l.designation,
+        qty: l.quantite,
+        subprice: l.prixUnitaire,
+        tva_tx: 20,
+        product_type: 1,
+        productId: '',
+      })));
+    } else {
+      setEditLines([{ desc: '', qty: 1, subprice: f.montantHT, tva_tx: 20, product_type: 1, productId: '' }]);
+    }
     setEditOpen(true);
   };
 
   const handleSaveEditLines = async () => {
     if (!selectedFacture) return;
-    await updateLinesMutation.mutateAsync({
-      id: selectedFacture.id,
-      socid: selectedFacture.socid || '',
-      lines: editLines.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type })),
-    });
-    setEditOpen(false);
-    setSelectedFacture(null);
+    try {
+      await updateLinesMutation.mutateAsync({
+        id: selectedFacture.id,
+        socid: selectedFacture.socid || '',
+        lines: editLines.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type })),
+      });
+      setEditOpen(false);
+      setSelectedFacture(null);
+    } catch {}
   };
+
+  // Unique clients in factures for filter
+  const factureClients = useMemo(() => {
+    const map = new Map<string, string>();
+    factures.forEach(f => { if (f.socid) map.set(f.socid, f.client); });
+    return Array.from(map.entries());
+  }, [factures]);
 
   return (
     <div className="space-y-6">
@@ -218,6 +273,34 @@ export default function Factures() {
         <StatCard title="Factures impayées" value={String(nonPayees.length)} subtitle={`${nonPayees.reduce((s, f) => s + f.montantTTC, 0).toLocaleString('fr-FR')} €`} icon={AlertCircle} />
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Rechercher ref ou client..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+        </div>
+        <Select value={filterStatut} onValueChange={setFilterStatut}>
+          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les statuts</SelectItem>
+            <SelectItem value="brouillon">Brouillon</SelectItem>
+            <SelectItem value="impayee">Impayée</SelectItem>
+            <SelectItem value="partielle">Partiellement payée</SelectItem>
+            <SelectItem value="payee">Payée</SelectItem>
+            <SelectItem value="abandonnee">Abandonnée</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterClient} onValueChange={setFilterClient}>
+          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les clients</SelectItem>
+            {factureClients.map(([id, nom]) => (
+              <SelectItem key={id} value={id}>{nom}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -227,17 +310,21 @@ export default function Factures() {
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Client</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Date</th>
                 <th className="text-right py-3 px-2 text-muted-foreground font-medium">Montant TTC</th>
+                <th className="text-right py-3 px-2 text-muted-foreground font-medium hidden md:table-cell">Reste à payer</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Statut</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium w-10"></th>
               </tr>
             </thead>
             <tbody>
-              {factures.map((f) => (
+              {filteredFactures.map((f) => (
                 <tr key={f.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => setSelectedFacture(f)}>
                   <td className="py-3 px-2 font-mono text-xs text-foreground">{f.ref}</td>
                   <td className="py-3 px-2 text-foreground">{f.client}</td>
                   <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(f.date)}</td>
                   <td className="py-3 px-2 text-right font-medium text-foreground">{f.montantTTC.toLocaleString('fr-FR')} €</td>
+                  <td className="py-3 px-2 text-right text-muted-foreground hidden md:table-cell">
+                    {f.fk_statut >= 1 && !f.paye ? `${f.resteAPayer.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €` : '—'}
+                  </td>
                   <td className="py-3 px-2"><StatusBadge statut={f.statut} /></td>
                   <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
                     {f.fk_statut === 0 && (
@@ -260,6 +347,9 @@ export default function Factures() {
                   </td>
                 </tr>
               ))}
+              {filteredFactures.length === 0 && (
+                <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">Aucune facture trouvée</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -280,16 +370,40 @@ export default function Factures() {
                   <div><span className="text-muted-foreground">Date :</span> <span className="text-foreground ml-1">{formatDateFR(selectedFacture.date)}</span></div>
                   <div><span className="text-muted-foreground">Montant HT :</span> <span className="text-foreground ml-1">{selectedFacture.montantHT.toLocaleString('fr-FR')} €</span></div>
                   <div><span className="text-muted-foreground">Montant TTC :</span> <span className="text-foreground ml-1 font-bold">{selectedFacture.montantTTC.toLocaleString('fr-FR')} €</span></div>
+                  {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && (
+                    <>
+                      <div><span className="text-muted-foreground">Déjà payé :</span> <span className="text-foreground ml-1">{selectedFacture.totalPaye.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span></div>
+                      <div><span className="text-muted-foreground">Reste à payer :</span> <span className="text-foreground ml-1 font-bold text-orange-600">{selectedFacture.resteAPayer.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span></div>
+                    </>
+                  )}
                 </div>
+
+                {/* Show lines */}
+                {selectedFacture.lignes && selectedFacture.lignes.length > 0 && (
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase">Lignes</h4>
+                    <div className="rounded border border-border divide-y divide-border text-xs">
+                      {selectedFacture.lignes.map((l, i) => (
+                        <div key={i} className="flex items-center justify-between px-3 py-2">
+                          <span className="text-foreground flex-1 truncate">{l.designation}</span>
+                          <span className="text-muted-foreground mx-2">{l.quantite} × {l.prixUnitaire.toLocaleString('fr-FR')} €</span>
+                          <span className="text-foreground font-medium">{l.totalHT.toLocaleString('fr-FR')} €</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Statut :</span>
                   <StatusBadge statut={selectedFacture.statut} />
                 </div>
                 <div className="flex flex-wrap gap-3 pt-2">
+                  {/* Brouillon actions */}
                   {selectedFacture.fk_statut === 0 && (
                     <>
                       <Button
-                        onClick={() => validateFactureMutation.mutate(selectedFacture.id, { onSuccess: () => setSelectedFacture(null) })}
+                        onClick={handleValidate}
                         disabled={validateFactureMutation.isPending}
                         className="gap-2"
                       >
@@ -307,12 +421,12 @@ export default function Factures() {
                   )}
 
                   {/* Payment button for validated unpaid invoices */}
-                  {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && (
+                  {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && selectedFacture.fk_statut !== 3 && (
                     <Button
                       variant="outline"
                       className="gap-2"
                       onClick={() => {
-                        setPaymentAmount(selectedFacture.montantTTC);
+                        setPaymentAmount(selectedFacture.resteAPayer);
                         setPaymentDate(new Date().toISOString().slice(0, 10));
                         setPaymentOpen(true);
                       }}
@@ -364,6 +478,14 @@ export default function Factures() {
             <DialogDescription className="sr-only">Formulaire de paiement</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
+            {selectedFacture && (
+              <div className="rounded-lg bg-muted/50 border border-border p-3 text-sm space-y-1">
+                <div className="flex justify-between"><span className="text-muted-foreground">Facture</span><span className="text-foreground font-mono">{selectedFacture.ref}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Montant TTC</span><span className="text-foreground">{selectedFacture.montantTTC.toLocaleString('fr-FR')} €</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Déjà payé</span><span className="text-foreground">{selectedFacture.totalPaye.toLocaleString('fr-FR')} €</span></div>
+                <div className="flex justify-between font-bold border-t border-border pt-1"><span className="text-foreground">Reste à payer</span><span className="text-orange-600">{selectedFacture.resteAPayer.toLocaleString('fr-FR')} €</span></div>
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm text-muted-foreground">Montant (€)</label>
               <Input type="number" value={paymentAmount} onChange={e => setPaymentAmount(Number(e.target.value))} step="0.01" />
