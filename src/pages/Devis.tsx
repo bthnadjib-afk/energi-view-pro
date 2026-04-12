@@ -1,7 +1,7 @@
 import { useState, Fragment, useEffect, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis } from '@/hooks/useDolibarr';
-import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, downloadPDFUrl, sendDevisByEmail, type Devis as DevisType } from '@/services/dolibarr';
+import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, openPDFInNewTab, downloadPDFUrl, sendDevisByEmail, type Devis as DevisType } from '@/services/dolibarr';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -148,13 +148,19 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
   const handleViewPDF = async () => {
     setGeneratingPDF(true);
     try {
-      await generatePDF('propal', devis.id, devis.ref, 'azur');
-      const url = await downloadPDFUrl('propal', devis.ref);
+      const url = await generatePDF('propal', devis.id, devis.ref, 'azur');
       if (url) {
-        window.open(url, '_blank');
-        toast.success(`PDF du devis ${devis.ref} ouvert`);
+        openPDFInNewTab(url, `${devis.ref}.pdf`);
+        toast.success(`PDF du devis ${devis.ref} téléchargé`);
       } else {
-        toast.success(`PDF du devis ${devis.ref} généré`);
+        // Fallback: try download endpoint
+        const dlUrl = await downloadPDFUrl('propal', devis.ref);
+        if (dlUrl) {
+          openPDFInNewTab(dlUrl, `${devis.ref}.pdf`);
+          toast.success(`PDF du devis ${devis.ref} téléchargé`);
+        } else {
+          toast.success(`PDF du devis ${devis.ref} généré`);
+        }
       }
     } catch {
       toast.error('Erreur lors de la génération du PDF');
@@ -328,6 +334,7 @@ export default function Devis() {
   const createDevisMutation = useCreateDevis();
   const convertMutation = useConvertDevisToFacture();
   const acompteMutation = useCreateAcompte();
+  const deleteDevisMutation = useDeleteDevis();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [socid, setSocid] = useState('');
@@ -498,6 +505,7 @@ export default function Devis() {
                 <th className="text-right py-3 px-2 text-muted-foreground font-medium">Montant HT</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden md:table-cell">Statut</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Acompte</th>
+                <th className="text-left py-3 px-2 text-muted-foreground font-medium w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -516,6 +524,27 @@ export default function Devis() {
                     <td className="py-3 px-2 text-right font-medium text-foreground">{(d.montantHT ?? 0).toLocaleString('fr-FR')} €</td>
                     <td className="py-3 px-2 hidden md:table-cell"><StatusBadge statut={d.statut} /></td>
                     <td className="py-3 px-2"><AcompteBadge montantHT={d.montantHT} /></td>
+                    <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
+                      {d.statut === 'brouillon' && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Supprimer ce devis ?</AlertDialogTitle>
+                              <AlertDialogDescription>Le devis {d.ref} sera définitivement supprimé.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteDevisMutation.mutate(d.id)} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </td>
                   </tr>
                   {expandedId === d.id && (
                     <DevisDetail

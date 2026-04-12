@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, deleteClient, createIntervention, createDevis, createFacture, createProduit, convertDevisToFacture, createAcompteFacture, updateDevis, validateDevis, closeDevis, deleteDevis, deleteFacture, deleteProduit, deleteIntervention, createDolibarrUser, validateFacture, validateIntervention, bulkDeleteDevis, bulkDeleteFactures, updateDevisLines, updateFactureLines, type CreateDevisLine } from '@/services/dolibarr';
+import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, deleteClient, updateClient, createIntervention, createDevis, createFacture, createProduit, convertDevisToFacture, createAcompteFacture, updateDevis, validateDevis, closeDevis, deleteDevis, deleteFacture, deleteProduit, deleteIntervention, createDolibarrUser, validateFacture, validateIntervention, bulkDeleteDevis, bulkDeleteFactures, updateDevisLines, updateFactureLines, updateProduit, updateIntervention, type CreateDevisLine } from '@/services/dolibarr';
 import { toast } from 'sonner';
 
 export function useFactures() {
@@ -210,5 +210,32 @@ export function useUpdateDevisLines() {
     mutationFn: (data: { id: string; socid: string; lines: CreateDevisLine[] }) => updateDevisLines(data.id, data.socid, data.lines),
     onSuccess: () => { toast.success('Lignes du devis modifiées'); qc.invalidateQueries({ queryKey: ['devis'] }); },
     onError: (e: any) => toast.error(`Erreur modification : ${e.message || e}`),
+  });
+}
+
+export function useUpdateClient() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { id: string; nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }) => updateClient(data.id, data),
+    onSuccess: () => { toast.success('Client modifié'); qc.invalidateQueries({ queryKey: ['clients'] }); },
+    onError: (e: any) => toast.error(`Erreur modification client : ${e.message || e}`),
+  });
+}
+
+export function useUpdateProduit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { id: string; label: string; description?: string; price: number; type: number }) => updateProduit(data.id, data),
+    onSuccess: () => { toast.success('Article modifié'); qc.invalidateQueries({ queryKey: ['produits'] }); },
+    onError: (e: any) => toast.error(`Erreur modification article : ${e.message || e}`),
+  });
+}
+
+export function useUpdateIntervention() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { id: string; description?: string }) => updateIntervention(data.id, data),
+    onSuccess: () => { toast.success('Intervention modifiée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    onError: (e: any) => toast.error(`Erreur modification intervention : ${e.message || e}`),
   });
 }

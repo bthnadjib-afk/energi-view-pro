@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useClients, useCreateClient, useDeleteClient, useDevis, useInterventions } from '@/hooks/useDolibarr';
-import { UserPlus, Search, Mail, History, Trash2 } from 'lucide-react';
+import { useClients, useCreateClient, useDeleteClient, useUpdateClient, useDevis, useInterventions } from '@/hooks/useDolibarr';
+import { UserPlus, Search, Mail, History, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -35,9 +35,11 @@ export default function Clients() {
   const { data: allInterventions = [] } = useInterventions();
   const createClientMutation = useCreateClient();
   const deleteClientMutation = useDeleteClient();
+  const updateClientMutation = useUpdateClient();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailClient, setDetailClient] = useState<Client | null>(null);
+  const [editMode, setEditMode] = useState(false);
   const [emailHistory, setEmailHistory] = useState<EmailRecord[]>([]);
 
   const [nom, setNom] = useState('');
@@ -61,32 +63,39 @@ export default function Clients() {
 
   const openDetail = (client: Client) => {
     setDetailClient(client);
+    setEditMode(false);
     supabase.from('email_history').select('*').eq('client_id', client.id).order('created_at', { ascending: false }).then(({ data }) => {
       setEmailHistory((data || []) as any);
     });
   };
 
-  // Build centralized history for detail client
+  const startEdit = () => {
+    if (!detailClient) return;
+    setNom(detailClient.nom);
+    setAdresse(detailClient.adresse || '');
+    setCodePostal(detailClient.codePostal || '');
+    setVille(detailClient.ville);
+    setTelephone(detailClient.telephone);
+    setEmail(detailClient.email);
+    setEditMode(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!detailClient || !nom.trim()) return;
+    await updateClientMutation.mutateAsync({ id: detailClient.id, nom, adresse, codePostal, ville, telephone, email });
+    setEditMode(false);
+    setDetailClient(null);
+  };
+
   const clientHistory: HistoryEntry[] = detailClient ? [
     ...allDevis.filter(d => d.socid === detailClient.id).map(d => ({
-      date: d.date,
-      type: 'devis' as const,
-      ref: d.ref,
-      label: `Devis — ${d.montantHT.toLocaleString('fr-FR')} € HT`,
-      statut: d.statut,
+      date: d.date, type: 'devis' as const, ref: d.ref, label: `Devis — ${d.montantHT.toLocaleString('fr-FR')} € HT`, statut: d.statut,
     })),
     ...allInterventions.filter(i => i.socid === detailClient.id).map(i => ({
-      date: i.date,
-      type: 'intervention' as const,
-      ref: i.ref,
-      label: `Intervention — ${i.description}`,
-      statut: i.statut,
+      date: i.date, type: 'intervention' as const, ref: i.ref, label: `Intervention — ${i.description}`, statut: i.statut,
     })),
     ...emailHistory.map(e => ({
-      date: e.created_at,
-      type: 'email' as const,
-      ref: e.document_ref || '',
-      label: `Email — ${e.objet}`,
+      date: e.created_at, type: 'email' as const, ref: e.document_ref || '', label: `Email — ${e.objet}`,
     })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [];
 
@@ -106,36 +115,21 @@ export default function Clients() {
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0">
-              <UserPlus className="h-4 w-4" />
-              Ajouter un client
+              <UserPlus className="h-4 w-4" /> Ajouter un client
             </Button>
           </DialogTrigger>
           <DialogContent className="glass-strong border-border/50">
-            <DialogHeader>
-              <DialogTitle className="text-foreground">Nouveau client</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle className="text-foreground">Nouveau client</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
               <Input placeholder="Nom du client *" value={nom} onChange={e => setNom(e.target.value)} className="glass border-border/50" />
-              <AddressAutocomplete
-                value={adresse}
-                onSelect={({ rue, codePostal: cp, ville: v }) => {
-                  setAdresse(rue);
-                  setCodePostal(cp);
-                  setVille(v);
-                }}
-                placeholder="Adresse (autocomplétion)"
-              />
+              <AddressAutocomplete value={adresse} onSelect={({ rue, codePostal: cp, ville: v }) => { setAdresse(rue); setCodePostal(cp); setVille(v); }} placeholder="Adresse (autocomplétion)" />
               <div className="grid grid-cols-2 gap-3">
                 <Input placeholder="Code postal" value={codePostal} onChange={e => setCodePostal(e.target.value)} className="glass border-border/50" />
                 <Input placeholder="Ville" value={ville} onChange={e => setVille(e.target.value)} className="glass border-border/50" />
               </div>
               <Input placeholder="Téléphone" value={telephone} onChange={e => setTelephone(e.target.value)} className="glass border-border/50" />
               <Input placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="glass border-border/50" />
-              <Button
-                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0"
-                onClick={handleCreate}
-                disabled={createClientMutation.isPending || !nom.trim()}
-              >
+              <Button className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0" onClick={handleCreate} disabled={createClientMutation.isPending || !nom.trim()}>
                 {createClientMutation.isPending ? 'Création...' : 'Enregistrer'}
               </Button>
             </div>
@@ -145,12 +139,7 @@ export default function Clients() {
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Rechercher un client..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 glass border-border/50"
-        />
+        <Input placeholder="Rechercher un client..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 glass border-border/50" />
       </div>
 
       <div className="glass rounded-xl p-5">
@@ -174,21 +163,14 @@ export default function Clients() {
                   <td className="py-3 px-2 text-muted-foreground hidden md:table-cell font-mono text-xs">{c.telephone}</td>
                   <td className="py-3 px-2 text-muted-foreground hidden lg:table-cell text-xs">{c.email}</td>
                   <td className="py-3 px-2">
-                    <span className={cn(
-                      'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
-                      c.projetsEnCours > 0
-                        ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                        : 'bg-muted text-muted-foreground border-border/50'
-                    )}>
+                    <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', c.projetsEnCours > 0 ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-muted text-muted-foreground border-border/50')}>
                       {c.projetsEnCours} en cours
                     </span>
                   </td>
                   <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
@@ -210,30 +192,52 @@ export default function Clients() {
       </div>
 
       {/* Client detail dialog */}
-      <Dialog open={!!detailClient} onOpenChange={(open) => { if (!open) setDetailClient(null); }}>
+      <Dialog open={!!detailClient} onOpenChange={(open) => { if (!open) { setDetailClient(null); setEditMode(false); } }}>
         <DialogContent className="glass-strong border-border/50 max-w-2xl max-h-[80vh] overflow-y-auto">
           {detailClient && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-foreground">{detailClient.nom}</DialogTitle>
+                <DialogTitle className="text-foreground flex items-center gap-2">
+                  {detailClient.nom}
+                  {!editMode && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={startEdit}>
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
+                  )}
+                </DialogTitle>
               </DialogHeader>
               <Tabs defaultValue="info" className="pt-2">
                 <TabsList className="glass border-border/50">
                   <TabsTrigger value="info">Informations</TabsTrigger>
-                  <TabsTrigger value="historique" className="gap-1.5">
-                    <History className="h-3.5 w-3.5" /> Historique
-                  </TabsTrigger>
-                  <TabsTrigger value="emails" className="gap-1.5">
-                    <Mail className="h-3.5 w-3.5" /> Emails
-                  </TabsTrigger>
+                  <TabsTrigger value="historique" className="gap-1.5"><History className="h-3.5 w-3.5" /> Historique</TabsTrigger>
+                  <TabsTrigger value="emails" className="gap-1.5"><Mail className="h-3.5 w-3.5" /> Emails</TabsTrigger>
                 </TabsList>
                 <TabsContent value="info">
-                  <div className="grid grid-cols-2 gap-4 text-sm pt-3">
-                    <div><span className="text-muted-foreground">Adresse :</span> <span className="text-foreground ml-1">{detailClient.adresse || '—'}</span></div>
-                    <div><span className="text-muted-foreground">Ville :</span> <span className="text-foreground ml-1">{detailClient.ville}</span></div>
-                    <div><span className="text-muted-foreground">Téléphone :</span> <span className="text-foreground ml-1 font-mono">{detailClient.telephone}</span></div>
-                    <div><span className="text-muted-foreground">Email :</span> <span className="text-foreground ml-1">{detailClient.email}</span></div>
-                  </div>
+                  {editMode ? (
+                    <div className="space-y-4 pt-3">
+                      <Input placeholder="Nom *" value={nom} onChange={e => setNom(e.target.value)} className="glass border-border/50" />
+                      <Input placeholder="Adresse" value={adresse} onChange={e => setAdresse(e.target.value)} className="glass border-border/50" />
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input placeholder="Code postal" value={codePostal} onChange={e => setCodePostal(e.target.value)} className="glass border-border/50" />
+                        <Input placeholder="Ville" value={ville} onChange={e => setVille(e.target.value)} className="glass border-border/50" />
+                      </div>
+                      <Input placeholder="Téléphone" value={telephone} onChange={e => setTelephone(e.target.value)} className="glass border-border/50" />
+                      <Input placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="glass border-border/50" />
+                      <div className="flex gap-3">
+                        <Button onClick={handleUpdate} disabled={updateClientMutation.isPending} className="bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
+                          {updateClientMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
+                        </Button>
+                        <Button variant="outline" onClick={() => setEditMode(false)} className="glass border-border/50">Annuler</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4 text-sm pt-3">
+                      <div><span className="text-muted-foreground">Adresse :</span> <span className="text-foreground ml-1">{detailClient.adresse || '—'}</span></div>
+                      <div><span className="text-muted-foreground">Ville :</span> <span className="text-foreground ml-1">{detailClient.ville}</span></div>
+                      <div><span className="text-muted-foreground">Téléphone :</span> <span className="text-foreground ml-1 font-mono">{detailClient.telephone}</span></div>
+                      <div><span className="text-muted-foreground">Email :</span> <span className="text-foreground ml-1">{detailClient.email}</span></div>
+                    </div>
+                  )}
                 </TabsContent>
                 <TabsContent value="historique">
                   <div className="pt-3">
@@ -244,9 +248,7 @@ export default function Clients() {
                         {clientHistory.map((entry, idx) => (
                           <div key={idx} className="flex items-center gap-3 text-xs p-2 rounded-lg bg-accent/10">
                             <span className="text-muted-foreground w-20 shrink-0">{formatDateFR(entry.date)}</span>
-                            <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs capitalize', typeColors[entry.type])}>
-                              {entry.type}
-                            </span>
+                            <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs capitalize', typeColors[entry.type])}>{entry.type}</span>
                             <span className="text-foreground truncate flex-1">{entry.label}</span>
                             {entry.ref && <span className="font-mono text-muted-foreground">{entry.ref}</span>}
                             {entry.statut && <StatusBadge statut={entry.statut as any} />}

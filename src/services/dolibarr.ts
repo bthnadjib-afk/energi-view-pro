@@ -12,7 +12,7 @@ export interface Facture {
   date: string;
   montantHT: number;
   montantTTC: number;
-  statut: 'payée' | 'impayée' | 'en retard';
+  statut: 'brouillon' | 'payée' | 'impayée' | 'en retard';
 }
 
 export interface DevisLigne {
@@ -299,8 +299,32 @@ export async function createClient(data: { nom: string; adresse?: string; codePo
   return result || '';
 }
 
+export async function updateClient(id: string, data: { nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }): Promise<string | null> {
+  return dolibarrCall<string>(`/thirdparties/${id}`, 'PUT', {
+    name: data.nom,
+    address: data.adresse || '',
+    zip: data.codePostal || '',
+    town: data.ville || '',
+    phone: data.telephone || '',
+    email: data.email || '',
+  });
+}
+
 export async function deleteClient(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/thirdparties/${id}`, 'DELETE');
+}
+
+export async function updateProduit(id: string, data: { label: string; description?: string; price: number; type: number }): Promise<string | null> {
+  return dolibarrCall<string>(`/products/${id}`, 'PUT', {
+    label: data.label,
+    description: data.description || '',
+    price: data.price,
+    type: data.type,
+  });
+}
+
+export async function updateIntervention(id: string, data: { description?: string }): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${id}`, 'PUT', data);
 }
 
 export async function createIntervention(data: { socid: string; description: string; date: string }): Promise<string> {
@@ -452,17 +476,26 @@ export async function generatePDF(
   });
   if (!result) return null;
   // builddoc returns { filename, content-type, filesize, content, ... }
-  // If content is present, open it directly
+  // If content is present, create a blob URL (NO window.open — caller decides)
   if (result.content) {
     const byteChars = atob(result.content);
     const byteArray = new Uint8Array(byteChars.length);
     for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
     const blob = new Blob([byteArray], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    return url;
+    return URL.createObjectURL(blob);
   }
   return result?.filename || result;
+}
+
+// Helper to open PDF in a new tab via blob download (avoids ERR_BLOCKED_BY_CLIENT)
+export function openPDFInNewTab(blobUrl: string, filename: string) {
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 export async function downloadPDFUrl(
@@ -584,7 +617,18 @@ function parseDolibarrDate(val: any): string {
 // --- Mapping Dolibarr → App types ---
 
 function mapDolibarrFacture(d: any): Facture {
-  const statut = d.fk_statut === '2' || d.paye === '1' ? 'payée' : d.fk_statut === '1' ? 'impayée' : 'en retard';
+  let statut: Facture['statut'];
+  if (d.paye === '1' || d.paye === 1) {
+    statut = 'payée';
+  } else if (String(d.fk_statut) === '0') {
+    statut = 'brouillon';
+  } else if (String(d.fk_statut) === '1') {
+    statut = 'impayée';
+  } else if (String(d.fk_statut) === '2') {
+    statut = 'payée';
+  } else {
+    statut = 'en retard';
+  }
   return {
     id: String(d.id),
     ref: d.ref || `FA-${d.id}`,
