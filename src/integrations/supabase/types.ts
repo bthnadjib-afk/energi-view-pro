@@ -93,6 +93,7 @@ export type Database = {
         Row: {
           actif: boolean
           created_at: string
+          dolibarr_user_id: string | null
           email: string
           id: string
           nom: string
@@ -100,6 +101,7 @@ export type Database = {
         Insert: {
           actif?: boolean
           created_at?: string
+          dolibarr_user_id?: string | null
           email?: string
           id: string
           nom?: string
@@ -107,6 +109,7 @@ export type Database = {
         Update: {
           actif?: boolean
           created_at?: string
+          dolibarr_user_id?: string | null
           email?: string
           id?: string
           nom?: string
