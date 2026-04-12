@@ -334,6 +334,7 @@ export default function Devis() {
   const createDevisMutation = useCreateDevis();
   const convertMutation = useConvertDevisToFacture();
   const acompteMutation = useCreateAcompte();
+  const deleteDevisMutation = useDeleteDevis();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [socid, setSocid] = useState('');
@@ -538,7 +539,7 @@ export default function Devis() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Annuler</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => useDeleteDevisInline(d.id)} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
+                              <AlertDialogAction onClick={() => deleteDevisMutation.mutate(d.id)} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
