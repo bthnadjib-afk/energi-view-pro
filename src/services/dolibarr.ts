@@ -350,26 +350,30 @@ export async function createIntervention(data: {
 }): Promise<string> {
   const socidInt = parseInt(data.socid, 10) || data.socid;
   
-  // Build timestamps with hours
   const baseDate = data.date; // YYYY-MM-DD
   const startTime = data.heureDebut || '08:00';
   const endTime = data.heureFin || '10:00';
-  const dateo = Math.floor(new Date(`${baseDate}T${startTime}:00`).getTime() / 1000);
-  const datee = Math.floor(new Date(`${baseDate}T${endTime}:00`).getTime() / 1000);
+  const dateTimestamp = Math.floor(new Date(`${baseDate}T12:00:00`).getTime() / 1000);
+  
+  // Serialize metadata into note_private as JSON
+  const metadata = JSON.stringify({
+    type: data.type || 'chantier',
+    technicien: data.fk_user_assign || '',
+    heureDebut: startTime,
+    heureFin: endTime,
+    notePrivee: data.note_private || '',
+  });
   
   const body: any = {
     socid: socidInt,
     fk_soc: socidInt,
     fk_project: 0,
     description: data.description || ' ',
-    datei: dateo,
-    dateo: dateo,
-    datee: datee,
+    date: dateTimestamp,
+    note_private: metadata,
   };
   
   if (data.fk_user_assign) body.fk_user_assign = data.fk_user_assign;
-  if (data.note_private) body.note_private = data.note_private;
-  if (data.type) body.array_options = { options_type: data.type };
   
   const result = await dolibarrCall<string>('/interventions', 'POST', body);
   return result || '';
@@ -789,20 +793,45 @@ function parseDolibarrTime(val: any): string {
   return '';
 }
 
+function parseNotePrivateMetadata(notePrivate: string | null | undefined): {
+  type: string; technicien: string; heureDebut: string; heureFin: string; notePrivee: string;
+} | null {
+  if (!notePrivate) return null;
+  try {
+    const parsed = JSON.parse(notePrivate);
+    if (parsed && typeof parsed === 'object' && ('type' in parsed || 'heureDebut' in parsed)) {
+      return parsed;
+    }
+  } catch { /* not JSON, legacy intervention */ }
+  return null;
+}
+
 function mapDolibarrIntervention(d: any): Intervention {
-  const fk_statut = Number(d.fk_statut) || 0;
-  const technicien = d.array_options?.options_technicien || (d.user_author?.firstname ? `${d.user_author.firstname} ${d.user_author.lastname || ''}`.trim() : '');
-  const interventionType = d.array_options?.options_type || 'chantier';
-  const heureDebut = parseDolibarrTime(d.dateo) || '08:00';
-  const heureFin = parseDolibarrTime(d.datee) || '10:00';
+  const fk_statut = Number(d.fk_statut ?? d.statut ?? d.status) || 0;
+  
+  // Parse metadata from note_private JSON
+  const meta = parseNotePrivateMetadata(d.note_private);
+  
+  const technicien = meta?.technicien
+    || d.array_options?.options_technicien
+    || (d.user_author?.firstname ? `${d.user_author.firstname} ${d.user_author.lastname || ''}`.trim() : '')
+    || (d.user_creation_id ? String(d.user_creation_id) : '');
+  
+  const interventionType = meta?.type || d.array_options?.options_type || 'chantier';
+  const heureDebut = meta?.heureDebut || parseDolibarrTime(d.dateo) || '08:00';
+  const heureFin = meta?.heureFin || parseDolibarrTime(d.datee) || '10:00';
+  
+  // Date: try date field first, then datec as fallback
+  const rawDate = d.datest || d.datei || d.dateo || d.date || d.date_creation || d.datec;
+  
   return {
     id: String(d.id),
     ref: d.ref || `INT-${d.id}`,
     client: d.thirdparty?.name || d.nom || `Client #${d.socid}`,
     socid: String(d.socid || ''),
     technicien,
-    user_author_id: d.user_author_id ? String(d.user_author_id) : undefined,
-    date: parseDolibarrDate(d.datest || d.datei || d.dateo || d.date || d.date_creation),
+    user_author_id: d.user_author_id ? String(d.user_author_id) : (d.user_creation_id ? String(d.user_creation_id) : undefined),
+    date: parseDolibarrDate(rawDate),
     heureDebut,
     heureFin,
     statut: getInterventionStatutLabel(fk_statut),
@@ -810,7 +839,7 @@ function mapDolibarrIntervention(d: any): Intervention {
     type: interventionType as InterventionType,
     description: d.description || '',
     descriptionClient: d.note_public || '',
-    compteRendu: d.note_private || '',
+    compteRendu: meta?.notePrivee || (meta ? '' : (d.note_private || '')),
   };
 }
 

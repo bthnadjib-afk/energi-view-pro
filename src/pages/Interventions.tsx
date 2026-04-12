@@ -219,7 +219,16 @@ export default function Interventions() {
   const handleEditSave = async () => {
     if (!selectedIntervention) return;
     const selectedUser = dolibarrUsers.find(u => u.fullname === editTech);
-    const dateTimestamp = editDate ? Math.floor(new Date(editDate).getTime() / 1000) : undefined;
+    const dateTimestamp = editDate ? Math.floor(new Date(`${editDate}T12:00:00`).getTime() / 1000) : undefined;
+    
+    // Serialize metadata into note_private as JSON
+    const metadata = JSON.stringify({
+      type: editType || 'chantier',
+      technicien: selectedUser?.id || editTech || '',
+      heureDebut: editHeureDebut || '08:00',
+      heureFin: editHeureFin || '10:00',
+      notePrivee: editNotePrivee || '',
+    });
     
     await updateMutation.mutateAsync({
       id: selectedIntervention.id,
@@ -227,8 +236,7 @@ export default function Interventions() {
       fk_user_assign: selectedUser?.id,
       dateo: dateTimestamp,
       datee: dateTimestamp,
-      note_private: editNotePrivee || undefined,
-      array_options: { options_type_intervention: editType },
+      note_private: metadata,
     });
     setEditOpen(false);
     setDetailOpen(false);
