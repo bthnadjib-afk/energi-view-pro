@@ -189,9 +189,11 @@ export default function Interventions() {
   const handleTransformDevis = async (inter: Intervention) => {
     const socid = inter.socid;
     if (!socid) { toast.error('Client non identifié'); return; }
+    const notePrivate = JSON.stringify({ from_intervention: inter.ref, intervention_id: inter.id });
     await createDevisMutation.mutateAsync({
       socid,
-      lines: [{ desc: inter.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+      lines: [{ desc: `Intervention ${inter.ref} — ${inter.description || 'Prestation'}`, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+      note_private: notePrivate,
     });
     toast.success('Devis créé depuis l\'intervention');
   };
@@ -199,9 +201,11 @@ export default function Interventions() {
   const handleTransformFacture = async (inter: Intervention) => {
     const socid = inter.socid;
     if (!socid) { toast.error('Client non identifié'); return; }
+    const notePrivate = JSON.stringify({ from_intervention: inter.ref, intervention_id: inter.id });
     await createFactureMutation.mutateAsync({
       socid,
-      lines: [{ desc: inter.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+      lines: [{ desc: `Intervention ${inter.ref} — ${inter.description || 'Prestation'}`, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+      note_private: notePrivate,
     });
     toast.success('Facture créée depuis l\'intervention');
   };
