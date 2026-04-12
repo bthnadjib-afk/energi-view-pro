@@ -276,7 +276,18 @@ export function useBulkDeleteFactures() {
 
 export function useCreateDolibarrUser() {
   return useMutation({
-    mutationFn: (data: { login: string; firstname: string; lastname: string; email: string }) => createDolibarrUser(data),
+    mutationFn: async (data: { login: string; firstname: string; lastname: string; email: string }) => {
+      const dolibarrId = await createDolibarrUser(data);
+      // Store dolibarr_user_id in profiles
+      if (dolibarrId) {
+        const { supabase } = await import('@/integrations/supabase/client');
+        await supabase
+          .from('profiles')
+          .update({ dolibarr_user_id: dolibarrId } as any)
+          .eq('email', data.email);
+      }
+      return dolibarrId;
+    },
     onSuccess: (result, variables) => {
       toast.success('Utilisateur synchronisé avec Dolibarr');
     },
