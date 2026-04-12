@@ -331,8 +331,11 @@ export async function updateIntervention(id: string, data: {
   if (data.note_public !== undefined) body.note_public = data.note_public;
   if (data.note_private !== undefined) body.note_private = data.note_private;
   if (data.socid !== undefined) body.socid = parseInt(data.socid, 10) || data.socid;
-  if (data.dateo !== undefined) body.dateo = data.dateo;
-  if (data.datee !== undefined) body.datee = data.datee;
+  if (data.dateo !== undefined) {
+    body.date = data.dateo;
+    body.dateo = data.dateo;
+    body.datee = data.datee ?? data.dateo;
+  }
   if (data.fk_user_assign !== undefined) body.fk_user_assign = data.fk_user_assign;
   if (data.array_options !== undefined) body.array_options = data.array_options;
   return dolibarrCall<string>(`/interventions/${id}`, 'PUT', body);
