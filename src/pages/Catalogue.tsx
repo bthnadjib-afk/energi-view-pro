@@ -33,7 +33,7 @@ export default function Catalogue() {
   const handleCreate = async () => {
     if (!label) return;
     const ref = generateRef(type);
-    await createProduitMutation.mutateAsync({ ref, label, description, price, tva_tx: 0, type: parseInt(type) });
+    await createProduitMutation.mutateAsync({ ref, label, description, price, tva_tx: 20, type: parseInt(type) });
     setDialogOpen(false);
     setLabel(''); setDescription(''); setPrice(0); setType('1');
   };

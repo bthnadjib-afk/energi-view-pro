@@ -798,7 +798,7 @@ function mapDolibarrClient(d: any): Client {
     ville: d.town || '',
     telephone: d.phone || '',
     email: d.email || '',
-    projetsEnCours: 0,
+    projetsEnCours: parseInt(d.nb_prospects || d.nb_projects || '0', 10),
   };
 }
 
