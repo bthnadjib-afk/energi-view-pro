@@ -806,7 +806,7 @@ function parseDolibarrTime(val: any): string {
 }
 
 function parseNotePrivateMetadata(notePrivate: string | null | undefined): {
-  type: string; technicien: string; heureDebut: string; heureFin: string; notePrivee: string;
+  type: string; technicien: string; heureDebut: string; heureFin: string; dateIntervention?: string; notePrivee: string;
 } | null {
   if (!notePrivate) return null;
   try {
