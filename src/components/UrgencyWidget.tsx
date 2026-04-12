@@ -8,7 +8,7 @@ interface UrgencyWidgetProps {
 
 export function UrgencyWidget({ interventions }: UrgencyWidgetProps) {
   const urgences = interventions.filter(
-    (i) => (i.type === 'panne' || i.type === 'sav') && (i.statut === 'planifié' || i.statut === 'en cours')
+    (i) => (i.type === 'panne' || i.type === 'sav') && (i.statut === 'validé' || i.statut === 'en cours')
   );
 
   if (urgences.length === 0) return null;
