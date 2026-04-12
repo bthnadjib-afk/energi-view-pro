@@ -15,6 +15,9 @@ export interface Facture {
   statut: string;
   fk_statut: number;
   paye: boolean;
+  resteAPayer: number;
+  totalPaye: number;
+  lignes: DevisLigne[];
 }
 
 export interface DevisLigne {
@@ -201,10 +204,13 @@ export function getDevisStatutLabel(fk_statut: number): string {
   return DEVIS_STATUTS[fk_statut] || `Statut ${fk_statut}`;
 }
 
-export function getFactureStatutLabel(fk_statut: number, paye: boolean): string {
+export function getFactureStatutLabel(fk_statut: number, paye: boolean, totalPaye?: number): string {
   if (paye) return 'Payée';
+  if (fk_statut === 3) return 'Abandonnée';
   if (fk_statut === 0) return 'Brouillon';
-  return 'Impayée';
+  if (fk_statut >= 1 && !paye && (totalPaye || 0) > 0) return 'Partiellement payée';
+  if (fk_statut >= 1) return 'Impayée';
+  return `Statut ${fk_statut}`;
 }
 
 export function getInterventionStatutLabel(fk_statut: number): string {
@@ -716,6 +722,8 @@ export function resolveTechnicianName(userAuthorId: string | undefined, dolibarr
 function mapDolibarrFacture(d: any): Facture {
   const fk_statut = Number(d.fk_statut) || 0;
   const paye = d.paye === '1' || d.paye === 1;
+  const totalPaye = parseFloat(d.sumpayed) || 0;
+  const resteAPayer = parseFloat(d.remaintopay) || (parseFloat(d.total_ttc) || 0) - totalPaye;
   return {
     id: String(d.id),
     ref: d.ref || `FA-${d.id}`,
@@ -724,9 +732,18 @@ function mapDolibarrFacture(d: any): Facture {
     date: parseDolibarrDate(d.date || d.datef || d.date_creation),
     montantHT: parseFloat(d.total_ht) || 0,
     montantTTC: parseFloat(d.total_ttc) || 0,
-    statut: getFactureStatutLabel(fk_statut, paye),
+    statut: getFactureStatutLabel(fk_statut, paye, totalPaye),
     fk_statut,
     paye,
+    resteAPayer,
+    totalPaye,
+    lignes: (d.lines || []).map((l: any) => ({
+      designation: l.desc || l.label || '',
+      quantite: parseFloat(l.qty) || 0,
+      prixUnitaire: parseFloat(l.subprice) || 0,
+      totalHT: parseFloat(l.total_ht) || 0,
+      prixAchat: parseFloat(l.pa_ht) || 0,
+    })),
   };
 }
 
