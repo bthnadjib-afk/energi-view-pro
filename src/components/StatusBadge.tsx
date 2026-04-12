@@ -2,11 +2,12 @@ import { cn } from '@/lib/utils';
 
 type StatutIntervention = 'planifié' | 'en cours' | 'terminé' | 'annulé';
 type StatutFacture = 'payée' | 'impayée' | 'en retard';
-type StatutDevis = 'en attente' | 'accepté' | 'refusé';
+type StatutDevis = 'brouillon' | 'en attente' | 'accepté' | 'refusé';
 
 type Statut = StatutIntervention | StatutFacture | StatutDevis;
 
 const statusStyles: Record<string, string> = {
+  'brouillon': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
   'planifié': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   'en cours': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
   'terminé': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',

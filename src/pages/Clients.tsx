@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useClients, useCreateClient } from '@/hooks/useDolibarr';
-import { UserPlus, Search, Mail, X } from 'lucide-react';
+import { useState } from 'react';
+import { useClients, useCreateClient, useDevis, useInterventions } from '@/hooks/useDolibarr';
+import { UserPlus, Search, Mail, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { StatusBadge } from '@/components/StatusBadge';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDateFR, type Client } from '@/services/dolibarr';
@@ -18,8 +19,18 @@ interface EmailRecord {
   user_id: string;
 }
 
+interface HistoryEntry {
+  date: string;
+  type: 'devis' | 'intervention' | 'email';
+  ref: string;
+  label: string;
+  statut?: string;
+}
+
 export default function Clients() {
   const { data: clients = [] } = useClients();
+  const { data: allDevis = [] } = useDevis();
+  const { data: allInterventions = [] } = useInterventions();
   const createClientMutation = useCreateClient();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -50,6 +61,36 @@ export default function Clients() {
     supabase.from('email_history').select('*').eq('client_id', client.id).order('created_at', { ascending: false }).then(({ data }) => {
       setEmailHistory((data || []) as any);
     });
+  };
+
+  // Build centralized history for detail client
+  const clientHistory: HistoryEntry[] = detailClient ? [
+    ...allDevis.filter(d => d.socid === detailClient.id).map(d => ({
+      date: d.date,
+      type: 'devis' as const,
+      ref: d.ref,
+      label: `Devis — ${d.montantTTC.toLocaleString('fr-FR')} €`,
+      statut: d.statut,
+    })),
+    ...allInterventions.filter(i => i.socid === detailClient.id).map(i => ({
+      date: i.date,
+      type: 'intervention' as const,
+      ref: i.ref,
+      label: `Intervention — ${i.description}`,
+      statut: i.statut,
+    })),
+    ...emailHistory.map(e => ({
+      date: e.created_at,
+      type: 'email' as const,
+      ref: e.document_ref || '',
+      label: `Email — ${e.objet}`,
+    })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [];
+
+  const typeColors: Record<string, string> = {
+    devis: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    intervention: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    email: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
   };
 
   return (
@@ -148,8 +189,11 @@ export default function Clients() {
               <Tabs defaultValue="info" className="pt-2">
                 <TabsList className="glass border-border/50">
                   <TabsTrigger value="info">Informations</TabsTrigger>
+                  <TabsTrigger value="historique" className="gap-1.5">
+                    <History className="h-3.5 w-3.5" /> Historique
+                  </TabsTrigger>
                   <TabsTrigger value="emails" className="gap-1.5">
-                    <Mail className="h-3.5 w-3.5" /> Emails envoyés
+                    <Mail className="h-3.5 w-3.5" /> Emails
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="info">
@@ -158,6 +202,27 @@ export default function Clients() {
                     <div><span className="text-muted-foreground">Ville :</span> <span className="text-foreground ml-1">{detailClient.ville}</span></div>
                     <div><span className="text-muted-foreground">Téléphone :</span> <span className="text-foreground ml-1 font-mono">{detailClient.telephone}</span></div>
                     <div><span className="text-muted-foreground">Email :</span> <span className="text-foreground ml-1">{detailClient.email}</span></div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="historique">
+                  <div className="pt-3">
+                    {clientHistory.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">Aucun historique pour ce client</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {clientHistory.map((entry, idx) => (
+                          <div key={idx} className="flex items-center gap-3 text-xs p-2 rounded-lg bg-accent/10">
+                            <span className="text-muted-foreground w-20 shrink-0">{formatDateFR(entry.date)}</span>
+                            <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs capitalize', typeColors[entry.type])}>
+                              {entry.type}
+                            </span>
+                            <span className="text-foreground truncate flex-1">{entry.label}</span>
+                            {entry.ref && <span className="font-mono text-muted-foreground">{entry.ref}</span>}
+                            {entry.statut && <StatusBadge statut={entry.statut as any} />}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
                 <TabsContent value="emails">

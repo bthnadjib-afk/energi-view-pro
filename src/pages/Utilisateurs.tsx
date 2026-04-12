@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { UserPlus, Shield, ShieldCheck, Wrench as WrenchIcon, Loader2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { UserPlus, Shield, ShieldCheck, Wrench as WrenchIcon, Loader2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -41,7 +42,10 @@ export default function Utilisateurs() {
   const [creating, setCreating] = useState(false);
   const [newNom, setNewNom] = useState('');
   const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState<UserRole>('technicien');
+  const [deleteTarget, setDeleteTarget] = useState<UserWithRole | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
   const dolibarrUserMutation = useCreateDolibarrUser();
 
@@ -73,9 +77,10 @@ export default function Utilisateurs() {
     }
     setCreating(true);
 
-    const { data, error } = await supabase.functions.invoke('create-user', {
-      body: { email: newEmail, nom: newNom, role: newRole },
-    });
+    const body: any = { email: newEmail, nom: newNom, role: newRole };
+    if (newPassword) body.password = newPassword;
+
+    const { data, error } = await supabase.functions.invoke('create-user', { body });
 
     setCreating(false);
 
@@ -86,7 +91,6 @@ export default function Utilisateurs() {
 
     toast({ title: 'Utilisateur créé', description: `Un email de confirmation a été envoyé à ${newEmail}.` });
     
-    // Sync to Dolibarr
     const nameParts = newNom.trim().split(' ');
     const firstname = nameParts[0] || '';
     const lastname = nameParts.slice(1).join(' ') || firstname;
@@ -95,8 +99,25 @@ export default function Utilisateurs() {
     setDialogOpen(false);
     setNewNom('');
     setNewEmail('');
+    setNewPassword('');
     setNewRole('technicien');
     fetchUsers();
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const { data, error } = await supabase.functions.invoke('delete-user', {
+      body: { user_id: deleteTarget.id },
+    });
+    setDeleting(false);
+    if (error || data?.error) {
+      toast({ title: 'Erreur', description: data?.error || error?.message || 'Erreur inconnue', variant: 'destructive' });
+    } else {
+      toast({ title: 'Utilisateur supprimé' });
+      fetchUsers();
+    }
+    setDeleteTarget(null);
   };
 
   return (
@@ -118,6 +139,7 @@ export default function Utilisateurs() {
               <div className="space-y-4 pt-2">
                 <Input placeholder="Nom complet" className="glass border-border/50" value={newNom} onChange={e => setNewNom(e.target.value)} />
                 <Input placeholder="Email" type="email" className="glass border-border/50" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
+                <Input placeholder="Mot de passe (optionnel)" type="password" className="glass border-border/50" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
                 <Select value={newRole} onValueChange={(v) => setNewRole(v as UserRole)}>
                   <SelectTrigger className="glass border-border/50"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -183,6 +205,7 @@ export default function Utilisateurs() {
                   <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Email</th>
                   <th className="text-left py-3 px-2 text-muted-foreground font-medium">Rôle</th>
                   <th className="text-left py-3 px-2 text-muted-foreground font-medium">Statut</th>
+                  {currentRole === 'admin' && <th className="text-left py-3 px-2 text-muted-foreground font-medium w-16"></th>}
                 </tr>
               </thead>
               <tbody>
@@ -202,17 +225,43 @@ export default function Utilisateurs() {
                           {u.actif ? 'Actif' : 'Inactif'}
                         </span>
                       </td>
+                      {currentRole === 'admin' && (
+                        <td className="py-3 px-2">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(u)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
                 {users.length === 0 && (
-                  <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">Aucun utilisateur trouvé</td></tr>
+                  <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">Aucun utilisateur trouvé</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent className="glass-strong border-border/50">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Supprimer l'utilisateur</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer <strong>{deleteTarget?.nom}</strong> ({deleteTarget?.email}) ? Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
