@@ -99,16 +99,6 @@ export default function Utilisateurs() {
 
     toast({ title: 'Utilisateur créé', description: `${newEmail} est actif immédiatement.` });
     
-    // Sync to Dolibarr (await to persist dolibarr_user_id before refresh)
-    const nameParts = newNom.trim().split(' ');
-    const firstname = nameParts[0] || '';
-    const lastname = nameParts.slice(1).join(' ') || firstname;
-    try {
-      await dolibarrUserMutation.mutateAsync({ login: newEmail.split('@')[0], firstname, lastname, email: newEmail });
-    } catch (e) {
-      console.warn('Dolibarr user sync failed (non-blocking):', e);
-    }
-    
     setDialogOpen(false);
     setNewNom('');
     setNewEmail('');

@@ -133,14 +133,40 @@ Deno.serve(async (req) => {
         if (doliResp.ok) {
           const doliData = await doliResp.json();
           dolibarrUserId = String(doliData);
-          // Persist dolibarr_user_id in profiles (adminClient bypasses RLS)
+        } else {
+          // Fallback: if user already exists, fetch by login
+          const errText = await doliResp.text();
+          console.error("Dolibarr user creation failed:", errText);
+          if (errText.includes("existe") || errText.includes("already exists")) {
+            try {
+              const searchResp = await fetch(
+                `${dolibarrApiUrl}/users?sqlfilters=(login='${login}')`,
+                {
+                  method: "GET",
+                  headers: {
+                    DOLAPIKEY: dolibarrApiKey,
+                    Accept: "application/json",
+                  },
+                }
+              );
+              if (searchResp.ok) {
+                const users = await searchResp.json();
+                if (Array.isArray(users) && users.length > 0) {
+                  dolibarrUserId = String(users[0].id);
+                }
+              }
+            } catch (searchErr) {
+              console.error("Dolibarr search fallback error:", searchErr);
+            }
+          }
+        }
+
+        // Persist dolibarr_user_id in profiles (adminClient bypasses RLS)
+        if (dolibarrUserId) {
           await adminClient
             .from("profiles")
             .update({ dolibarr_user_id: dolibarrUserId })
             .eq("id", newUser.user.id);
-        } else {
-          const errText = await doliResp.text();
-          console.error("Dolibarr user creation failed:", errText);
         }
       } catch (e) {
         console.error("Dolibarr sync error:", e);
