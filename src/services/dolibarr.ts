@@ -12,7 +12,7 @@ export interface Facture {
   date: string;
   montantHT: number;
   montantTTC: number;
-  statut: 'payée' | 'impayée' | 'en retard';
+  statut: 'brouillon' | 'payée' | 'impayée' | 'en retard';
 }
 
 export interface DevisLigne {
@@ -452,17 +452,26 @@ export async function generatePDF(
   });
   if (!result) return null;
   // builddoc returns { filename, content-type, filesize, content, ... }
-  // If content is present, open it directly
+  // If content is present, create a blob URL (NO window.open — caller decides)
   if (result.content) {
     const byteChars = atob(result.content);
     const byteArray = new Uint8Array(byteChars.length);
     for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
     const blob = new Blob([byteArray], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    return url;
+    return URL.createObjectURL(blob);
   }
   return result?.filename || result;
+}
+
+// Helper to open PDF in a new tab via blob download (avoids ERR_BLOCKED_BY_CLIENT)
+export function openPDFInNewTab(blobUrl: string, filename: string) {
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 export async function downloadPDFUrl(
@@ -584,7 +593,18 @@ function parseDolibarrDate(val: any): string {
 // --- Mapping Dolibarr → App types ---
 
 function mapDolibarrFacture(d: any): Facture {
-  const statut = d.fk_statut === '2' || d.paye === '1' ? 'payée' : d.fk_statut === '1' ? 'impayée' : 'en retard';
+  let statut: Facture['statut'];
+  if (d.paye === '1' || d.paye === 1) {
+    statut = 'payée';
+  } else if (String(d.fk_statut) === '0') {
+    statut = 'brouillon';
+  } else if (String(d.fk_statut) === '1') {
+    statut = 'impayée';
+  } else if (String(d.fk_statut) === '2') {
+    statut = 'payée';
+  } else {
+    statut = 'en retard';
+  }
   return {
     id: String(d.id),
     ref: d.ref || `FA-${d.id}`,
