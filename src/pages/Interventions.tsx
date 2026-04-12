@@ -265,6 +265,7 @@ export default function Interventions() {
       technicien: selectedUser?.id || editTech || '',
       heureDebut: editHeureDebut || '08:00',
       heureFin: editHeureFin || '10:00',
+      dateIntervention: editDate || '',
       notePrivee: editNotePrivee || '',
     });
     
