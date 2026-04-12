@@ -28,7 +28,7 @@ export interface Devis {
   socid?: string;
   date: string;
   montantTTC: number;
-  statut: 'en attente' | 'accepté' | 'refusé';
+  statut: 'brouillon' | 'en attente' | 'accepté' | 'refusé';
   lignes: DevisLigne[];
 }
 
@@ -430,7 +430,8 @@ function mapDolibarrFacture(d: any): Facture {
 }
 
 function mapDolibarrDevis(d: any): Devis {
-  const statut = d.fk_statut === '2' ? 'accepté' : d.fk_statut === '3' ? 'refusé' : 'en attente';
+  const statutMap: Record<string, Devis['statut']> = { '0': 'brouillon', '1': 'en attente', '2': 'accepté', '3': 'refusé' };
+  const statut = statutMap[String(d.fk_statut)] || 'brouillon';
   return {
     id: String(d.id),
     ref: d.ref || `DE-${d.id}`,
@@ -450,12 +451,13 @@ function mapDolibarrDevis(d: any): Devis {
 
 function mapDolibarrIntervention(d: any): Intervention {
   const statutMap: Record<string, Intervention['statut']> = { '0': 'planifié', '1': 'en cours', '2': 'terminé', '3': 'annulé' };
+  const technicien = d.array_options?.options_technicien || d.user_author?.firstname && `${d.user_author.firstname} ${d.user_author.lastname || ''}`.trim() || '';
   return {
     id: String(d.id),
     ref: d.ref || `INT-${d.id}`,
     client: d.thirdparty?.name || d.nom || `Client #${d.socid}`,
     socid: String(d.socid || ''),
-    technicien: '',
+    technicien,
     date: parseDolibarrDate(d.datei || d.dateo || d.date || d.date_creation),
     heureDebut: '08:00',
     heureFin: '10:00',
