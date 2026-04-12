@@ -166,7 +166,7 @@ function resolveClientName(socid: string | undefined, clients: Client[], fallbac
 // --- Raw fetch (no client resolution) ---
 
 async function fetchClientsRaw(): Promise<Client[]> {
-  const result = await dolibarrGet<any[]>('/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=100');
+  const result = await dolibarrGet<any[]>('/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=500');
   if (!result) return [];
   return result.map(mapDolibarrClient);
 }
@@ -214,7 +214,7 @@ export function getInterventionStatutLabel(fk_statut: number): string {
 // --- API Fetch functions ---
 
 export async function fetchFactures(): Promise<Facture[]> {
-  const result = await dolibarrGet<any[]>('/invoices?sortfield=t.rowid&sortorder=DESC&limit=100');
+  const result = await dolibarrGet<any[]>('/invoices?sortfield=t.rowid&sortorder=DESC&limit=500');
   if (!result) return [];
   const mapped = result.map(mapDolibarrFacture);
   try {
@@ -224,7 +224,7 @@ export async function fetchFactures(): Promise<Facture[]> {
 }
 
 export async function fetchDevis(): Promise<Devis[]> {
-  const result = await dolibarrGet<any[]>('/proposals?sortfield=t.rowid&sortorder=DESC&limit=100');
+  const result = await dolibarrGet<any[]>('/proposals?sortfield=t.rowid&sortorder=DESC&limit=500');
   if (!result) return [];
   const mapped = result.map(mapDolibarrDevis);
   try {
@@ -234,7 +234,7 @@ export async function fetchDevis(): Promise<Devis[]> {
 }
 
 export async function fetchInterventions(): Promise<Intervention[]> {
-  const result = await dolibarrGet<any[]>('/interventions?sortfield=t.rowid&sortorder=DESC&limit=100');
+  const result = await dolibarrGet<any[]>('/interventions?sortfield=t.rowid&sortorder=DESC&limit=500');
   if (!result) return [];
   const mapped = result.map(mapDolibarrIntervention);
   try {
@@ -248,13 +248,13 @@ export async function fetchClients(): Promise<Client[]> {
 }
 
 export async function fetchProduits(): Promise<Produit[]> {
-  const result = await dolibarrGet<any[]>('/products?sortfield=t.rowid&sortorder=DESC&limit=100');
+  const result = await dolibarrGet<any[]>('/products?sortfield=t.rowid&sortorder=DESC&limit=500');
   if (!result) return [];
   return result.map(mapDolibarrProduit);
 }
 
 export async function fetchDolibarrUsers(): Promise<DolibarrUser[]> {
-  const result = await dolibarrGet<any[]>('/users?sortfield=t.rowid&sortorder=ASC&limit=100');
+  const result = await dolibarrGet<any[]>('/users?sortfield=t.rowid&sortorder=ASC&limit=500');
   if (!result) return [];
   return result.map((u: any) => ({
     id: String(u.id),
@@ -306,21 +306,62 @@ export async function updateProduit(id: string, data: { label: string; descripti
   });
 }
 
-export async function updateIntervention(id: string, data: { description?: string; note_public?: string; note_private?: string }): Promise<string | null> {
-  return dolibarrCall<string>(`/interventions/${id}`, 'PUT', data);
+export async function updateIntervention(id: string, data: {
+  description?: string;
+  note_public?: string;
+  note_private?: string;
+  socid?: string;
+  dateo?: number;
+  datee?: number;
+  fk_user_assign?: string;
+  array_options?: Record<string, any>;
+}): Promise<string | null> {
+  const body: any = {};
+  if (data.description !== undefined) body.description = data.description;
+  if (data.note_public !== undefined) body.note_public = data.note_public;
+  if (data.note_private !== undefined) body.note_private = data.note_private;
+  if (data.socid !== undefined) body.socid = parseInt(data.socid, 10) || data.socid;
+  if (data.dateo !== undefined) body.dateo = data.dateo;
+  if (data.datee !== undefined) body.datee = data.datee;
+  if (data.fk_user_assign !== undefined) body.fk_user_assign = data.fk_user_assign;
+  if (data.array_options !== undefined) body.array_options = data.array_options;
+  return dolibarrCall<string>(`/interventions/${id}`, 'PUT', body);
 }
 
-export async function createIntervention(data: { socid: string; description: string; date: string }): Promise<string> {
+export async function createIntervention(data: {
+  socid: string;
+  description: string;
+  date: string;
+  heureDebut?: string;
+  heureFin?: string;
+  fk_user_assign?: string;
+  type?: string;
+  note_private?: string;
+}): Promise<string> {
   const socidInt = parseInt(data.socid, 10) || data.socid;
-  const ts = toUnixTimestamp(data.date);
-  const result = await dolibarrCall<string>('/interventions', 'POST', {
+  
+  // Build timestamps with hours
+  const baseDate = data.date; // YYYY-MM-DD
+  const startTime = data.heureDebut || '08:00';
+  const endTime = data.heureFin || '10:00';
+  const dateo = Math.floor(new Date(`${baseDate}T${startTime}:00`).getTime() / 1000);
+  const datee = Math.floor(new Date(`${baseDate}T${endTime}:00`).getTime() / 1000);
+  
+  const body: any = {
     socid: socidInt,
     fk_soc: socidInt,
     fk_project: 0,
     description: data.description || ' ',
-    datei: ts,
-    dateo: ts,
-  });
+    datei: dateo,
+    dateo: dateo,
+    datee: datee,
+  };
+  
+  if (data.fk_user_assign) body.fk_user_assign = data.fk_user_assign;
+  if (data.note_private) body.note_private = data.note_private;
+  if (data.type) body.array_options = { options_type: data.type };
+  
+  const result = await dolibarrCall<string>('/interventions', 'POST', body);
   return result || '';
 }
 
@@ -598,6 +639,42 @@ export async function getDolibarrUserByEmail(email: string): Promise<any | null>
   return users && users.length > 0 ? users[0] : null;
 }
 
+// --- Payment ---
+
+export async function addPayment(invoiceId: string, data: {
+  datepaye: string;
+  paymentid: number;
+  closepaidinvoices: string;
+  amount: number;
+}): Promise<string | null> {
+  const result = await dolibarrCall<string>(`/invoices/${invoiceId}/payments`, 'POST', {
+    datepaye: toUnixTimestamp(data.datepaye),
+    payment_id: data.paymentid,
+    closepaidinvoices: data.closepaidinvoices,
+    amount: data.amount,
+  });
+  return result;
+}
+
+// --- User update ---
+
+export async function updateDolibarrUser(dolibarrUserId: string, data: { firstname?: string; lastname?: string; email?: string }): Promise<string | null> {
+  return dolibarrCall<string>(`/users/${dolibarrUserId}`, 'PUT', data);
+}
+
+// --- Signature persistence ---
+
+export async function saveInterventionSignatures(id: string, signatureClient?: string, signatureTech?: string): Promise<string | null> {
+  const body: any = {};
+  if (signatureClient || signatureTech) {
+    body.note_public = [
+      signatureClient ? `[SIGNATURE_CLIENT]${signatureClient}[/SIGNATURE_CLIENT]` : '',
+      signatureTech ? `[SIGNATURE_TECH]${signatureTech}[/SIGNATURE_TECH]` : '',
+    ].filter(Boolean).join('\n');
+  }
+  return dolibarrCall<string>(`/interventions/${id}`, 'PUT', body);
+}
+
 // --- Email variable replacement ---
 
 export function replaceEmailVariables(text: string, vars: Record<string, string>): string {
@@ -675,9 +752,24 @@ function mapDolibarrDevis(d: any): Devis {
   };
 }
 
+function parseDolibarrTime(val: any): string {
+  if (!val || val === '0') return '';
+  const num = Number(val);
+  if (!isNaN(num) && num > 0) {
+    const d = new Date(num * 1000);
+    if (!isNaN(d.getTime())) {
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+  }
+  return '';
+}
+
 function mapDolibarrIntervention(d: any): Intervention {
   const fk_statut = Number(d.fk_statut) || 0;
   const technicien = d.array_options?.options_technicien || (d.user_author?.firstname ? `${d.user_author.firstname} ${d.user_author.lastname || ''}`.trim() : '');
+  const interventionType = d.array_options?.options_type || 'chantier';
+  const heureDebut = parseDolibarrTime(d.dateo) || '08:00';
+  const heureFin = parseDolibarrTime(d.datee) || '10:00';
   return {
     id: String(d.id),
     ref: d.ref || `INT-${d.id}`,
@@ -686,11 +778,11 @@ function mapDolibarrIntervention(d: any): Intervention {
     technicien,
     user_author_id: d.user_author_id ? String(d.user_author_id) : undefined,
     date: parseDolibarrDate(d.datest || d.datei || d.dateo || d.date || d.date_creation),
-    heureDebut: '08:00',
-    heureFin: '10:00',
+    heureDebut,
+    heureFin,
     statut: getInterventionStatutLabel(fk_statut),
     fk_statut,
-    type: 'chantier',
+    type: interventionType as InterventionType,
     description: d.description || '',
     descriptionClient: d.note_public || '',
     compteRendu: d.note_private || '',

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useDolibarrUsers } from '@/hooks/useDolibarr';
+import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useDolibarrUsers, useSaveSignatures } from '@/hooks/useDolibarr';
 import { statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, resolveTechnicianName, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ export default function Interventions() {
   const validateMutation = useValidateIntervention();
   const deleteMutation = useDeleteIntervention();
   const closeMutation = useCloseIntervention();
+  const saveSignaturesMutation = useSaveSignatures();
   const { role } = useAuth();
   const [techFilter, setTechFilter] = useState('all');
   const [statutFilter, setStatutFilter] = useState('all');
@@ -113,10 +114,18 @@ export default function Interventions() {
       return;
     }
 
+    // Find the Dolibarr user ID for the selected technician
+    const selectedUser = dolibarrUsers.find(u => u.fullname === newTech);
+    
     await createInterventionMutation.mutateAsync({
       socid: newClientId,
       description: newDescription || ' ',
       date: newDate,
+      heureDebut: newHeureDebut,
+      heureFin: newHeureFin,
+      fk_user_assign: selectedUser?.id,
+      type: newType,
+      note_private: notePrivee || undefined,
     });
     setDialogOpen(false);
     setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee('');
@@ -373,11 +382,23 @@ export default function Interventions() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-muted-foreground mb-2">Signature du client</p>
-                      <SignaturePad onSave={(data) => { setSignatureData(data); toast.success('Signature client enregistrée'); }} />
+                      <SignaturePad onSave={(data) => {
+                        setSignatureData(data);
+                        if (selectedIntervention) {
+                          saveSignaturesMutation.mutate({ id: selectedIntervention.id, signatureClient: data, signatureTech: signatureTechData || undefined });
+                        }
+                        toast.success('Signature client enregistrée');
+                      }} />
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mb-2">Signature du technicien</p>
-                      <SignaturePad onSave={(data) => { setSignatureTechData(data); toast.success('Signature technicien enregistrée'); }} />
+                      <SignaturePad onSave={(data) => {
+                        setSignatureTechData(data);
+                        if (selectedIntervention) {
+                          saveSignaturesMutation.mutate({ id: selectedIntervention.id, signatureClient: signatureData || undefined, signatureTech: data });
+                        }
+                        toast.success('Signature technicien enregistrée');
+                      }} />
                     </div>
                   </div>
                 </div>

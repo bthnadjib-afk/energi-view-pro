@@ -297,9 +297,9 @@ export default function Devis() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [socid, setSocid] = useState('');
-  const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 0, product_type: 0, productId: '', prixAchat: 0 }]);
+  const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '', prixAchat: 0 }]);
 
-  const emptyLigne = (): LigneForm => ({ desc: '', qty: 1, subprice: 0, tva_tx: 0, product_type: 0, productId: '', prixAchat: 0 });
+  const emptyLigne = (): LigneForm => ({ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '', prixAchat: 0 });
   const addLigne = () => setLignes([...lignes, emptyLigne()]);
   const removeLigne = (i: number) => setLignes(lignes.filter((_, idx) => idx !== i));
 
@@ -315,7 +315,7 @@ export default function Devis() {
           productId,
           desc: `[${p.ref}] ${p.label}`,
           subprice: p.prixHT,
-          tva_tx: 0,
+          tva_tx: p.tauxTVA || 20,
           product_type: p.type === 'main_oeuvre' ? 1 : 0,
           prixAchat: p.prixAchat || 0,
         };
@@ -342,7 +342,7 @@ export default function Devis() {
     if (!socid || lignes.length === 0 || !lignes[0].desc) return;
     await createDevisMutation.mutateAsync({
       socid,
-      lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: 0, product_type: l.product_type })),
+      lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx || 20, product_type: l.product_type })),
     });
     setDialogOpen(false);
     setSocid('');

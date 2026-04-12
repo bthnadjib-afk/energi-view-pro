@@ -8,7 +8,7 @@ import {
   convertDevisToFacture, createAcompteFacture,
   createProduit, deleteProduit, updateProduit,
   bulkDeleteDevis, bulkDeleteFactures,
-  createDolibarrUser,
+  createDolibarrUser, addPayment, updateDolibarrUser, saveInterventionSignatures,
   type CreateDevisLine,
 } from '@/services/dolibarr';
 import { toast } from 'sonner';
@@ -73,7 +73,16 @@ export function useDeleteClient() {
 export function useCreateIntervention() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { socid: string; description: string; date: string }) => createIntervention(data),
+    mutationFn: (data: {
+      socid: string;
+      description: string;
+      date: string;
+      heureDebut?: string;
+      heureFin?: string;
+      fk_user_assign?: string;
+      type?: string;
+      note_private?: string;
+    }) => createIntervention(data),
     onSuccess: () => { toast.success('Intervention créée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
@@ -100,7 +109,17 @@ export function useCloseIntervention() {
 export function useUpdateIntervention() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { id: string; description?: string; note_public?: string; note_private?: string }) => updateIntervention(data.id, data),
+    mutationFn: (data: {
+      id: string;
+      description?: string;
+      note_public?: string;
+      note_private?: string;
+      socid?: string;
+      dateo?: number;
+      datee?: number;
+      fk_user_assign?: string;
+      array_options?: Record<string, any>;
+    }) => updateIntervention(data.id, data),
     onSuccess: () => { toast.success('Intervention modifiée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
@@ -299,5 +318,49 @@ export function useCreateDolibarrUser() {
         toast.warning(`Synchro Dolibarr échouée : ${msg}`);
       }
     },
+  });
+}
+
+// --- Payment ---
+
+export function useAddPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { invoiceId: string; datepaye: string; paymentid: number; closepaidinvoices: string; amount: number }) =>
+      addPayment(data.invoiceId, data),
+    onSuccess: () => { toast.success('Paiement enregistré'); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur paiement : ${e.message || e}`),
+  });
+}
+
+// --- User update (Dolibarr) ---
+
+export function useUpdateDolibarrUser() {
+  return useMutation({
+    mutationFn: (data: { dolibarrUserId: string; firstname?: string; lastname?: string; email?: string }) =>
+      updateDolibarrUser(data.dolibarrUserId, data),
+    onSuccess: () => toast.success('Utilisateur Dolibarr mis à jour'),
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+// --- Signature persistence ---
+
+export function useSaveSignatures() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { id: string; signatureClient?: string; signatureTech?: string }) =>
+      saveInterventionSignatures(data.id, data.signatureClient, data.signatureTech),
+    onSuccess: () => { toast.success('Signatures sauvegardées'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    onError: (e: any) => toast.error(`Erreur signatures : ${e.message || e}`),
+  });
+}
+
+export function useUpdateFactureLines() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { id: string; socid: string; lines: CreateDevisLine[] }) => updateFactureLines(data.id, data.socid, data.lines),
+    onSuccess: () => { toast.success('Facture modifiée'); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
