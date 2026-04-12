@@ -304,13 +304,16 @@ export async function deleteClient(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/thirdparties/${id}`, 'DELETE');
 }
 
-export async function updateProduit(id: string, data: { label: string; description?: string; price: number; type: number }): Promise<string | null> {
-  return dolibarrCall<string>(`/products/${id}`, 'PUT', {
+export async function updateProduit(id: string, data: { label: string; description?: string; price: number; type: number; tva_tx?: number; cost_price?: number }): Promise<string | null> {
+  const body: Record<string, unknown> = {
     label: data.label,
     description: data.description || '',
     price: data.price,
     type: data.type,
-  });
+  };
+  if (data.tva_tx !== undefined) body.tva_tx = data.tva_tx;
+  if (data.cost_price !== undefined) body.cost_price = data.cost_price;
+  return dolibarrCall<string>(`/products/${id}`, 'PUT', body);
 }
 
 export async function updateIntervention(id: string, data: {
@@ -456,8 +459,8 @@ export async function createAcompteFacture(socid: string, montantHT: number, dev
 
 // --- Products ---
 
-export async function createProduit(data: { ref: string; label: string; description?: string; price: number; tva_tx: number; type: number }): Promise<string> {
-  const result = await dolibarrCall<string>('/products', 'POST', {
+export async function createProduit(data: { ref: string; label: string; description?: string; price: number; tva_tx: number; type: number; cost_price?: number }): Promise<string> {
+  const body: Record<string, unknown> = {
     ref: data.ref,
     label: data.label,
     description: data.description || '',
@@ -466,7 +469,9 @@ export async function createProduit(data: { ref: string; label: string; descript
     type: data.type,
     status: 1,
     status_buy: 1,
-  });
+  };
+  if (data.cost_price !== undefined) body.cost_price = data.cost_price;
+  const result = await dolibarrCall<string>('/products', 'POST', body);
   return result || '';
 }
 
