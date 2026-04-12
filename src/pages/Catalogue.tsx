@@ -1,34 +1,32 @@
 import { useState } from 'react';
-import { useProduits, useCreateProduit, useDeleteProduit } from '@/hooks/useDolibarr';
-import { Package, Wrench, Plus, Trash2 } from 'lucide-react';
+import { useProduits, useCreateProduit, useDeleteProduit, useUpdateProduit } from '@/hooks/useDolibarr';
+import { Package, Wrench, Plus, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { type Produit } from '@/services/dolibarr';
 
 export default function Catalogue() {
   const { data: produits = [] } = useProduits();
   const createProduitMutation = useCreateProduit();
   const deleteProduitMutation = useDeleteProduit();
+  const updateProduitMutation = useUpdateProduit();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState<Produit | null>(null);
   const [label, setLabel] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState(0);
-  const [type, setType] = useState<'0' | '1'>('1'); // 0=fourniture, 1=main d'oeuvre
+  const [type, setType] = useState<'0' | '1'>('1');
 
-  // Auto-generate ref based on type and existing items
   const generateRef = (productType: '0' | '1') => {
     if (productType === '1') {
-      // Main d'œuvre: MO001, MO002...
       const moItems = produits.filter(p => p.type === 'main_oeuvre');
-      const nextNum = moItems.length + 1;
-      return `MO${String(nextNum).padStart(3, '0')}`;
+      return `MO${String(moItems.length + 1).padStart(3, '0')}`;
     } else {
-      // Fourniture: 0001, 0002...
       const fItems = produits.filter(p => p.type === 'fourniture');
-      const nextNum = fItems.length + 1;
-      return String(nextNum).padStart(4, '0');
+      return String(fItems.length + 1).padStart(4, '0');
     }
   };
 
@@ -37,6 +35,21 @@ export default function Catalogue() {
     const ref = generateRef(type);
     await createProduitMutation.mutateAsync({ ref, label, description, price, tva_tx: 0, type: parseInt(type) });
     setDialogOpen(false);
+    setLabel(''); setDescription(''); setPrice(0); setType('1');
+  };
+
+  const openEdit = (p: Produit) => {
+    setEditProduct(p);
+    setLabel(p.label);
+    setDescription(p.description);
+    setPrice(p.prixHT);
+    setType(p.type === 'main_oeuvre' ? '1' : '0');
+  };
+
+  const handleEdit = async () => {
+    if (!editProduct || !label) return;
+    await updateProduitMutation.mutateAsync({ id: editProduct.id, label, description, price, type: parseInt(type) });
+    setEditProduct(null);
     setLabel(''); setDescription(''); setPrice(0); setType('1');
   };
 
@@ -72,11 +85,7 @@ export default function Catalogue() {
                 <label className="text-xs text-muted-foreground">Prix HT (€)</label>
                 <Input type="number" value={price} onChange={e => setPrice(Number(e.target.value))} className="glass border-border/50" />
               </div>
-              <Button
-                onClick={handleCreate}
-                disabled={createProduitMutation.isPending || !label}
-                className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 text-base"
-              >
+              <Button onClick={handleCreate} disabled={createProduitMutation.isPending || !label} className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 text-base">
                 {createProduitMutation.isPending ? 'Création...' : 'Créer'}
               </Button>
             </div>
@@ -93,8 +102,11 @@ export default function Catalogue() {
                 <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${p.type === 'main_oeuvre' ? 'bg-gradient-to-br from-violet-500 to-purple-600' : 'bg-gradient-to-br from-emerald-500 to-green-600'}`}>
                   {p.type === 'main_oeuvre' ? <Wrench className="h-4 w-4 text-foreground" /> : <Package className="h-4 w-4 text-foreground" />}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <span className="text-xs font-mono text-muted-foreground">{p.ref}</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => openEdit(p)}>
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -104,24 +116,18 @@ export default function Catalogue() {
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Supprimer cet article ?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Cette action est irréversible. L'article "{p.label}" sera définitivement supprimé.
-                        </AlertDialogDescription>
+                        <AlertDialogDescription>L'article "{p.label}" sera définitivement supprimé.</AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => deleteProduitMutation.mutate(p.id)} className="bg-destructive text-destructive-foreground">
-                          Supprimer
-                        </AlertDialogAction>
+                        <AlertDialogAction onClick={() => deleteProduitMutation.mutate(p.id)} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
                 </div>
               </div>
-
               <h3 className="font-semibold text-foreground mb-1">{p.label}</h3>
               <p className="text-xs text-muted-foreground mb-4 line-clamp-2">{p.description}</p>
-
               <div className="flex items-end justify-between">
                 <div>
                   <p className="text-lg font-bold text-foreground">{p.prixHT.toLocaleString('fr-FR')} €</p>
@@ -135,6 +141,24 @@ export default function Catalogue() {
           </div>
         ))}
       </div>
+
+      {/* Edit product dialog */}
+      <Dialog open={!!editProduct} onOpenChange={(open) => { if (!open) { setEditProduct(null); setLabel(''); setDescription(''); setPrice(0); } }}>
+        <DialogContent className="glass-strong border-border/50 max-w-lg">
+          <DialogHeader><DialogTitle className="text-foreground">Modifier l'article</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Input placeholder="Libellé" value={label} onChange={e => setLabel(e.target.value)} className="glass border-border/50" />
+            <Input placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} className="glass border-border/50" />
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Prix HT (€)</label>
+              <Input type="number" value={price} onChange={e => setPrice(Number(e.target.value))} className="glass border-border/50" />
+            </div>
+            <Button onClick={handleEdit} disabled={updateProduitMutation.isPending || !label} className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 text-base">
+              {updateProduitMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
