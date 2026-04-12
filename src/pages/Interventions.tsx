@@ -414,7 +414,25 @@ export default function Interventions() {
                     <td className="py-3 px-2 text-muted-foreground">{formatDateFR(i.date)}</td>
                     <td className="py-3 px-2"><StatusBadge statut={i.statut} /></td>
                     <td className="py-3 px-2">
-                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {/* Linked document badges */}
+                        {(() => {
+                          const linked = linkedDocsByIntervention.get(i.id) || linkedDocsByIntervention.get(i.ref);
+                          return (
+                            <>
+                              {linked?.devis.map(ref => (
+                                <span key={ref} className="inline-flex items-center gap-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 text-[10px] font-medium" title={`Devis ${ref}`}>
+                                  <FileText className="h-2.5 w-2.5" />{ref}
+                                </span>
+                              ))}
+                              {linked?.factures.map(ref => (
+                                <span key={ref} className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-medium" title={`Facture ${ref}`}>
+                                  <Receipt className="h-2.5 w-2.5" />{ref}
+                                </span>
+                              ))}
+                            </>
+                          );
+                        })()}
                         {i.fk_statut === 3 && (
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Générer facture" onClick={() => handleTransformFacture(i)}>
                             <Receipt className="h-3.5 w-3.5 text-emerald-600" />
