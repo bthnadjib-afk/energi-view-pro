@@ -1,77 +1,77 @@
 
 
-# Audit complet — Onglet Clients
+# Audit complet — Onglet Catalogue
 
 ## Ce qui fonctionne
 
 | Action | API Dolibarr | Status |
 |--------|-------------|--------|
-| Créer client | `POST /thirdparties` | ✅ |
-| Modifier client | `PUT /thirdparties/{id}` | ✅ |
-| Supprimer client | `DELETE /thirdparties/{id}` | ⚠️ pas async |
-| Recherche par nom/ville | Filtre local | ✅ |
-| Historique devis/interventions/emails | Combiné + trié | ✅ |
-| Édition inline (mode edit) | Dialog détail | ✅ |
-| Autocomplétion adresse | API adresse.data.gouv.fr | ✅ |
+| Créer produit | `POST /products` | ✅ (async) |
+| Modifier produit | `PUT /products/{id}` | ✅ (async) |
+| Supprimer produit | `DELETE /products/{id}` | ⚠️ pas async |
+| Affichage grille | Cards avec type/ref/prix | ✅ |
+| Référence auto | MO001 / 0001 | ✅ |
 
 ## Problèmes identifiés
 
 ### P1 — Suppression utilise `mutate` au lieu de `mutateAsync`
-Ligne 182 : `deleteClientMutation.mutate(c.id)` dans le `AlertDialogAction`. Pas séquencé — le dialog se ferme immédiatement sans attendre la confirmation Dolibarr.
+Ligne 121 : `deleteProduitMutation.mutate(p.id)` dans le `AlertDialogAction`. Pas séquencé.
 
-**Correction** : `await deleteClientMutation.mutateAsync(c.id)`.
+**Correction** : `await deleteProduitMutation.mutateAsync(p.id)`.
 
-### P2 — Pas d'autocomplétion dans le mode édition
-Le formulaire de création utilise `AddressAutocomplete` (ligne 125), mais le formulaire d'édition (lignes 219-225) utilise un simple `Input` pour l'adresse. Pas de cohérence.
+### P2 — Pas de recherche / filtre
+Aucun filtre par type (Main d'œuvre / Fourniture) ni recherche texte (libellé, ref, description).
 
-**Correction** : Remplacer l'input adresse en mode édition par `AddressAutocomplete`.
+**Correction** : Ajouter `searchQuery` + `filterType` (Tous / Main d'œuvre / Fourniture).
 
-### P3 — Recherche limitée (nom/ville seulement)
-La recherche ne couvre ni le téléphone, ni l'email, ni le code postal.
+### P3 — Pas de TVA modifiable en édition
+Le formulaire de création envoie `tva_tx: 20` (fixe), et l'édition ne transmet pas du tout `tva_tx`. Si un produit a un taux différent, impossible de le modifier.
 
-**Correction** : Étendre le filtre pour inclure `email`, `telephone`, `codePostal`.
+**Correction** : Ajouter un champ TVA dans les deux formulaires (création + édition), pré-rempli à 20%.
 
-### P4 — `projetsEnCours` toujours à 0
-Ligne 821 : `parseInt(d.nb_prospects || d.nb_projects || '0', 10)`. Ces champs Dolibarr ne contiennent probablement pas ce qu'on attend. Le compteur "en cours" devrait plutôt être calculé localement depuis les devis/interventions chargés.
+### P4 — Pas de prix d'achat (marge)
+Le type `Produit` contient `prixAchat` et le mapping lit `cost_price`, mais ni le formulaire de création ni celui d'édition ne permettent de saisir le prix d'achat. La marge ne peut pas être gérée.
 
-**Correction** : Calculer `projetsEnCours` côté client en comptant les devis non clos + interventions non terminées pour chaque client.
+**Correction** : Ajouter un champ `prixAchat` dans les deux formulaires, et l'envoyer comme `cost_price` à Dolibarr.
 
-### P5 — Pas de code postal affiché dans le détail
-Le détail client (lignes 234-239) affiche Adresse, Ville, Téléphone, Email mais pas le Code Postal.
+### P5 — Référence auto potentiellement dupliquée
+`generateRef` compte le nombre de produits existants du même type +1. Si un produit est supprimé au milieu, la référence va être dupliquée (ex: 3 produits MO001-MO003, on supprime MO002, le suivant sera MO003 → collision).
 
-**Correction** : Ajouter le code postal dans l'affichage détail.
+**Correction** : Extraire le max numérique des refs existantes +1 au lieu de compter.
 
-### P6 — Historique ne montre pas les factures
-L'historique combine devis + interventions + emails, mais pas les factures. Or le hook `useFactures` n'est même pas importé.
+### P6 — Édition ne permet pas de changer le type
+Le dialog d'édition ne contient pas le `Select` de type. Si on a classé un produit en fourniture par erreur, impossible de corriger.
 
-**Correction** : Ajouter les factures dans l'historique client.
+**Correction** : Ajouter le Select type dans le dialog d'édition.
 
 ## Plan de correction
 
-### `src/pages/Clients.tsx`
+### `src/pages/Catalogue.tsx`
 
-1. **Suppression async** : `await deleteClientMutation.mutateAsync(c.id)` dans le AlertDialogAction
-2. **Autocomplétion édition** : remplacer `<Input placeholder="Adresse">` en mode edit par `<AddressAutocomplete>`
-3. **Recherche étendue** : filtrer aussi par email, téléphone, code postal
-4. **Projets en cours calculés** : compter les devis (fk_statut 0-2) + interventions (fk_statut 0-2) par client depuis les données déjà chargées
-5. **Code postal dans détail** : ajouter une ligne CP dans la vue info
-6. **Factures dans historique** : importer `useFactures`, ajouter les factures dans `clientHistory`
+1. **Suppression async** : `await deleteProduitMutation.mutateAsync(p.id)`
+2. **Recherche + filtre type** : `searchQuery` + `filterType` avec Input + Select
+3. **TVA modifiable** : champ TVA dans création et édition, envoyé à Dolibarr
+4. **Prix d'achat** : champ `prixAchat` dans les deux formulaires
+5. **Ref auto robuste** : max numérique des refs existantes +1
+6. **Type en édition** : ajouter le Select type dans le dialog d'édition
 
 ### `src/services/dolibarr.ts`
 
-Aucune modification nécessaire — les types et fonctions existent déjà.
+1. Ajouter `cost_price` dans `createProduit` et `updateProduit`
+2. Ajouter `tva_tx` dans `updateProduit`
 
-## Fichier impacté
+## Fichiers impactés
 
 | Fichier | Modifications |
 |---------|--------------|
-| `src/pages/Clients.tsx` | Async suppression, autocomplétion édition, recherche étendue, projets calculés, CP détail, factures dans historique |
+| `src/pages/Catalogue.tsx` | Async suppression, recherche, filtres, TVA, prix d'achat, ref robuste, type en édition |
+| `src/services/dolibarr.ts` | `cost_price` + `tva_tx` dans create/update produit |
 
 ## Comportement attendu de chaque action sur Dolibarr
 
 | Action ElectroPro | Appel API | Effet Dolibarr |
 |---|---|---|
-| **Créer** | `POST /thirdparties` | Crée un tiers dans Dolibarr (client) |
-| **Modifier** | `PUT /thirdparties/{id}` | Met à jour nom, adresse, tel, email |
-| **Supprimer** | `DELETE /thirdparties/{id}` | Supprime le tiers. Échoue si des documents liés existent. |
+| **Créer** | `POST /products` | Crée un produit/service (type 0=fourniture, 1=service). Ref unique obligatoire. status=1 (en vente), status_buy=1 (achetable). |
+| **Modifier** | `PUT /products/{id}` | Met à jour label, description, prix, TVA, type, prix d'achat. |
+| **Supprimer** | `DELETE /products/{id}` | Suppression définitive. Échoue si le produit est utilisé dans des lignes de devis/factures. |
 
