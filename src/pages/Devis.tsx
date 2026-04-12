@@ -1,7 +1,7 @@
 import { useState, Fragment, useEffect, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis } from '@/hooks/useDolibarr';
-import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, type Devis as DevisType } from '@/services/dolibarr';
+import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, downloadPDFUrl, sendDevisByEmail, type Devis as DevisType } from '@/services/dolibarr';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
