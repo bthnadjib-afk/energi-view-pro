@@ -488,7 +488,7 @@ export default function Devis() {
                     <td className="py-3 px-2 font-mono text-xs text-foreground">{d.ref}</td>
                     <td className="py-3 px-2 text-foreground">{d.client}</td>
                     <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(d.date)}</td>
-                    <td className="py-3 px-2 text-right font-medium text-foreground">{d.montantHT.toLocaleString('fr-FR')} €</td>
+                    <td className="py-3 px-2 text-right font-medium text-foreground">{(d.montantHT ?? 0).toLocaleString('fr-FR')} €</td>
                     <td className="py-3 px-2 hidden md:table-cell"><StatusBadge statut={d.statut} /></td>
                     <td className="py-3 px-2"><AcompteBadge montantHT={d.montantHT} /></td>
                   </tr>
