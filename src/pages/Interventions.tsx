@@ -64,6 +64,13 @@ export default function Interventions() {
   const [collisionOpen, setCollisionOpen] = useState(false);
   const [collisionInfo, setCollisionInfo] = useState({ technicien: '', creneauExistant: '' });
 
+  // Email
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailDest, setEmailDest] = useState('');
+  const [emailObjet, setEmailObjet] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+
   // Signatures
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signatureTechData, setSignatureTechData] = useState<string | null>(null);
