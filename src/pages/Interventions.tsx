@@ -466,6 +466,25 @@ export default function Interventions() {
                   </span>
                 </DialogTitle>
               </DialogHeader>
+              {/* Linked documents */}
+              {(() => {
+                const linked = linkedDocsByIntervention.get(selectedIntervention.id) || linkedDocsByIntervention.get(selectedIntervention.ref);
+                if (!linked || (linked.devis.length === 0 && linked.factures.length === 0)) return null;
+                return (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {linked.devis.map(ref => (
+                      <span key={ref} className="inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-0.5 text-xs font-medium">
+                        <FileText className="h-3 w-3" /> Devis {ref}
+                      </span>
+                    ))}
+                    {linked.factures.map(ref => (
+                      <span key={ref} className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-medium">
+                        <Receipt className="h-3 w-3" /> Facture {ref}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
               <div className="space-y-6 pt-2">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div><span className="text-muted-foreground">Client :</span> <span className="text-foreground ml-1">{selectedIntervention.client}</span></div>
