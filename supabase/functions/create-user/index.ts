@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     // Create user (sends confirmation email automatically)
     const createPayload: any = {
       email,
-      email_confirm: false,
+      email_confirm: true,
       user_metadata: { nom },
     };
     if (password) {

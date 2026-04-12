@@ -563,13 +563,26 @@ export async function checkAcomptePayment(factureId: string): Promise<{ paye: bo
 // --- Dolibarr user sync ---
 
 export async function createDolibarrUser(data: { login: string; firstname: string; lastname: string; email: string }): Promise<string | null> {
-  return dolibarrCall<string>('/users', 'POST', {
-    login: data.login,
-    firstname: data.firstname,
-    lastname: data.lastname,
-    email: data.email,
-    statut: 1,
-  });
+  try {
+    const result = await dolibarrCall<string>('/users', 'POST', {
+      login: data.login,
+      firstname: data.firstname,
+      lastname: data.lastname,
+      email: data.email,
+      statut: 1,
+    });
+    return result;
+  } catch (error: any) {
+    const msg = error?.message || String(error);
+    // If user already exists in Dolibarr, find and return existing ID
+    if (msg.includes('existe déjà') || msg.includes('already exist')) {
+      const existing = await dolibarrGet<any[]>(`/users?sqlfilters=(t.login='${encodeURIComponent(data.login)}')`);
+      if (existing && existing.length > 0) {
+        return String(existing[0].id);
+      }
+    }
+    throw error;
+  }
 }
 
 // --- Email variable replacement ---
