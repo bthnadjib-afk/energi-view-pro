@@ -35,6 +35,8 @@ export default function Interventions() {
   const { data: interventions = [] } = useInterventions();
   const { data: clients = [] } = useClients();
   const { data: dolibarrUsers = [] } = useDolibarrUsers();
+  const { data: allDevis = [] } = useDevis();
+  const { data: allFactures = [] } = useFactures();
   const createInterventionMutation = useCreateIntervention();
   const createDevisMutation = useCreateDevis();
   const createFactureMutation = useCreateFacture();
@@ -44,6 +46,38 @@ export default function Interventions() {
   const saveSignaturesMutation = useSaveSignatures();
   const updateMutation = useUpdateIntervention();
   const { role } = useAuth();
+
+  // Cross-reference: find linked devis/factures per intervention
+  const linkedDocsByIntervention = useMemo(() => {
+    const map = new Map<string, { devis: string[]; factures: string[] }>();
+    allDevis.forEach(d => {
+      if (d.note_private) {
+        try {
+          const meta = JSON.parse(d.note_private);
+          if (meta.from_intervention) {
+            const key = meta.intervention_id || meta.from_intervention;
+            const entry = map.get(key) || { devis: [], factures: [] };
+            entry.devis.push(d.ref);
+            map.set(key, entry);
+          }
+        } catch {}
+      }
+    });
+    allFactures.forEach(f => {
+      if (f.note_private) {
+        try {
+          const meta = JSON.parse(f.note_private);
+          if (meta.from_intervention) {
+            const key = meta.intervention_id || meta.from_intervention;
+            const entry = map.get(key) || { devis: [], factures: [] };
+            entry.factures.push(f.ref);
+            map.set(key, entry);
+          }
+        } catch {}
+      }
+    });
+    return map;
+  }, [allDevis, allFactures]);
   const [techFilter, setTechFilter] = useState('all');
   const [statutFilter, setStatutFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
