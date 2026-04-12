@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useDolibarrUsers, useSaveSignatures } from '@/hooks/useDolibarr';
+import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useDolibarrUsers, useSaveSignatures, useUpdateIntervention } from '@/hooks/useDolibarr';
 import { statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, resolveTechnicianName, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
 import { SignaturePad } from '@/components/SignaturePad';
-import { Plus, FileText, Receipt, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send, Play, CheckCircle2 } from 'lucide-react';
+import { Plus, FileText, Receipt, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send, Play, CheckCircle2, Search, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -42,13 +42,25 @@ export default function Interventions() {
   const deleteMutation = useDeleteIntervention();
   const closeMutation = useCloseIntervention();
   const saveSignaturesMutation = useSaveSignatures();
+  const updateMutation = useUpdateIntervention();
   const { role } = useAuth();
   const [techFilter, setTechFilter] = useState('all');
   const [statutFilter, setStatutFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedIntervention, setSelectedIntervention] = useState<Intervention | null>(null);
+
+  // Edit draft state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDescription, setEditDescription] = useState('');
+  const [editTech, setEditTech] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editHeureDebut, setEditHeureDebut] = useState('08:00');
+  const [editHeureFin, setEditHeureFin] = useState('10:00');
+  const [editType, setEditType] = useState<InterventionType>('chantier');
+  const [editNotePrivee, setEditNotePrivee] = useState('');
 
   const [newTech, setNewTech] = useState('');
   const [newDate, setNewDate] = useState('');
@@ -83,6 +95,10 @@ export default function Interventions() {
     if (techFilter !== 'all' && i.technicien !== techFilter) return false;
     if (statutFilter !== 'all' && i.statut !== statutFilter) return false;
     if (typeFilter !== 'all' && i.type !== typeFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!i.ref?.toLowerCase().includes(q) && !i.client?.toLowerCase().includes(q) && !i.description?.toLowerCase().includes(q)) return false;
+    }
     return true;
   });
 
@@ -114,7 +130,6 @@ export default function Interventions() {
       return;
     }
 
-    // Find the Dolibarr user ID for the selected technician
     const selectedUser = dolibarrUsers.find(u => u.fullname === newTech);
     
     await createInterventionMutation.mutateAsync({
@@ -136,24 +151,23 @@ export default function Interventions() {
     setDetailOpen(true);
   };
 
-  const handleTransformDevis = async () => {
-    if (!selectedIntervention) return;
-    const socid = selectedIntervention.socid;
+  // Fix P2: pass intervention as param instead of depending on selectedIntervention state
+  const handleTransformDevis = async (inter: Intervention) => {
+    const socid = inter.socid;
     if (!socid) { toast.error('Client non identifié'); return; }
     await createDevisMutation.mutateAsync({
       socid,
-      lines: [{ desc: selectedIntervention.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+      lines: [{ desc: inter.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
     });
     toast.success('Devis créé depuis l\'intervention');
   };
 
-  const handleTransformFacture = async () => {
-    if (!selectedIntervention) return;
-    const socid = selectedIntervention.socid;
+  const handleTransformFacture = async (inter: Intervention) => {
+    const socid = inter.socid;
     if (!socid) { toast.error('Client non identifié'); return; }
     await createFactureMutation.mutateAsync({
       socid,
-      lines: [{ desc: selectedIntervention.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+      lines: [{ desc: inter.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
     });
     toast.success('Facture créée depuis l\'intervention');
   };
@@ -187,6 +201,37 @@ export default function Interventions() {
     }
     setSendingEmail(false);
     setEmailOpen(false);
+  };
+
+  // Edit draft handler
+  const openEditDraft = () => {
+    if (!selectedIntervention) return;
+    setEditDescription(selectedIntervention.description || '');
+    setEditTech(selectedIntervention.technicien || '');
+    setEditDate(selectedIntervention.date || '');
+    setEditHeureDebut(selectedIntervention.heureDebut || '08:00');
+    setEditHeureFin(selectedIntervention.heureFin || '10:00');
+    setEditType(selectedIntervention.type || 'chantier');
+    setEditNotePrivee(selectedIntervention.compteRendu || '');
+    setEditOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!selectedIntervention) return;
+    const selectedUser = dolibarrUsers.find(u => u.fullname === editTech);
+    const dateTimestamp = editDate ? Math.floor(new Date(editDate).getTime() / 1000) : undefined;
+    
+    await updateMutation.mutateAsync({
+      id: selectedIntervention.id,
+      description: editDescription || ' ',
+      fk_user_assign: selectedUser?.id,
+      dateo: dateTimestamp,
+      datee: dateTimestamp,
+      note_private: editNotePrivee || undefined,
+      array_options: { options_type_intervention: editType },
+    });
+    setEditOpen(false);
+    setDetailOpen(false);
   };
 
   return (
@@ -254,7 +299,17 @@ export default function Interventions() {
         </Dialog>
       </div>
 
+      {/* Filters + Search */}
       <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Rechercher par réf, client, description..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
         <Select value={techFilter} onValueChange={setTechFilter}>
           <SelectTrigger className="w-full sm:w-[220px]"><SelectValue placeholder="Technicien" /></SelectTrigger>
           <SelectContent>
@@ -315,12 +370,12 @@ export default function Interventions() {
                     <td className="py-3 px-2">
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                         {i.fk_statut === 3 && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Générer facture" onClick={() => { setSelectedIntervention(i); handleTransformFacture(); }}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Générer facture" onClick={() => handleTransformFacture(i)}>
                             <Receipt className="h-3.5 w-3.5 text-emerald-600" />
                           </Button>
                         )}
                         {(i.fk_statut <= 2) && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => { setSelectedIntervention(i); handleTransformDevis(); }}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => handleTransformDevis(i)}>
                             <FileText className="h-3.5 w-3.5" />
                           </Button>
                         )}
@@ -382,22 +437,20 @@ export default function Interventions() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-muted-foreground mb-2">Signature du client</p>
-                      <SignaturePad onSave={(data) => {
+                      <SignaturePad onSave={async (data) => {
                         setSignatureData(data);
                         if (selectedIntervention) {
-                          saveSignaturesMutation.mutate({ id: selectedIntervention.id, signatureClient: data, signatureTech: signatureTechData || undefined });
+                          await saveSignaturesMutation.mutateAsync({ id: selectedIntervention.id, signatureClient: data, signatureTech: signatureTechData || undefined });
                         }
-                        toast.success('Signature client enregistrée');
                       }} />
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mb-2">Signature du technicien</p>
-                      <SignaturePad onSave={(data) => {
+                      <SignaturePad onSave={async (data) => {
                         setSignatureTechData(data);
                         if (selectedIntervention) {
-                          saveSignaturesMutation.mutate({ id: selectedIntervention.id, signatureClient: signatureData || undefined, signatureTech: data });
+                          await saveSignaturesMutation.mutateAsync({ id: selectedIntervention.id, signatureClient: signatureData || undefined, signatureTech: data });
                         }
-                        toast.success('Signature technicien enregistrée');
                       }} />
                     </div>
                   </div>
@@ -407,7 +460,10 @@ export default function Interventions() {
                 <div className="flex flex-wrap gap-3 pt-2">
                   {selectedIntervention.fk_statut === 0 && (
                     <>
-                      <Button onClick={() => validateMutation.mutate(selectedIntervention.id, { onSuccess: () => setDetailOpen(false) })} disabled={validateMutation.isPending} className="gap-2">
+                      <Button onClick={openEditDraft} variant="outline" className="gap-2">
+                        <Pencil className="h-4 w-4" /> Modifier
+                      </Button>
+                      <Button onClick={async () => { await validateMutation.mutateAsync(selectedIntervention.id); setDetailOpen(false); }} disabled={validateMutation.isPending} className="gap-2">
                         <FileCheck className="h-4 w-4" /> {validateMutation.isPending ? 'Validation...' : 'Valider'}
                       </Button>
                       <AlertDialog>
@@ -421,7 +477,7 @@ export default function Interventions() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Annuler</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => { deleteMutation.mutate(selectedIntervention.id); setDetailOpen(false); }} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
+                            <AlertDialogAction onClick={async () => { await deleteMutation.mutateAsync(selectedIntervention.id); setDetailOpen(false); }} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
@@ -429,25 +485,25 @@ export default function Interventions() {
                   )}
 
                   {selectedIntervention.fk_statut === 1 && (
-                    <Button onClick={() => closeMutation.mutate({ id: selectedIntervention.id, status: 2 }, { onSuccess: () => setDetailOpen(false) })} disabled={closeMutation.isPending} className="gap-2 bg-orange-500 hover:bg-orange-600">
+                    <Button onClick={async () => { await closeMutation.mutateAsync({ id: selectedIntervention.id, status: 2 }); setDetailOpen(false); }} disabled={closeMutation.isPending} className="gap-2 bg-orange-500 hover:bg-orange-600">
                       <Play className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Démarrer (En cours)'}
                     </Button>
                   )}
 
                   {selectedIntervention.fk_statut === 2 && (
-                    <Button onClick={() => closeMutation.mutate({ id: selectedIntervention.id, status: 3 }, { onSuccess: () => setDetailOpen(false) })} disabled={closeMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                    <Button onClick={async () => { await closeMutation.mutateAsync({ id: selectedIntervention.id, status: 3 }); setDetailOpen(false); }} disabled={closeMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                       <CheckCircle2 className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Terminer'}
                     </Button>
                   )}
 
                   {selectedIntervention.fk_statut === 3 && (
-                    <Button onClick={handleTransformFacture} disabled={createFactureMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                    <Button onClick={() => handleTransformFacture(selectedIntervention)} disabled={createFactureMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                       <Receipt className="h-4 w-4" /> {createFactureMutation.isPending ? 'Création...' : 'Générer une facture'}
                     </Button>
                   )}
 
                   {selectedIntervention.fk_statut <= 2 && (
-                    <Button onClick={handleTransformDevis} disabled={createDevisMutation.isPending} variant="outline" className="gap-2">
+                    <Button onClick={() => handleTransformDevis(selectedIntervention)} disabled={createDevisMutation.isPending} variant="outline" className="gap-2">
                       <ArrowRightLeft className="h-4 w-4" /> {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
                     </Button>
                   )}
@@ -492,6 +548,50 @@ export default function Interventions() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit draft dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Modifier l'intervention (Brouillon)</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Select value={editType} onValueChange={(v) => setEditType(v as InterventionType)}>
+              <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+              <SelectContent>
+                {typesIntervention.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={editTech} onValueChange={setEditTech}>
+              <SelectTrigger><SelectValue placeholder="Technicien" /></SelectTrigger>
+              <SelectContent>
+                {technicienNames.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Début</label>
+                <Input type="time" value={editHeureDebut} onChange={(e) => setEditHeureDebut(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Fin</label>
+                <Input type="time" value={editHeureFin} onChange={(e) => setEditHeureFin(e.target.value)} />
+              </div>
+            </div>
+            <Textarea placeholder="Description technique" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="min-h-[80px]" />
+            {role === 'admin' && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
+                  <Lock className="h-3.5 w-3.5" /> Note privée (admin)
+                </h3>
+                <Textarea placeholder="Note privée..." value={editNotePrivee} onChange={(e) => setEditNotePrivee(e.target.value)} className="min-h-[60px]" />
+              </div>
+            )}
+            <Button onClick={handleEditSave} disabled={updateMutation.isPending} className="w-full bg-emerald-600 hover:bg-emerald-700 h-12 text-base">
+              {updateMutation.isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
