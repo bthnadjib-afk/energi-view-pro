@@ -299,8 +299,32 @@ export async function createClient(data: { nom: string; adresse?: string; codePo
   return result || '';
 }
 
+export async function updateClient(id: string, data: { nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }): Promise<string | null> {
+  return dolibarrCall<string>(`/thirdparties/${id}`, 'PUT', {
+    name: data.nom,
+    address: data.adresse || '',
+    zip: data.codePostal || '',
+    town: data.ville || '',
+    phone: data.telephone || '',
+    email: data.email || '',
+  });
+}
+
 export async function deleteClient(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/thirdparties/${id}`, 'DELETE');
+}
+
+export async function updateProduit(id: string, data: { label: string; description?: string; price: number; type: number }): Promise<string | null> {
+  return dolibarrCall<string>(`/products/${id}`, 'PUT', {
+    label: data.label,
+    description: data.description || '',
+    price: data.price,
+    type: data.type,
+  });
+}
+
+export async function updateIntervention(id: string, data: { description?: string }): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${id}`, 'PUT', data);
 }
 
 export async function createIntervention(data: { socid: string; description: string; date: string }): Promise<string> {
