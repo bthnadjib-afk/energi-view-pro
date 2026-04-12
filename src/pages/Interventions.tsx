@@ -142,7 +142,7 @@ export default function Interventions() {
     if (!socid) { toast.error('Client non identifié'); return; }
     await createDevisMutation.mutateAsync({
       socid,
-      lines: [{ desc: selectedIntervention.description, qty: 1, subprice: 0, tva_tx: 0, product_type: 1 }],
+      lines: [{ desc: selectedIntervention.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
     });
     toast.success('Devis créé depuis l\'intervention');
   };
