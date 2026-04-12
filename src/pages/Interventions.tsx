@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention } from '@/hooks/useDolibarr';
-import { techniciens, statutsIntervention, typesIntervention, formatDateFR, generatePDF, downloadPDFUrl, sendInterventionByEmail, type InterventionType, type Intervention, type InterventionStatut } from '@/services/dolibarr';
+import { techniciens, statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, type InterventionType, type Intervention, type InterventionStatut } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -149,13 +149,18 @@ export default function Interventions() {
   const handleViewPDF = async () => {
     if (!selectedIntervention) return;
     try {
-      await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
-      const url = await downloadPDFUrl('ficheinter', selectedIntervention.ref);
+      const url = await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
       if (url) {
-        window.open(url, '_blank');
-        toast.success(`Bon d'intervention ${selectedIntervention.ref} ouvert`);
+        openPDFInNewTab(url, `${selectedIntervention.ref}.pdf`);
+        toast.success(`Bon d'intervention ${selectedIntervention.ref} téléchargé`);
       } else {
-        toast.success(`Bon d'intervention ${selectedIntervention.ref} généré`);
+        const dlUrl = await downloadPDFUrl('ficheinter', selectedIntervention.ref);
+        if (dlUrl) {
+          openPDFInNewTab(dlUrl, `${selectedIntervention.ref}.pdf`);
+          toast.success(`Bon d'intervention ${selectedIntervention.ref} téléchargé`);
+        } else {
+          toast.success(`Bon d'intervention ${selectedIntervention.ref} généré`);
+        }
       }
     } catch {
       toast.error('Erreur lors de la génération du PDF');
