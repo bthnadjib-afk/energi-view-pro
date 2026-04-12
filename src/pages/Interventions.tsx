@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture } from '@/hooks/useDolibarr';
-import { techniciens, statutsIntervention, typesIntervention, formatDateFR, generatePDF, downloadPDFUrl, sendInterventionByEmail, validateIntervention, type InterventionType, type Intervention, type InterventionStatut } from '@/services/dolibarr';
+import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention } from '@/hooks/useDolibarr';
+import { techniciens, statutsIntervention, typesIntervention, formatDateFR, generatePDF, downloadPDFUrl, sendInterventionByEmail, type InterventionType, type Intervention, type InterventionStatut } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
 import { SignaturePad } from '@/components/SignaturePad';
-import { Plus, FileText, Receipt, Camera, Clock, ArrowRightLeft, Lock, FileDown } from 'lucide-react';
+import { Plus, FileText, Receipt, Camera, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 const typeLabels: Record<InterventionType, string> = {
   devis_sur_place: 'Devis sur place',
@@ -36,7 +38,9 @@ export default function Interventions() {
   const createInterventionMutation = useCreateIntervention();
   const createDevisMutation = useCreateDevis();
   const createFactureMutation = useCreateFacture();
-  const { role } = useAuth();
+  const validateMutation = useValidateIntervention();
+  const deleteMutation = useDeleteIntervention();
+  const { role, user } = useAuth();
   const [techFilter, setTechFilter] = useState('all');
   const [statutFilter, setStatutFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -59,6 +63,13 @@ export default function Interventions() {
   // Anti-collision
   const [collisionOpen, setCollisionOpen] = useState(false);
   const [collisionInfo, setCollisionInfo] = useState({ technicien: '', creneauExistant: '' });
+
+  // Email
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailDest, setEmailDest] = useState('');
+  const [emailObjet, setEmailObjet] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Signatures
   const [signatureData, setSignatureData] = useState<string | null>(null);
@@ -149,6 +160,36 @@ export default function Interventions() {
     } catch {
       toast.error('Erreur lors de la génération du PDF');
     }
+  };
+
+  const handleSendEmail = async () => {
+    if (!selectedIntervention || !emailDest || !emailObjet) return;
+    setSendingEmail(true);
+    try {
+      await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
+      await sendInterventionByEmail(selectedIntervention.id, emailDest, emailObjet, emailMessage);
+      await supabase.from('email_history').insert({
+        user_id: user?.id || '',
+        client_id: selectedIntervention.socid || '',
+        document_ref: selectedIntervention.ref,
+        destinataire: emailDest,
+        objet: emailObjet,
+        message: emailMessage,
+      });
+      toast.success('Bon d\'intervention envoyé par email');
+    } catch (e: any) {
+      await supabase.from('email_history').insert({
+        user_id: user?.id || '',
+        client_id: selectedIntervention.socid || '',
+        document_ref: selectedIntervention.ref,
+        destinataire: emailDest,
+        objet: emailObjet,
+        message: emailMessage,
+      });
+      toast.warning('Email enregistré localement — l\'envoi Dolibarr a échoué');
+    }
+    setSendingEmail(false);
+    setEmailOpen(false);
   };
 
   return (
@@ -390,6 +431,36 @@ export default function Interventions() {
 
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-3 pt-2">
+                  {selectedIntervention.statut === 'brouillon' && (
+                    <>
+                      <Button
+                        onClick={() => validateMutation.mutate(selectedIntervention.id)}
+                        disabled={validateMutation.isPending}
+                        className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0 h-12 px-6 text-base"
+                      >
+                        <FileCheck className="h-4 w-4" />
+                        {validateMutation.isPending ? 'Validation...' : 'Valider'}
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" className="gap-2 glass border-red-500/30 text-red-400 h-12 px-6 text-base">
+                            <Trash2 className="h-4 w-4" /> Supprimer
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Supprimer cette intervention ?</AlertDialogTitle>
+                            <AlertDialogDescription>L'intervention {selectedIntervention.ref} sera définitivement supprimée.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => { deleteMutation.mutate(selectedIntervention.id); setDetailOpen(false); }} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  )}
+
                   {selectedIntervention.statut === 'terminé' && (
                     <Button
                       onClick={handleTransformFacture}
@@ -413,7 +484,34 @@ export default function Interventions() {
                   <Button onClick={handleViewPDF} variant="outline" className="gap-2 glass border-border/50 h-12 px-6 text-base">
                     <FileDown className="h-4 w-4" /> Voir le PDF
                   </Button>
+                  <Button onClick={() => { setEmailDest(''); setEmailObjet(`Bon d'intervention ${selectedIntervention.ref}`); setEmailMessage(''); setEmailOpen(true); }} variant="outline" className="gap-2 glass border-border/50 h-12 px-6 text-base">
+                    <Send className="h-4 w-4" /> Envoyer par email
+                  </Button>
                 </div>
+
+                {/* Email dialog */}
+                <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+                  <DialogContent className="glass-strong border-border/50 max-w-lg">
+                    <DialogHeader><DialogTitle className="text-foreground">Envoyer par email</DialogTitle></DialogHeader>
+                    <div className="space-y-4 pt-2">
+                      <div className="space-y-2">
+                        <label className="text-sm text-muted-foreground">Destinataire</label>
+                        <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} className="glass border-border/50" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm text-muted-foreground">Objet</label>
+                        <Input value={emailObjet} onChange={e => setEmailObjet(e.target.value)} className="glass border-border/50" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm text-muted-foreground">Message</label>
+                        <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="glass border-border/50 min-h-[120px]" />
+                      </div>
+                      <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest} className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
+                        {sendingEmail ? 'Envoi...' : 'Envoyer'}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </>
           )}

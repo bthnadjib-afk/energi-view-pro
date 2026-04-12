@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, deleteClient, createIntervention, createDevis, createFacture, createProduit, convertDevisToFacture, createAcompteFacture, updateDevis, validateDevis, closeDevis, deleteDevis, deleteFacture, deleteProduit, createDolibarrUser, validateFacture, validateIntervention, bulkDeleteDevis, bulkDeleteFactures, updateDevisLines, updateFactureLines, type CreateDevisLine } from '@/services/dolibarr';
+import { fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, createClient, deleteClient, createIntervention, createDevis, createFacture, createProduit, convertDevisToFacture, createAcompteFacture, updateDevis, validateDevis, closeDevis, deleteDevis, deleteFacture, deleteProduit, deleteIntervention, createDolibarrUser, validateFacture, validateIntervention, bulkDeleteDevis, bulkDeleteFactures, updateDevisLines, updateFactureLines, type CreateDevisLine } from '@/services/dolibarr';
 import { toast } from 'sonner';
 
 export function useFactures() {
@@ -174,6 +174,15 @@ export function useValidateIntervention() {
     mutationFn: (id: string) => validateIntervention(id),
     onSuccess: () => { toast.success('Intervention validée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
     onError: (e: any) => toast.error(`Erreur validation intervention : ${e.message || e}`),
+  });
+}
+
+export function useDeleteIntervention() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteIntervention(id),
+    onSuccess: () => { toast.success('Intervention supprimée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    onError: (e: any) => toast.error(`Erreur suppression intervention : ${e.message || e}`),
   });
 }
 
