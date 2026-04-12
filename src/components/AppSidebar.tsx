@@ -47,7 +47,7 @@ export function AppSidebar() {
           <NavLink
             to={item.url}
             end={item.url === '/'}
-            className="hover:bg-sidebar-accent/50"
+            className="hover:bg-sidebar-accent"
             activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
           >
             <item.icon className="mr-2 h-4 w-4" />
@@ -58,7 +58,7 @@ export function AppSidebar() {
     ));
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border/50">
+    <Sidebar collapsible="icon" className="border-r border-border">
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">

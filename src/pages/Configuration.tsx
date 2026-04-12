@@ -94,92 +94,75 @@ export default function Configuration() {
           <h1 className="text-2xl font-bold text-foreground">Configuration</h1>
           <p className="text-muted-foreground text-sm">Paramètres de l'application</p>
         </div>
-        <Button
-          onClick={saveToSupabase}
-          disabled={saving}
-          className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0 h-12 px-6 text-base"
-        >
+        <Button onClick={saveToSupabase} disabled={saving} className="gap-2 h-12 px-6 text-base">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Sauvegarder les paramètres
         </Button>
       </div>
 
       <Tabs defaultValue="entreprise" className="space-y-4">
-        <TabsList className="glass border-border/50">
-          <TabsTrigger value="entreprise" className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Building2 className="h-3.5 w-3.5" /> Entreprise
-          </TabsTrigger>
-          <TabsTrigger value="defaults" className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Settings2 className="h-3.5 w-3.5" /> Valeurs par défaut
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Bell className="h-3.5 w-3.5" /> Notifications
-          </TabsTrigger>
-          <TabsTrigger value="emails" className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Mail className="h-3.5 w-3.5" /> Modèles emails
-          </TabsTrigger>
-          <TabsTrigger value="dolibarr" className="gap-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Database className="h-3.5 w-3.5" /> Dolibarr
-          </TabsTrigger>
+        <TabsList>
+          <TabsTrigger value="entreprise" className="gap-1.5"><Building2 className="h-3.5 w-3.5" /> Entreprise</TabsTrigger>
+          <TabsTrigger value="defaults" className="gap-1.5"><Settings2 className="h-3.5 w-3.5" /> Valeurs par défaut</TabsTrigger>
+          <TabsTrigger value="notifications" className="gap-1.5"><Bell className="h-3.5 w-3.5" /> Notifications</TabsTrigger>
+          <TabsTrigger value="emails" className="gap-1.5"><Mail className="h-3.5 w-3.5" /> Modèles emails</TabsTrigger>
+          <TabsTrigger value="dolibarr" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Dolibarr</TabsTrigger>
         </TabsList>
 
         <TabsContent value="entreprise">
-          <div className="glass rounded-xl p-6 space-y-4">
+          <div className="bg-card rounded-lg border border-border p-6 shadow-sm space-y-4">
             <h2 className="text-lg font-semibold text-foreground">Informations entreprise</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Nom de l'entreprise</label>
-                <Input value={config.entreprise.nom} onChange={(e) => updateEntreprise({ nom: e.target.value })} className="glass border-border/50" />
+                <Input value={config.entreprise.nom} onChange={(e) => updateEntreprise({ nom: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">SIRET</label>
-                <Input value={config.entreprise.siret} onChange={(e) => updateEntreprise({ siret: e.target.value })} className="glass border-border/50" placeholder="123 456 789 00001" />
+                <Input value={config.entreprise.siret} onChange={(e) => updateEntreprise({ siret: e.target.value })} placeholder="123 456 789 00001" />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm text-muted-foreground">Adresse</label>
-                <AddressAutocomplete
-                  value={config.entreprise.adresse}
-                  onSelect={(addr) => updateEntreprise({ adresse: addr.rue, codePostal: addr.codePostal, ville: addr.ville })}
-                />
+                <AddressAutocomplete value={config.entreprise.adresse} onSelect={(addr) => updateEntreprise({ adresse: addr.rue, codePostal: addr.codePostal, ville: addr.ville })} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Téléphone</label>
-                <Input value={config.entreprise.telephone} onChange={(e) => updateEntreprise({ telephone: e.target.value })} className="glass border-border/50" />
+                <Input value={config.entreprise.telephone} onChange={(e) => updateEntreprise({ telephone: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Email</label>
-                <Input value={config.entreprise.email} onChange={(e) => updateEntreprise({ email: e.target.value })} type="email" className="glass border-border/50" />
+                <Input value={config.entreprise.email} onChange={(e) => updateEntreprise({ email: e.target.value })} type="email" />
               </div>
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="defaults">
-          <div className="glass rounded-xl p-6 space-y-4">
+          <div className="bg-card rounded-lg border border-border p-6 shadow-sm space-y-4">
             <h2 className="text-lg font-semibold text-foreground">Valeurs par défaut</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Taux TVA (%)</label>
-                <Input type="number" value={config.defaults.tauxTVA} onChange={(e) => updateDefaults({ tauxTVA: Number(e.target.value) })} className="glass border-border/50" />
+                <Input type="number" value={config.defaults.tauxTVA} onChange={(e) => updateDefaults({ tauxTVA: Number(e.target.value) })} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Délai de paiement (jours)</label>
-                <Input type="number" value={config.defaults.delaiPaiement} onChange={(e) => updateDefaults({ delaiPaiement: Number(e.target.value) })} className="glass border-border/50" />
+                <Input type="number" value={config.defaults.delaiPaiement} onChange={(e) => updateDefaults({ delaiPaiement: Number(e.target.value) })} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Durée intervention par défaut (heures)</label>
-                <Input type="number" value={config.defaults.dureeIntervention} onChange={(e) => updateDefaults({ dureeIntervention: Number(e.target.value) })} className="glass border-border/50" />
+                <Input type="number" value={config.defaults.dureeIntervention} onChange={(e) => updateDefaults({ dureeIntervention: Number(e.target.value) })} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Taux horaire (€/h)</label>
-                <Input type="number" value={config.defaults.tauxHoraire} onChange={(e) => updateDefaults({ tauxHoraire: Number(e.target.value) })} className="glass border-border/50" />
+                <Input type="number" value={config.defaults.tauxHoraire} onChange={(e) => updateDefaults({ tauxHoraire: Number(e.target.value) })} />
               </div>
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="notifications">
-          <div className="glass rounded-xl p-6 space-y-4">
+          <div className="bg-card rounded-lg border border-border p-6 shadow-sm space-y-4">
             <h2 className="text-lg font-semibold text-foreground">Notifications email</h2>
             <div className="space-y-4">
               {[
@@ -197,10 +180,10 @@ export default function Configuration() {
         </TabsContent>
 
         <TabsContent value="emails">
-          <div className="glass rounded-xl p-6 space-y-4">
+          <div className="bg-card rounded-lg border border-border p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-foreground">Modèles d'emails</h2>
-              <Button onClick={startNew} className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0" size="sm">
+              <Button onClick={startNew} className="gap-2" size="sm">
                 <Plus className="h-3.5 w-3.5" /> Ajouter
               </Button>
             </div>
@@ -209,13 +192,13 @@ export default function Configuration() {
             </p>
 
             {editingId && (
-              <div className="space-y-3 p-4 rounded-lg bg-accent/20 border border-border/30">
-                <Input placeholder="Nom du modèle" value={editNom} onChange={e => setEditNom(e.target.value)} className="glass border-border/50" />
-                <Input placeholder="Objet de l'email" value={editObjet} onChange={e => setEditObjet(e.target.value)} className="glass border-border/50" />
-                <Textarea placeholder="Corps du message..." value={editCorps} onChange={e => setEditCorps(e.target.value)} className="glass border-border/50 min-h-[100px]" />
+              <div className="space-y-3 p-4 rounded-lg bg-muted/50 border border-border">
+                <Input placeholder="Nom du modèle" value={editNom} onChange={e => setEditNom(e.target.value)} />
+                <Input placeholder="Objet de l'email" value={editObjet} onChange={e => setEditObjet(e.target.value)} />
+                <Textarea placeholder="Corps du message..." value={editCorps} onChange={e => setEditCorps(e.target.value)} className="min-h-[100px]" />
                 <div className="flex gap-2">
-                  <Button onClick={saveTemplate} className="bg-gradient-to-r from-emerald-500 to-green-600 border-0" size="sm">Enregistrer</Button>
-                  <Button onClick={() => setEditingId(null)} variant="outline" size="sm" className="glass border-border/50">Annuler</Button>
+                  <Button onClick={saveTemplate} className="bg-emerald-600 hover:bg-emerald-700" size="sm">Enregistrer</Button>
+                  <Button onClick={() => setEditingId(null)} variant="outline" size="sm">Annuler</Button>
                 </div>
               </div>
             )}
@@ -227,7 +210,7 @@ export default function Configuration() {
             ) : (
               <div className="space-y-2">
                 {templates.map(t => (
-                  <div key={t.id} className="flex items-start justify-between p-3 rounded-lg bg-accent/10 border border-border/20">
+                  <div key={t.id} className="flex items-start justify-between p-3 rounded-lg bg-muted/50 border border-border">
                     <div className="space-y-1 flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">{t.nom}</p>
                       <p className="text-xs text-muted-foreground truncate">Objet : {t.objet}</p>
@@ -249,12 +232,12 @@ export default function Configuration() {
         </TabsContent>
 
         <TabsContent value="dolibarr">
-          <div className="glass rounded-xl p-6 space-y-4">
+          <div className="bg-card rounded-lg border border-border p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-foreground">Connexion Dolibarr</h2>
               <div className="flex items-center gap-2">
                 {config.dolibarr.connected ? (
-                  <span className="flex items-center gap-1.5 text-sm text-emerald-400"><CheckCircle2 className="h-4 w-4" /> Connecté</span>
+                  <span className="flex items-center gap-1.5 text-sm text-emerald-600"><CheckCircle2 className="h-4 w-4" /> Connecté</span>
                 ) : (
                   <span className="flex items-center gap-1.5 text-sm text-muted-foreground"><XCircle className="h-4 w-4" /> Non connecté</span>
                 )}
@@ -266,14 +249,14 @@ export default function Configuration() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">URL API</label>
-                <Input value={config.dolibarr.apiUrl} onChange={(e) => updateDolibarr({ apiUrl: e.target.value })} className="glass border-border/50" placeholder="https://votre-instance.fr/api/index.php" />
+                <Input value={config.dolibarr.apiUrl} onChange={(e) => updateDolibarr({ apiUrl: e.target.value })} placeholder="https://votre-instance.fr/api/index.php" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Clé API (DOLAPIKEY)</label>
-                <Input value={config.dolibarr.apiKey} onChange={(e) => updateDolibarr({ apiKey: e.target.value })} type="password" className="glass border-border/50" placeholder="••••••••••••••" />
+                <Input value={config.dolibarr.apiKey} onChange={(e) => updateDolibarr({ apiKey: e.target.value })} type="password" placeholder="••••••••••••••" />
               </div>
             </div>
-            <Button onClick={handleTestConnection} disabled={testing} className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0 h-12 px-6 text-base">
+            <Button onClick={handleTestConnection} disabled={testing} className="gap-2 h-12 px-6 text-base">
               {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
               Tester la connexion
             </Button>

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useDolibarrUsers } from '@/hooks/useDolibarr';
-import { statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, type InterventionType, type Intervention } from '@/services/dolibarr';
+import { statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, resolveTechnicianName, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,11 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
 import { SignaturePad } from '@/components/SignaturePad';
-import { Plus, FileText, Receipt, Camera, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send, Play, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, FileText, Receipt, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send, Play, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 
 const typeLabels: Record<InterventionType, string> = {
   devis_sur_place: 'Devis sur place',
@@ -25,11 +24,11 @@ const typeLabels: Record<InterventionType, string> = {
 };
 
 const typeColors: Record<InterventionType, string> = {
-  devis_sur_place: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  panne: 'bg-red-500/20 text-red-400 border-red-500/30',
-  sav: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  chantier: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  realisation: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+  devis_sur_place: 'bg-blue-100 text-blue-700 border-blue-200',
+  panne: 'bg-red-100 text-red-700 border-red-200',
+  sav: 'bg-orange-100 text-orange-700 border-orange-200',
+  chantier: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  realisation: 'bg-violet-100 text-violet-700 border-violet-200',
 };
 
 export default function Interventions() {
@@ -42,7 +41,7 @@ export default function Interventions() {
   const validateMutation = useValidateIntervention();
   const deleteMutation = useDeleteIntervention();
   const closeMutation = useCloseIntervention();
-  const { role, user } = useAuth();
+  const { role } = useAuth();
   const [techFilter, setTechFilter] = useState('all');
   const [statutFilter, setStatutFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -57,7 +56,6 @@ export default function Interventions() {
   const [newType, setNewType] = useState<InterventionType>('chantier');
   const [newDescription, setNewDescription] = useState('');
   const [newClientId, setNewClientId] = useState('');
-  const [descriptionClient, setDescriptionClient] = useState('');
   const [notePrivee, setNotePrivee] = useState('');
 
   const [collisionOpen, setCollisionOpen] = useState(false);
@@ -72,10 +70,15 @@ export default function Interventions() {
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signatureTechData, setSignatureTechData] = useState<string | null>(null);
 
-  // Technician names from Dolibarr users
-  const technicienNames = dolibarrUsers.map(u => `${u.firstname} ${u.lastname}`.trim()).filter(Boolean);
+  // Resolve technician names from user_author_id
+  const resolvedInterventions = interventions.map(i => {
+    const techName = i.technicien || resolveTechnicianName(i.user_author_id, dolibarrUsers);
+    return { ...i, technicien: techName };
+  });
 
-  const filtered = interventions.filter((i) => {
+  const technicienNames = dolibarrUsers.map(u => u.fullname).filter(Boolean);
+
+  const filtered = resolvedInterventions.filter((i) => {
     if (techFilter !== 'all' && i.technicien !== techFilter) return false;
     if (statutFilter !== 'all' && i.statut !== statutFilter) return false;
     if (typeFilter !== 'all' && i.type !== typeFilter) return false;
@@ -88,7 +91,7 @@ export default function Interventions() {
       return;
     }
 
-    const slots: InterventionSlot[] = interventions.map(i => ({
+    const slots: InterventionSlot[] = resolvedInterventions.map(i => ({
       technicien: i.technicien,
       date: i.date,
       heureDebut: i.heureDebut,
@@ -116,7 +119,7 @@ export default function Interventions() {
       date: newDate,
     });
     setDialogOpen(false);
-    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee(''); setDescriptionClient('');
+    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee('');
   };
 
   const openDetail = (inter: Intervention) => {
@@ -169,14 +172,6 @@ export default function Interventions() {
     try {
       await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
       await sendInterventionByEmail(selectedIntervention.id, emailDest, emailObjet, emailMessage);
-      await supabase.from('email_history').insert({
-        user_id: user?.id || '',
-        client_id: selectedIntervention.socid || '',
-        document_ref: selectedIntervention.ref,
-        destinataire: emailDest,
-        objet: emailObjet,
-        message: emailMessage,
-      });
       toast.success('Bon d\'intervention envoyé par email via Dolibarr');
     } catch (e: any) {
       toast.error(`Erreur envoi : ${e.message || e}`);
@@ -194,55 +189,55 @@ export default function Interventions() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 border-0 h-12 px-6 text-base">
+            <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 h-12 px-6 text-base">
               <Plus className="h-4 w-4" /> Nouvelle intervention
             </Button>
           </DialogTrigger>
-          <DialogContent className="glass-strong border-border/50 max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle className="text-foreground">Nouvelle intervention (Brouillon)</DialogTitle></DialogHeader>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Nouvelle intervention (Brouillon)</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
               <Select value={newClientId} onValueChange={setNewClientId}>
-                <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
                 <SelectContent>
                   {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={newType} onValueChange={(v) => setNewType(v as InterventionType)}>
-                <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Type" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
                 <SelectContent>
                   {typesIntervention.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={newTech} onValueChange={setNewTech}>
-                <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Technicien (Dolibarr)" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Technicien (Dolibarr)" /></SelectTrigger>
                 <SelectContent>
                   {technicienNames.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   {technicienNames.length === 0 && <SelectItem value="none" disabled>Aucun utilisateur Dolibarr</SelectItem>}
                 </SelectContent>
               </Select>
-              <Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="glass border-border/50" />
+              <Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">Début</label>
-                  <Input type="time" value={newHeureDebut} onChange={(e) => setNewHeureDebut(e.target.value)} className="glass border-border/50" />
+                  <Input type="time" value={newHeureDebut} onChange={(e) => setNewHeureDebut(e.target.value)} />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">Fin</label>
-                  <Input type="time" value={newHeureFin} onChange={(e) => setNewHeureFin(e.target.value)} className="glass border-border/50" />
+                  <Input type="time" value={newHeureFin} onChange={(e) => setNewHeureFin(e.target.value)} />
                 </div>
               </div>
-              <Input placeholder="Description technique" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="glass border-border/50" />
+              <Input placeholder="Description technique" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
 
               {role === 'admin' && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
                     <Lock className="h-3.5 w-3.5" /> Note privée (admin)
                   </h3>
-                  <Textarea placeholder="Note visible uniquement par les administrateurs..." value={notePrivee} onChange={(e) => setNotePrivee(e.target.value)} className="glass border-border/50 min-h-[60px]" />
+                  <Textarea placeholder="Note visible uniquement par les administrateurs..." value={notePrivee} onChange={(e) => setNotePrivee(e.target.value)} className="min-h-[60px]" />
                 </div>
               )}
 
-              <Button onClick={handleCreate} disabled={createInterventionMutation.isPending} className="w-full bg-gradient-to-r from-emerald-500 to-green-600 border-0 h-12 text-base">
+              <Button onClick={handleCreate} disabled={createInterventionMutation.isPending} className="w-full bg-emerald-600 hover:bg-emerald-700 h-12 text-base">
                 {createInterventionMutation.isPending ? 'Création...' : "Créer (Brouillon)"}
               </Button>
             </div>
@@ -252,21 +247,21 @@ export default function Interventions() {
 
       <div className="flex flex-col sm:flex-row gap-3">
         <Select value={techFilter} onValueChange={setTechFilter}>
-          <SelectTrigger className="w-full sm:w-[220px] glass border-border/50"><SelectValue placeholder="Technicien" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[220px]"><SelectValue placeholder="Technicien" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les techniciens</SelectItem>
             {technicienNames.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={statutFilter} onValueChange={setStatutFilter}>
-          <SelectTrigger className="w-full sm:w-[180px] glass border-border/50"><SelectValue placeholder="Statut" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Statut" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les statuts</SelectItem>
             {statutsIntervention.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-full sm:w-[180px] glass border-border/50"><SelectValue placeholder="Type" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Type" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous les types</SelectItem>
             {typesIntervention.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
@@ -274,11 +269,11 @@ export default function Interventions() {
         </Select>
       </div>
 
-      <div className="glass rounded-xl p-5">
+      <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border/50">
+              <tr className="border-b border-border">
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Réf.</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Client</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Technicien</th>
@@ -294,7 +289,7 @@ export default function Interventions() {
                 <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">Aucune intervention trouvée</td></tr>
               ) : (
                 filtered.map((i) => (
-                  <tr key={i.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors cursor-pointer" onClick={() => openDetail(i)}>
+                  <tr key={i.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => openDetail(i)}>
                     <td className="py-3 px-2 font-mono text-xs text-foreground">{i.ref}</td>
                     <td className="py-3 px-2 text-foreground">{i.client}</td>
                     <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{i.technicien || '—'}</td>
@@ -312,7 +307,7 @@ export default function Interventions() {
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                         {i.fk_statut === 3 && (
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Générer facture" onClick={() => { setSelectedIntervention(i); handleTransformFacture(); }}>
-                            <Receipt className="h-3.5 w-3.5 text-emerald-400" />
+                            <Receipt className="h-3.5 w-3.5 text-emerald-600" />
                           </Button>
                         )}
                         {(i.fk_statut <= 2) && (
@@ -332,11 +327,11 @@ export default function Interventions() {
 
       {/* Detail dialog */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="glass-strong border-border/50 max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedIntervention && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-foreground flex items-center gap-2">
+                <DialogTitle className="flex items-center gap-2">
                   {selectedIntervention.ref}
                   <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs ml-2', typeColors[selectedIntervention.type])}>
                     {typeLabels[selectedIntervention.type]}
@@ -353,20 +348,20 @@ export default function Interventions() {
 
                 <div className="text-sm space-y-1">
                   <span className="text-muted-foreground font-medium">Description :</span>
-                  <p className="text-foreground bg-accent/10 p-2 rounded">{selectedIntervention.description || '—'}</p>
+                  <p className="text-foreground bg-muted/50 p-2 rounded">{selectedIntervention.description || '—'}</p>
                 </div>
 
                 {selectedIntervention.descriptionClient && (
                   <div className="text-sm space-y-1">
                     <span className="text-muted-foreground font-medium">Note publique :</span>
-                    <p className="text-foreground bg-accent/10 p-2 rounded">{selectedIntervention.descriptionClient}</p>
+                    <p className="text-foreground bg-muted/50 p-2 rounded">{selectedIntervention.descriptionClient}</p>
                   </div>
                 )}
 
                 {role === 'admin' && (
-                  <div className="space-y-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                  <div className="space-y-2 p-3 rounded-lg bg-orange-50 border border-orange-200">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                      <Lock className="h-3.5 w-3.5 text-orange-400" /> Note privée
+                      <Lock className="h-3.5 w-3.5 text-orange-500" /> Note privée
                     </h3>
                     <p className="text-sm text-foreground">{selectedIntervention.compteRendu || '—'}</p>
                   </div>
@@ -387,17 +382,16 @@ export default function Interventions() {
                   </div>
                 </div>
 
-                {/* Action buttons based on fk_statut */}
+                {/* Action buttons */}
                 <div className="flex flex-wrap gap-3 pt-2">
-                  {/* fk_statut 0: Brouillon → Valider + Supprimer */}
                   {selectedIntervention.fk_statut === 0 && (
                     <>
-                      <Button onClick={() => validateMutation.mutate(selectedIntervention.id)} disabled={validateMutation.isPending} className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
+                      <Button onClick={() => validateMutation.mutate(selectedIntervention.id, { onSuccess: () => setDetailOpen(false) })} disabled={validateMutation.isPending} className="gap-2">
                         <FileCheck className="h-4 w-4" /> {validateMutation.isPending ? 'Validation...' : 'Valider'}
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="outline" className="gap-2 glass border-red-500/30 text-red-400"><Trash2 className="h-4 w-4" /> Supprimer</Button>
+                          <Button variant="outline" className="gap-2 border-destructive/30 text-destructive"><Trash2 className="h-4 w-4" /> Supprimer</Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -413,36 +407,31 @@ export default function Interventions() {
                     </>
                   )}
 
-                  {/* fk_statut 1: Validée → Démarrer (En cours) */}
                   {selectedIntervention.fk_statut === 1 && (
-                    <Button onClick={() => closeMutation.mutate({ id: selectedIntervention.id, status: 2 })} disabled={closeMutation.isPending} className="gap-2 bg-gradient-to-r from-orange-500 to-amber-600 border-0">
+                    <Button onClick={() => closeMutation.mutate({ id: selectedIntervention.id, status: 2 }, { onSuccess: () => setDetailOpen(false) })} disabled={closeMutation.isPending} className="gap-2 bg-orange-500 hover:bg-orange-600">
                       <Play className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Démarrer (En cours)'}
                     </Button>
                   )}
 
-                  {/* fk_statut 2: En cours → Terminer */}
                   {selectedIntervention.fk_statut === 2 && (
-                    <Button onClick={() => closeMutation.mutate({ id: selectedIntervention.id, status: 3 })} disabled={closeMutation.isPending} className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0">
+                    <Button onClick={() => closeMutation.mutate({ id: selectedIntervention.id, status: 3 }, { onSuccess: () => setDetailOpen(false) })} disabled={closeMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                       <CheckCircle2 className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Terminer'}
                     </Button>
                   )}
 
-                  {/* fk_statut 3: Terminée → Facturer */}
                   {selectedIntervention.fk_statut === 3 && (
-                    <Button onClick={handleTransformFacture} disabled={createFactureMutation.isPending} className="gap-2 bg-gradient-to-r from-emerald-500 to-green-600 border-0">
+                    <Button onClick={handleTransformFacture} disabled={createFactureMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                       <Receipt className="h-4 w-4" /> {createFactureMutation.isPending ? 'Création...' : 'Générer une facture'}
                     </Button>
                   )}
 
-                  {/* Transformer en devis (brouillon/validée/en cours) */}
                   {selectedIntervention.fk_statut <= 2 && (
-                    <Button onClick={handleTransformDevis} disabled={createDevisMutation.isPending} variant="outline" className="gap-2 glass border-border/50">
+                    <Button onClick={handleTransformDevis} disabled={createDevisMutation.isPending} variant="outline" className="gap-2">
                       <ArrowRightLeft className="h-4 w-4" /> {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
                     </Button>
                   )}
 
-                  {/* PDF & Email always */}
-                  <Button onClick={handleViewPDF} variant="outline" className="gap-2 glass border-border/50">
+                  <Button onClick={handleViewPDF} variant="outline" className="gap-2">
                     <FileDown className="h-4 w-4" /> Voir le PDF
                   </Button>
                   <Button onClick={() => {
@@ -451,29 +440,29 @@ export default function Interventions() {
                     setEmailObjet(`Bon d'intervention ${selectedIntervention.ref}`);
                     setEmailMessage('');
                     setEmailOpen(true);
-                  }} variant="outline" className="gap-2 glass border-border/50">
+                  }} variant="outline" className="gap-2">
                     <Send className="h-4 w-4" /> Envoyer par email
                   </Button>
                 </div>
 
                 {/* Email dialog */}
                 <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
-                  <DialogContent className="glass-strong border-border/50 max-w-lg">
-                    <DialogHeader><DialogTitle className="text-foreground">Envoyer par email</DialogTitle></DialogHeader>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader><DialogTitle>Envoyer par email</DialogTitle></DialogHeader>
                     <div className="space-y-4 pt-2">
                       <div className="space-y-2">
                         <label className="text-sm text-muted-foreground">Destinataire</label>
-                        <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} className="glass border-border/50" />
+                        <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm text-muted-foreground">Objet</label>
-                        <Input value={emailObjet} onChange={e => setEmailObjet(e.target.value)} className="glass border-border/50" />
+                        <Input value={emailObjet} onChange={e => setEmailObjet(e.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm text-muted-foreground">Message</label>
-                        <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="glass border-border/50 min-h-[120px]" />
+                        <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[120px]" />
                       </div>
-                      <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest} className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
+                      <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest} className="w-full">
                         {sendingEmail ? 'Envoi via Dolibarr...' : 'Envoyer'}
                       </Button>
                     </div>

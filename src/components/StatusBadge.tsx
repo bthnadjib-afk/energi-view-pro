@@ -1,30 +1,25 @@
 import { cn } from '@/lib/utils';
 
-// Status styles keyed by Dolibarr native labels (case-insensitive via lowercase match)
 const statusStyles: Record<string, string> = {
-  // Devis
-  'brouillon': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-  'validé': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  'validée': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  'signé': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  'refusé': 'bg-red-500/20 text-red-400 border-red-500/30',
-  'facturé': 'bg-violet-500/20 text-violet-400 border-violet-500/30',
-  'facturée': 'bg-violet-500/20 text-violet-400 border-violet-500/30',
-  // Factures
-  'payée': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  'abandonnée': 'bg-red-500/20 text-red-400 border-red-500/30',
-  // Interventions
-  'en cours': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  'terminée': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  'terminé': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  'annulée': 'bg-red-500/20 text-red-400 border-red-500/30',
-  'annulé': 'bg-red-500/20 text-red-400 border-red-500/30',
-  // Legacy
-  'en attente': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  'accepté': 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  'impayée': 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  'en retard': 'bg-red-500/20 text-red-400 border-red-500/30',
-  'planifié': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  'brouillon': 'bg-gray-100 text-gray-600 border-gray-200',
+  'validé': 'bg-blue-100 text-blue-700 border-blue-200',
+  'validée': 'bg-blue-100 text-blue-700 border-blue-200',
+  'signé': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'refusé': 'bg-red-100 text-red-700 border-red-200',
+  'facturé': 'bg-violet-100 text-violet-700 border-violet-200',
+  'facturée': 'bg-violet-100 text-violet-700 border-violet-200',
+  'payée': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'impayée': 'bg-amber-100 text-amber-700 border-amber-200',
+  'abandonnée': 'bg-red-100 text-red-700 border-red-200',
+  'en cours': 'bg-orange-100 text-orange-700 border-orange-200',
+  'terminée': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'terminé': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'annulée': 'bg-red-100 text-red-700 border-red-200',
+  'annulé': 'bg-red-100 text-red-700 border-red-200',
+  'en attente': 'bg-blue-100 text-blue-700 border-blue-200',
+  'accepté': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'en retard': 'bg-red-100 text-red-700 border-red-200',
+  'planifié': 'bg-blue-100 text-blue-700 border-blue-200',
 };
 
 export function StatusBadge({ statut }: { statut: string }) {

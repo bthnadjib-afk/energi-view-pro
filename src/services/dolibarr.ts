@@ -97,6 +97,7 @@ export interface DolibarrUser {
   lastname: string;
   email: string;
   statut: number;
+  fullname: string;
 }
 
 // --- Proxy call ---
@@ -182,7 +183,7 @@ export const DEVIS_STATUTS: Record<number, string> = {
 
 export const FACTURE_STATUTS: Record<number, string> = {
   0: 'Brouillon',
-  1: 'Validée',
+  1: 'Impayée',
   2: 'Payée',
   3: 'Abandonnée',
 };
@@ -202,7 +203,8 @@ export function getDevisStatutLabel(fk_statut: number): string {
 
 export function getFactureStatutLabel(fk_statut: number, paye: boolean): string {
   if (paye) return 'Payée';
-  return FACTURE_STATUTS[fk_statut] || `Statut ${fk_statut}`;
+  if (fk_statut === 0) return 'Brouillon';
+  return 'Impayée';
 }
 
 export function getInterventionStatutLabel(fk_statut: number): string {
@@ -261,6 +263,7 @@ export async function fetchDolibarrUsers(): Promise<DolibarrUser[]> {
     lastname: u.lastname || '',
     email: u.email || '',
     statut: Number(u.statut) || 0,
+    fullname: `${u.firstname || ''} ${u.lastname || ''}`.trim(),
   })).filter((u: DolibarrUser) => u.statut === 1);
 }
 
@@ -597,6 +600,14 @@ function parseDolibarrDate(val: any): string {
   return '';
 }
 
+// --- Resolve technician name from user_author_id ---
+
+export function resolveTechnicianName(userAuthorId: string | undefined, dolibarrUsers: DolibarrUser[]): string {
+  if (!userAuthorId) return '';
+  const user = dolibarrUsers.find(u => u.id === String(userAuthorId));
+  return user ? user.fullname : '';
+}
+
 // --- Mapping Dolibarr → App types ---
 
 function mapDolibarrFacture(d: any): Facture {
@@ -648,7 +659,7 @@ function mapDolibarrIntervention(d: any): Intervention {
     socid: String(d.socid || ''),
     technicien,
     user_author_id: d.user_author_id ? String(d.user_author_id) : undefined,
-    date: parseDolibarrDate(d.datei || d.dateo || d.date || d.date_creation),
+    date: parseDolibarrDate(d.datest || d.datei || d.dateo || d.date || d.date_creation),
     heureDebut: '08:00',
     heureFin: '10:00',
     statut: getInterventionStatutLabel(fk_statut),

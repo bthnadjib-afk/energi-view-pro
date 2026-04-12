@@ -100,9 +100,9 @@ export default function Clients() {
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [];
 
   const typeColors: Record<string, string> = {
-    devis: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    intervention: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    email: 'bg-violet-500/20 text-violet-400 border-violet-500/30',
+    devis: 'bg-blue-100 text-blue-700 border-blue-200',
+    intervention: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    email: 'bg-violet-100 text-violet-700 border-violet-200',
   };
 
   return (
@@ -114,22 +114,22 @@ export default function Clients() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0">
+            <Button className="gap-2">
               <UserPlus className="h-4 w-4" /> Ajouter un client
             </Button>
           </DialogTrigger>
-          <DialogContent className="glass-strong border-border/50">
-            <DialogHeader><DialogTitle className="text-foreground">Nouveau client</DialogTitle></DialogHeader>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Nouveau client</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
-              <Input placeholder="Nom du client *" value={nom} onChange={e => setNom(e.target.value)} className="glass border-border/50" />
+              <Input placeholder="Nom du client *" value={nom} onChange={e => setNom(e.target.value)} />
               <AddressAutocomplete value={adresse} onSelect={({ rue, codePostal: cp, ville: v }) => { setAdresse(rue); setCodePostal(cp); setVille(v); }} placeholder="Adresse (autocomplétion)" />
               <div className="grid grid-cols-2 gap-3">
-                <Input placeholder="Code postal" value={codePostal} onChange={e => setCodePostal(e.target.value)} className="glass border-border/50" />
-                <Input placeholder="Ville" value={ville} onChange={e => setVille(e.target.value)} className="glass border-border/50" />
+                <Input placeholder="Code postal" value={codePostal} onChange={e => setCodePostal(e.target.value)} />
+                <Input placeholder="Ville" value={ville} onChange={e => setVille(e.target.value)} />
               </div>
-              <Input placeholder="Téléphone" value={telephone} onChange={e => setTelephone(e.target.value)} className="glass border-border/50" />
-              <Input placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="glass border-border/50" />
-              <Button className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0" onClick={handleCreate} disabled={createClientMutation.isPending || !nom.trim()}>
+              <Input placeholder="Téléphone" value={telephone} onChange={e => setTelephone(e.target.value)} />
+              <Input placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} />
+              <Button className="w-full" onClick={handleCreate} disabled={createClientMutation.isPending || !nom.trim()}>
                 {createClientMutation.isPending ? 'Création...' : 'Enregistrer'}
               </Button>
             </div>
@@ -139,14 +139,14 @@ export default function Clients() {
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Rechercher un client..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 glass border-border/50" />
+        <Input placeholder="Rechercher un client..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
       </div>
 
-      <div className="glass rounded-xl p-5">
+      <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border/50">
+              <tr className="border-b border-border">
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Nom</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Ville</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden md:table-cell">Téléphone</th>
@@ -157,13 +157,13 @@ export default function Clients() {
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr key={c.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors cursor-pointer" onClick={() => openDetail(c)}>
+                <tr key={c.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => openDetail(c)}>
                   <td className="py-3 px-2 font-medium text-foreground">{c.nom}</td>
                   <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{c.ville}</td>
                   <td className="py-3 px-2 text-muted-foreground hidden md:table-cell font-mono text-xs">{c.telephone}</td>
                   <td className="py-3 px-2 text-muted-foreground hidden lg:table-cell text-xs">{c.email}</td>
                   <td className="py-3 px-2">
-                    <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', c.projetsEnCours > 0 ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-muted text-muted-foreground border-border/50')}>
+                    <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', c.projetsEnCours > 0 ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-muted text-muted-foreground border-border')}>
                       {c.projetsEnCours} en cours
                     </span>
                   </td>
@@ -193,11 +193,11 @@ export default function Clients() {
 
       {/* Client detail dialog */}
       <Dialog open={!!detailClient} onOpenChange={(open) => { if (!open) { setDetailClient(null); setEditMode(false); } }}>
-        <DialogContent className="glass-strong border-border/50 max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           {detailClient && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-foreground flex items-center gap-2">
+                <DialogTitle className="flex items-center gap-2">
                   {detailClient.nom}
                   {!editMode && (
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={startEdit}>
@@ -207,7 +207,7 @@ export default function Clients() {
                 </DialogTitle>
               </DialogHeader>
               <Tabs defaultValue="info" className="pt-2">
-                <TabsList className="glass border-border/50">
+                <TabsList>
                   <TabsTrigger value="info">Informations</TabsTrigger>
                   <TabsTrigger value="historique" className="gap-1.5"><History className="h-3.5 w-3.5" /> Historique</TabsTrigger>
                   <TabsTrigger value="emails" className="gap-1.5"><Mail className="h-3.5 w-3.5" /> Emails</TabsTrigger>
@@ -215,19 +215,19 @@ export default function Clients() {
                 <TabsContent value="info">
                   {editMode ? (
                     <div className="space-y-4 pt-3">
-                      <Input placeholder="Nom *" value={nom} onChange={e => setNom(e.target.value)} className="glass border-border/50" />
-                      <Input placeholder="Adresse" value={adresse} onChange={e => setAdresse(e.target.value)} className="glass border-border/50" />
+                      <Input placeholder="Nom *" value={nom} onChange={e => setNom(e.target.value)} />
+                      <Input placeholder="Adresse" value={adresse} onChange={e => setAdresse(e.target.value)} />
                       <div className="grid grid-cols-2 gap-3">
-                        <Input placeholder="Code postal" value={codePostal} onChange={e => setCodePostal(e.target.value)} className="glass border-border/50" />
-                        <Input placeholder="Ville" value={ville} onChange={e => setVille(e.target.value)} className="glass border-border/50" />
+                        <Input placeholder="Code postal" value={codePostal} onChange={e => setCodePostal(e.target.value)} />
+                        <Input placeholder="Ville" value={ville} onChange={e => setVille(e.target.value)} />
                       </div>
-                      <Input placeholder="Téléphone" value={telephone} onChange={e => setTelephone(e.target.value)} className="glass border-border/50" />
-                      <Input placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="glass border-border/50" />
+                      <Input placeholder="Téléphone" value={telephone} onChange={e => setTelephone(e.target.value)} />
+                      <Input placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} />
                       <div className="flex gap-3">
-                        <Button onClick={handleUpdate} disabled={updateClientMutation.isPending} className="bg-gradient-to-r from-blue-500 to-indigo-600 border-0">
+                        <Button onClick={handleUpdate} disabled={updateClientMutation.isPending}>
                           {updateClientMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
                         </Button>
-                        <Button variant="outline" onClick={() => setEditMode(false)} className="glass border-border/50">Annuler</Button>
+                        <Button variant="outline" onClick={() => setEditMode(false)}>Annuler</Button>
                       </div>
                     </div>
                   ) : (
@@ -246,7 +246,7 @@ export default function Clients() {
                     ) : (
                       <div className="space-y-2">
                         {clientHistory.map((entry, idx) => (
-                          <div key={idx} className="flex items-center gap-3 text-xs p-2 rounded-lg bg-accent/10">
+                          <div key={idx} className="flex items-center gap-3 text-xs p-2 rounded-lg bg-muted/50">
                             <span className="text-muted-foreground w-20 shrink-0">{formatDateFR(entry.date)}</span>
                             <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs capitalize', typeColors[entry.type])}>{entry.type}</span>
                             <span className="text-foreground truncate flex-1">{entry.label}</span>
@@ -265,7 +265,7 @@ export default function Clients() {
                     ) : (
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="border-b border-border/50">
+                          <tr className="border-b border-border">
                             <th className="text-left py-2 px-1 text-muted-foreground">Date</th>
                             <th className="text-left py-2 px-1 text-muted-foreground">Document</th>
                             <th className="text-left py-2 px-1 text-muted-foreground">Objet</th>
@@ -274,7 +274,7 @@ export default function Clients() {
                         </thead>
                         <tbody>
                           {emailHistory.map(e => (
-                            <tr key={e.id} className="border-b border-border/20">
+                            <tr key={e.id} className="border-b border-border/50">
                               <td className="py-2 px-1 text-muted-foreground">{formatDateFR(e.created_at)}</td>
                               <td className="py-2 px-1 font-mono text-foreground">{e.document_ref || '—'}</td>
                               <td className="py-2 px-1 text-foreground">{e.objet}</td>

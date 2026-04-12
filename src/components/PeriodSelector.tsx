@@ -15,7 +15,7 @@ const periods: { value: Period; label: string }[] = [
 
 export function PeriodSelector({ value, onChange }: PeriodSelectorProps) {
   return (
-    <div className="inline-flex rounded-lg glass p-1 gap-0.5">
+    <div className="inline-flex rounded-lg bg-muted p-1 gap-0.5 border border-border">
       {periods.map((p) => (
         <button
           key={p.value}
