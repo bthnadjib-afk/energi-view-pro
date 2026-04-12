@@ -764,6 +764,7 @@ function mapDolibarrFacture(d: any): Facture {
       totalHT: parseFloat(l.total_ht) || 0,
       prixAchat: parseFloat(l.pa_ht) || 0,
     })),
+    note_private: d.note_private || undefined,
   };
 }
 
@@ -787,6 +788,7 @@ function mapDolibarrDevis(d: any): Devis {
       prixAchat: parseFloat(l.pa_ht) || 0,
     })),
     finValidite: parseDolibarrDate(d.fin_validite || d.duree_validite || ''),
+    note_private: d.note_private || undefined,
   };
 }
 
