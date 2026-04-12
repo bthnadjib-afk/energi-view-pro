@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { typesIntervention, formatDateFR, type InterventionType } from '@/services/dolibarr';
+import { typesIntervention, formatDateFR, type InterventionType, resolveTechnicianName } from '@/services/dolibarr';
 import type { Intervention } from '@/services/dolibarr';
+import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
 import { toast } from 'sonner';
 
 function getDaysInMonth(year: number, month: number) {
@@ -25,6 +26,14 @@ const MONTH_NAMES = [
 ];
 
 const DAY_NAMES = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+const TYPE_LABELS: Record<InterventionType, string> = {
+  devis_sur_place: 'Devis sur place',
+  panne: 'Panne',
+  sav: 'SAV',
+  chantier: 'Chantier',
+  realisation: 'Réalisation',
+};
 
 const statusColor: Record<string, string> = {
   'Brouillon': 'bg-muted-foreground',
@@ -44,6 +53,19 @@ export default function Agenda() {
   const [month, setMonth] = useState(today.getMonth());
   const [selected, setSelected] = useState<Intervention | null>(null);
 
+  // Day list dialog
+  const [dayListOpen, setDayListOpen] = useState(false);
+  const [dayListDate, setDayListDate] = useState('');
+  const [dayListInterventions, setDayListInterventions] = useState<Intervention[]>([]);
+
+  // Collision
+  const [collisionOpen, setCollisionOpen] = useState(false);
+  const [collisionTech, setCollisionTech] = useState('');
+  const [collisionCreneau, setCollisionCreneau] = useState('');
+
+  // Filter
+  const [filterTech, setFilterTech] = useState('all');
+
   // Create dialog
   const [createOpen, setCreateOpen] = useState(false);
   const [createDate, setCreateDate] = useState('');
@@ -54,17 +76,27 @@ export default function Agenda() {
   const [newHeureDebut, setNewHeureDebut] = useState('08:00');
   const [newHeureFin, setNewHeureFin] = useState('10:00');
 
-  const technicienNames = dolibarrUsers.map(u => u.fullname).filter(Boolean);
+  const technicienNames = useMemo(() => {
+    const names = new Set<string>();
+    dolibarrUsers.forEach(u => { if (u.fullname) names.add(u.fullname); });
+    interventions.forEach(i => { if (i.technicien) names.add(i.technicien); });
+    return Array.from(names).sort();
+  }, [dolibarrUsers, interventions]);
+
+  const filteredInterventions = useMemo(() => {
+    if (filterTech === 'all') return interventions;
+    return interventions.filter(i => i.technicien === filterTech);
+  }, [interventions, filterTech]);
 
   const interventionsByDate = useMemo(() => {
     const map: Record<string, Intervention[]> = {};
-    interventions.forEach((i) => {
+    filteredInterventions.forEach((i) => {
       const key = i.date;
       if (!map[key]) map[key] = [];
       map[key].push(i);
     });
     return map;
-  }, [interventions]);
+  }, [filteredInterventions]);
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
@@ -86,10 +118,13 @@ export default function Agenda() {
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const handleDayClick = (dateStr: string, dayInterventions: Intervention[]) => {
-    if (dayInterventions.length > 0) {
+    if (dayInterventions.length > 1) {
+      setDayListDate(dateStr);
+      setDayListInterventions(dayInterventions);
+      setDayListOpen(true);
+    } else if (dayInterventions.length === 1) {
       setSelected(dayInterventions[0]);
     } else {
-      // Open create dialog pre-filled with date
       setCreateDate(dateStr);
       setNewClientId('');
       setNewDescription('');
@@ -106,6 +141,28 @@ export default function Agenda() {
       toast.error('Client et date requis');
       return;
     }
+
+    // Collision check
+    if (newTech) {
+      const slots: InterventionSlot[] = interventions.map(i => ({
+        technicien: i.technicien,
+        date: i.date,
+        heureDebut: i.heureDebut,
+        heureFin: i.heureFin,
+        ref: i.ref,
+      }));
+      const collision = checkCollision(
+        { technicien: newTech, date: createDate, heureDebut: newHeureDebut, heureFin: newHeureFin },
+        slots
+      );
+      if (collision) {
+        setCollisionTech(newTech);
+        setCollisionCreneau(`${collision.ref || ''} — ${collision.heureDebut} à ${collision.heureFin}`);
+        setCollisionOpen(true);
+        return;
+      }
+    }
+
     const selectedUser = dolibarrUsers.find(u => u.fullname === newTech);
     await createMutation.mutateAsync({
       socid: newClientId,
@@ -121,11 +178,18 @@ export default function Agenda() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Agenda</h1>
           <p className="text-muted-foreground text-sm">Cliquez sur un jour vide pour créer une intervention</p>
         </div>
+        <Select value={filterTech} onValueChange={setFilterTech}>
+          <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Filtrer par technicien" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les techniciens</SelectItem>
+            {technicienNames.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
@@ -160,7 +224,7 @@ export default function Agenda() {
             return (
               <div
                 key={idx}
-                className={`aspect-square rounded-lg p-1 flex flex-col cursor-pointer transition-colors hover:bg-accent/30 ${isToday ? 'ring-1 ring-primary/50 bg-primary/5' : ''} ${dayInterventions.length === 0 ? 'hover:ring-1 hover:ring-primary/30' : ''}`}
+                className={`aspect-square rounded-lg p-1 flex flex-col cursor-pointer transition-colors group hover:bg-accent/30 ${isToday ? 'ring-1 ring-primary/50 bg-primary/5' : ''} ${dayInterventions.length === 0 ? 'hover:ring-1 hover:ring-primary/30' : ''}`}
                 onClick={() => handleDayClick(dateStr, dayInterventions)}
               >
                 <span className={`text-xs font-medium self-end px-1 ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
@@ -183,7 +247,7 @@ export default function Agenda() {
                     <span className="text-[10px] text-muted-foreground px-1">+{dayInterventions.length - 3}</span>
                   )}
                   {dayInterventions.length === 0 && (
-                    <div className="flex-1 flex items-center justify-center opacity-0 hover:opacity-30 transition-opacity">
+                    <div className="flex-1 flex items-center justify-center opacity-0 group-hover:opacity-30 transition-opacity">
                       <Plus className="h-3 w-3 text-muted-foreground" />
                     </div>
                   )}
@@ -215,6 +279,10 @@ export default function Agenda() {
               <p className="text-foreground">{selected.technicien || '—'}</p>
             </div>
             <div>
+              <p className="text-muted-foreground text-xs">Type</p>
+              <p className="text-foreground">{TYPE_LABELS[selected.type] || selected.type}</p>
+            </div>
+            <div>
               <p className="text-muted-foreground text-xs">Date</p>
               <p className="text-foreground">{formatDateFR(selected.date)}</p>
             </div>
@@ -234,11 +302,54 @@ export default function Agenda() {
         </div>
       )}
 
+      {/* Day list dialog (multiple interventions on same day) */}
+      <Dialog open={dayListOpen} onOpenChange={setDayListOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Interventions du {formatDateFR(dayListDate)}</DialogTitle>
+            <DialogDescription className="sr-only">Liste des interventions de ce jour</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 pt-2 max-h-80 overflow-y-auto">
+            {dayListInterventions.map(inter => (
+              <div
+                key={inter.id}
+                className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-accent/30 cursor-pointer transition-colors"
+                onClick={() => { setDayListOpen(false); setSelected(inter); }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-block w-2 h-2 rounded-full ${statusColor[inter.statut] || 'bg-muted-foreground'}`} />
+                    <span className="font-mono text-xs text-muted-foreground">{inter.ref}</span>
+                    <span className="text-xs text-muted-foreground">{inter.heureDebut}–{inter.heureFin}</span>
+                  </div>
+                  <p className="text-sm font-medium text-foreground truncate mt-0.5">{inter.client}</p>
+                  <p className="text-xs text-muted-foreground">{inter.technicien || '—'} · {TYPE_LABELS[inter.type] || inter.type}</p>
+                </div>
+                <StatusBadge statut={inter.statut} />
+              </div>
+            ))}
+          </div>
+          <Button variant="outline" className="w-full mt-2" onClick={() => {
+            setDayListOpen(false);
+            setCreateDate(dayListDate);
+            setNewClientId('');
+            setNewDescription('');
+            setNewType('chantier');
+            setNewTech('');
+            setNewHeureDebut('08:00');
+            setNewHeureFin('10:00');
+            setCreateOpen(true);
+          }}>
+            <Plus className="h-4 w-4 mr-2" /> Ajouter une intervention
+          </Button>
+        </DialogContent>
+      </Dialog>
+
       {/* Create intervention dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nouvelle intervention — {createDate}</DialogTitle>
+            <DialogTitle>Nouvelle intervention — {formatDateFR(createDate)}</DialogTitle>
             <DialogDescription className="sr-only">Créer une intervention pour cette date</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
@@ -272,11 +383,19 @@ export default function Agenda() {
             </div>
             <Input placeholder="Description" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
             <Button onClick={handleCreate} disabled={createMutation.isPending} className="w-full">
-              {createMutation.isPending ? 'Création...' : 'Créer l\'intervention'}
+              {createMutation.isPending ? 'Création...' : "Créer l'intervention"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Collision alert */}
+      <CollisionAlert
+        open={collisionOpen}
+        onClose={() => setCollisionOpen(false)}
+        technicien={collisionTech}
+        creneauExistant={collisionCreneau}
+      />
     </div>
   );
 }
