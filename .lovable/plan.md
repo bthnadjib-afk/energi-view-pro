@@ -1,25 +1,46 @@
 
-
-# Correction: Double création Dolibarr
+# Correction: Fallback recherche Dolibarr ne fonctionne pas
 
 ## Cause racine
 
-La création Dolibarr se fait **deux fois** :
-1. **Edge Function `create-user`** (lignes 109-144) : crée l'utilisateur Dolibarr côté serveur et persiste `dolibarr_user_id` dans `profiles` via `adminClient`.
-2. **`Utilisateurs.tsx`** (lignes 106-110) : après le retour de l'Edge Function, appelle `dolibarrUserMutation.mutateAsync()` qui re-tente un `POST /users` côté client → erreur "existe déjà".
+Dans `create-user/index.ts` ligne 143, l'URL de recherche contient des caractères non encodés :
+```
+${dolibarrApiUrl}/users?sqlfilters=(login='bth.nadjib')
+```
+Les parenthèses et apostrophes ne sont pas URL-encodées. Dolibarr rejette probablement la requête, mais le code ne logge rien si `searchResp.ok` est `false` — le fallback échoue silencieusement et `dolibarr_user_id` reste `null`.
 
-## Corrections
+## Corrections dans `supabase/functions/create-user/index.ts`
 
-### 1. Supprimer l'appel client-side redondant (`Utilisateurs.tsx`)
-Retirer les lignes 102-110 (le `try { await dolibarrUserMutation.mutateAsync(...) }`) car l'Edge Function gère déjà la synchro Dolibarr + la persistance de `dolibarr_user_id`.
+1. **URL-encoder le paramètre `sqlfilters`** :
+```typescript
+const filter = encodeURIComponent(`(login='${login}')`);
+const searchResp = await fetch(
+  `${dolibarrApiUrl}/users?sqlfilters=${filter}&limit=1`,
+  ...
+);
+```
 
-### 2. Edge Function : fallback si l'utilisateur existe déjà
-Dans `create-user/index.ts`, si le `POST /users` retourne une erreur "existe déjà", faire un `GET /users?sqlfilters=login='{login}'` pour récupérer l'ID existant et le persister dans `profiles` quand même.
+2. **Ajouter un log si la recherche échoue** pour éviter les échecs silencieux :
+```typescript
+if (!searchResp.ok) {
+  console.error("Dolibarr search failed:", await searchResp.text());
+}
+```
 
-## Fichiers impactés
+3. **Ajouter une recherche par email en fallback** si la recherche par login ne trouve rien :
+```typescript
+// Si pas trouvé par login, chercher par email
+if (!dolibarrUserId) {
+  const emailFilter = encodeURIComponent(`(email='${email}')`);
+  const emailResp = await fetch(`${dolibarrApiUrl}/users?sqlfilters=${emailFilter}&limit=1`, ...);
+  ...
+}
+```
+
+## Fichier impacté
 
 | Fichier | Modification |
 |---------|-------------|
-| `src/pages/Utilisateurs.tsx` | Supprimer lignes 102-110 (double appel Dolibarr) |
-| `supabase/functions/create-user/index.ts` | Ajouter fallback GET si POST échoue avec "existe déjà" |
+| `supabase/functions/create-user/index.ts` | URL-encoder `sqlfilters`, ajouter logs d'erreur, fallback par email |
 
+Correction mineure, une seule passe.
