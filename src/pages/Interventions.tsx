@@ -433,15 +433,14 @@ export default function Interventions() {
                             </>
                           );
                         })()}
-                        {i.fk_statut === 3 && (
+                        {i.fk_statut >= 1 && (
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Générer facture" onClick={() => handleTransformFacture(i)}>
                             <Receipt className="h-3.5 w-3.5 text-emerald-600" />
                           </Button>
                         )}
-                        {(i.fk_statut <= 2) && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => handleTransformDevis(i)}>
-                            <FileText className="h-3.5 w-3.5" />
-                          </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => handleTransformDevis(i)}>
+                          <FileText className="h-3.5 w-3.5" />
+                        </Button>
                         )}
                       </div>
                     </td>
@@ -579,16 +578,15 @@ export default function Interventions() {
                     </Button>
                   )}
 
-                  {selectedIntervention.fk_statut === 3 && (
+                  {selectedIntervention.fk_statut >= 1 && (
                     <Button onClick={() => handleTransformFacture(selectedIntervention)} disabled={createFactureMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                       <Receipt className="h-4 w-4" /> {createFactureMutation.isPending ? 'Création...' : 'Générer une facture'}
                     </Button>
                   )}
 
-                  {selectedIntervention.fk_statut <= 2 && (
-                    <Button onClick={() => handleTransformDevis(selectedIntervention)} disabled={createDevisMutation.isPending} variant="outline" className="gap-2">
-                      <ArrowRightLeft className="h-4 w-4" /> {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
-                    </Button>
+                  <Button onClick={() => handleTransformDevis(selectedIntervention)} disabled={createDevisMutation.isPending} variant="outline" className="gap-2">
+                    <ArrowRightLeft className="h-4 w-4" /> {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
+                  </Button>
                   )}
 
                   <Button onClick={handleViewPDF} variant="outline" className="gap-2">
