@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Euro, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useFactures, useClients, useProduits, useCreateFacture } from '@/hooks/useDolibarr';
+import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture } from '@/hooks/useDolibarr';
 import { formatDateFR } from '@/services/dolibarr';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 interface LigneForm {
   desc: string;
@@ -23,6 +24,7 @@ export default function Factures() {
   const { data: clients = [] } = useClients();
   const { data: produits = [] } = useProduits();
   const createFactureMutation = useCreateFacture();
+  const deleteFactureMutation = useDeleteFacture();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [socid, setSocid] = useState('');
   const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '' }]);
@@ -42,7 +44,7 @@ export default function Factures() {
     } else {
       const p = produits.find(pr => pr.id === productId);
       if (p) {
-        updated[i] = { ...updated[i], productId, desc: `[${p.ref}] ${p.label}`, subprice: p.prixHT, tva_tx: p.tauxTVA, product_type: p.type === 'service' ? 1 : 0 };
+        updated[i] = { ...updated[i], productId, desc: `[${p.ref}] ${p.label}`, subprice: p.prixHT, tva_tx: 20, product_type: p.type === 'main_oeuvre' ? 1 : 0 };
       }
     }
     setLignes(updated);
@@ -53,6 +55,13 @@ export default function Factures() {
     (updated[i] as any)[field] = value;
     setLignes(updated);
   };
+
+  // Totals with TVA (factures include TVA)
+  const totals = useMemo(() => {
+    const ht = lignes.reduce((s, l) => s + l.qty * l.subprice, 0);
+    const tva = lignes.reduce((s, l) => s + l.qty * l.subprice * l.tva_tx / 100, 0);
+    return { ht, tva, ttc: ht + tva };
+  }, [lignes]);
 
   const handleCreate = async () => {
     if (!socid || lignes.length === 0 || !lignes[0].desc) return;
@@ -70,7 +79,7 @@ export default function Factures() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Factures</h1>
-          <p className="text-muted-foreground text-sm">Gestion des factures clients</p>
+          <p className="text-muted-foreground text-sm">Gestion des factures clients — TVA appliquée ici</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -79,7 +88,7 @@ export default function Factures() {
             </Button>
           </DialogTrigger>
           <DialogContent className="glass-strong border-border/50 max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle className="text-foreground">Nouvelle facture</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-foreground">Nouvelle facture (avec TVA)</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
               <Select value={socid} onValueChange={setSocid}>
                 <SelectTrigger className="glass border-border/50"><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
@@ -99,13 +108,13 @@ export default function Factures() {
                   <div key={i} className="space-y-2 p-3 rounded-lg bg-accent/10 border border-border/30">
                     <Select value={l.productId || '__libre__'} onValueChange={(v) => selectProduct(i, v)}>
                       <SelectTrigger className="glass border-border/50 text-xs">
-                        <SelectValue placeholder="Sélectionner un produit" />
+                        <SelectValue placeholder="Sélectionner un article" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__libre__">✏️ Ligne libre</SelectItem>
                         {produits.map(p => (
                           <SelectItem key={p.id} value={p.id}>
-                            [{p.ref}] — {p.label} ({p.type === 'service' ? 'Service' : 'Produit'})
+                            [{p.ref}] — {p.label} ({p.type === 'main_oeuvre' ? "Main d'œuvre" : 'Fourniture'})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -116,8 +125,8 @@ export default function Factures() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="0">Produit</SelectItem>
-                          <SelectItem value="1">Service</SelectItem>
+                          <SelectItem value="0">Fourniture</SelectItem>
+                          <SelectItem value="1">Main d'œuvre</SelectItem>
                         </SelectContent>
                       </Select>
                     )}
@@ -146,6 +155,22 @@ export default function Factures() {
                 ))}
               </div>
 
+              {/* Totals with TVA */}
+              <div className="rounded-lg bg-accent/20 border border-border/30 p-4 space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total HT</span>
+                  <span className="text-foreground font-medium">{totals.ht.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">TVA</span>
+                  <span className="text-foreground">{totals.tva.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                </div>
+                <div className="flex justify-between text-sm font-bold border-t border-border/30 pt-1">
+                  <span className="text-foreground">Total TTC</span>
+                  <span className="text-primary">{totals.ttc.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+                </div>
+              </div>
+
               <Button
                 onClick={handleCreate}
                 disabled={createFactureMutation.isPending || !socid}
@@ -159,7 +184,7 @@ export default function Factures() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title="Total CA" value={`${totalCA.toLocaleString('fr-FR')} €`} icon={Euro} gradient="bg-gradient-to-br from-blue-500 to-indigo-600" />
+        <StatCard title="Total CA TTC" value={`${totalCA.toLocaleString('fr-FR')} €`} icon={Euro} gradient="bg-gradient-to-br from-blue-500 to-indigo-600" />
         <StatCard title="Factures payées" value={String(payees.length)} subtitle={`${payees.reduce((s, f) => s + f.montantTTC, 0).toLocaleString('fr-FR')} €`} icon={CheckCircle} gradient="bg-gradient-to-br from-emerald-500 to-green-600" />
         <StatCard title="Factures impayées" value={String(impayees.length)} subtitle={`${impayees.reduce((s, f) => s + f.montantTTC, 0).toLocaleString('fr-FR')} €`} icon={AlertCircle} gradient="bg-gradient-to-br from-orange-500 to-amber-600" />
       </div>
@@ -174,6 +199,7 @@ export default function Factures() {
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Date</th>
                 <th className="text-right py-3 px-2 text-muted-foreground font-medium">Montant TTC</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Statut</th>
+                <th className="text-left py-3 px-2 text-muted-foreground font-medium w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -184,6 +210,27 @@ export default function Factures() {
                   <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(f.date)}</td>
                   <td className="py-3 px-2 text-right font-medium text-foreground">{f.montantTTC.toLocaleString('fr-FR')} €</td>
                   <td className="py-3 px-2"><StatusBadge statut={f.statut} /></td>
+                  <td className="py-3 px-2">
+                    {f.statut !== 'payée' && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Supprimer cette facture ?</AlertDialogTitle>
+                            <AlertDialogDescription>La facture {f.ref} sera définitivement supprimée.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => deleteFactureMutation.mutate(f.id)} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

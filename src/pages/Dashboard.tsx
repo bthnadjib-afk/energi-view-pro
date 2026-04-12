@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Euro, FileText, ClipboardList, TrendingUp, Users, AlertTriangle, Clock, Receipt } from 'lucide-react';
+import { Euro, FileText, ClipboardList, TrendingUp, Users, AlertTriangle, Clock, Receipt, Wallet, CalendarDays } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PeriodSelector, type Period } from '@/components/PeriodSelector';
 import { UrgencyWidget } from '@/components/UrgencyWidget';
 import { useFactures, useDevis, useInterventions } from '@/hooks/useDolibarr';
-import { techniciens } from '@/services/dolibarr';
+import { techniciens, formatDateFR } from '@/services/dolibarr';
 
 export default function Dashboard() {
   const { data: factures = [] } = useFactures();
@@ -25,9 +25,9 @@ export default function Dashboard() {
     return d.getFullYear() === now.getFullYear();
   });
 
-  const totalCA = filteredFactures.reduce((s, f) => s + f.montantTTC, 0);
+  const totalCA = filteredFactures.reduce((s, f) => s + f.montantHT, 0);
   const devisEnAttente = devis.filter(d => d.statut === 'en attente').length;
-  const interventionsPlanifiees = interventions.filter(i => i.statut === 'planifié' || i.statut === 'en cours').length;
+  const interventionsActives = interventions.filter(i => i.statut === 'validé' || i.statut === 'en cours').length;
   const devisAcceptes = devis.filter(d => d.statut === 'accepté').length;
   const tauxConversion = devis.length > 0 ? Math.round((devisAcceptes / devis.length) * 100) : 0;
 
@@ -38,16 +38,17 @@ export default function Dashboard() {
     interventions: todayInterventions.filter(i => i.technicien === t),
   }));
 
-  const recentInterventions = [...interventions]
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 5);
-
   // Priority items
   const sevenDaysAgo = new Date(now);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const devisRelances = devis.filter(d => d.statut === 'en attente' && new Date(d.date) <= sevenDaysAgo);
   const facturesImpayees = factures.filter(f => f.statut === 'impayée' || f.statut === 'en retard');
-  const interventionsAValider = interventions.filter(i => i.statut === 'planifié');
+  const interventionsAValider = interventions.filter(i => i.statut === 'brouillon' || i.statut === 'validé');
+
+  // CASH widget
+  const totalImpaye = facturesImpayees.reduce((s, f) => s + f.montantHT, 0);
+  const interventionsTerminees = interventions.filter(i => i.statut === 'terminé');
+  const aFacturer = interventionsTerminees.length;
 
   const hasPriorities = devisRelances.length > 0 || facturesImpayees.length > 0 || interventionsAValider.length > 0;
 
@@ -63,7 +64,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Chiffre d'Affaires"
+          title="Chiffre d'Affaires HT"
           value={`${totalCA.toLocaleString('fr-FR')} €`}
           subtitle={`${filteredFactures.length} factures`}
           icon={Euro}
@@ -78,7 +79,7 @@ export default function Dashboard() {
         />
         <StatCard
           title="Interventions actives"
-          value={String(interventionsPlanifiees)}
+          value={String(interventionsActives)}
           subtitle={`${interventions.length} total`}
           icon={FileText}
           gradient="bg-gradient-to-br from-emerald-500 to-green-600"
@@ -90,6 +91,55 @@ export default function Dashboard() {
           icon={TrendingUp}
           gradient="bg-gradient-to-br from-orange-500 to-amber-600"
         />
+      </div>
+
+      {/* CASH & AGENDA Widgets */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="glass rounded-xl p-5">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            <Wallet className="h-5 w-5 text-orange-400" /> CASH
+          </h2>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+              <div>
+                <p className="text-sm font-medium text-foreground">Impayés</p>
+                <p className="text-xs text-muted-foreground">{facturesImpayees.length} facture(s)</p>
+              </div>
+              <p className="text-xl font-bold text-red-400">{totalImpaye.toLocaleString('fr-FR')} €</p>
+            </div>
+            <div className="flex justify-between items-center p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <div>
+                <p className="text-sm font-medium text-foreground">À facturer</p>
+                <p className="text-xs text-muted-foreground">{aFacturer} intervention(s) terminée(s)</p>
+              </div>
+              <Receipt className="h-6 w-6 text-amber-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="glass rounded-xl p-5">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-blue-400" /> AGENDA — Aujourd'hui
+          </h2>
+          {todayInterventions.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Aucune intervention aujourd'hui</p>
+          ) : (
+            <div className="space-y-2">
+              {todayInterventions.map(i => (
+                <div key={i.id} className="flex items-center justify-between p-2 rounded-lg bg-accent/10 text-xs">
+                  <div className="flex items-center gap-2 truncate mr-2">
+                    <span className="font-mono text-muted-foreground">{i.heureDebut}–{i.heureFin}</span>
+                    <span className="text-foreground truncate">{i.description}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">{i.technicien || '—'}</span>
+                    <StatusBadge statut={i.statut} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Priority section */}
@@ -108,7 +158,7 @@ export default function Dashboard() {
                   {devisRelances.slice(0, 5).map(d => (
                     <div key={d.id} className="flex items-center justify-between text-xs">
                       <span className="text-foreground truncate mr-2">{d.ref} — {d.client}</span>
-                      <span className="text-muted-foreground whitespace-nowrap">{d.montantTTC.toLocaleString('fr-FR')} €</span>
+                      <span className="text-muted-foreground whitespace-nowrap">{d.montantHT.toLocaleString('fr-FR')} € HT</span>
                     </div>
                   ))}
                 </div>
@@ -132,13 +182,13 @@ export default function Dashboard() {
             {interventionsAValider.length > 0 && (
               <div className="glass rounded-lg p-4 border-l-4 border-l-amber-500">
                 <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-amber-400" /> Interventions planifiées ({interventionsAValider.length})
+                  <Clock className="h-4 w-4 text-amber-400" /> Interventions à valider ({interventionsAValider.length})
                 </h3>
                 <div className="space-y-2">
                   {interventionsAValider.slice(0, 5).map(i => (
                     <div key={i.id} className="flex items-center justify-between text-xs">
                       <span className="text-foreground truncate mr-2">{i.ref} — {i.description}</span>
-                      <span className="text-muted-foreground whitespace-nowrap">{i.date}</span>
+                      <span className="text-muted-foreground whitespace-nowrap">{formatDateFR(i.date)}</span>
                     </div>
                   ))}
                 </div>
@@ -150,7 +200,7 @@ export default function Dashboard() {
 
       <UrgencyWidget interventions={interventions} />
 
-      {/* Today view */}
+      {/* Today view by technician */}
       <div className="glass rounded-xl p-5">
         <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
           <Users className="h-5 w-5 text-primary" /> Aujourd'hui — par technicien
@@ -193,12 +243,15 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {recentInterventions.map((inter) => (
+              {[...interventions]
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .slice(0, 5)
+                .map((inter) => (
                 <tr key={inter.id} className="border-b border-border/30 hover:bg-accent/30 transition-colors">
                   <td className="py-3 px-2 font-mono text-xs text-foreground">{inter.ref}</td>
                   <td className="py-3 px-2 text-foreground">{inter.client}</td>
-                  <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{inter.technicien}</td>
-                  <td className="py-3 px-2 text-muted-foreground hidden md:table-cell">{new Date(inter.date).toLocaleDateString('fr-FR')}</td>
+                  <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{inter.technicien || '—'}</td>
+                  <td className="py-3 px-2 text-muted-foreground hidden md:table-cell">{formatDateFR(inter.date)}</td>
                   <td className="py-3 px-2"><StatusBadge statut={inter.statut} /></td>
                 </tr>
               ))}

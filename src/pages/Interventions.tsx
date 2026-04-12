@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture } from '@/hooks/useDolibarr';
-import { techniciens, statutsIntervention, typesIntervention, formatDateFR, type InterventionType, type Intervention } from '@/services/dolibarr';
+import { techniciens, statutsIntervention, typesIntervention, formatDateFR, generatePDF, type InterventionType, type Intervention, type InterventionStatut } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
 import { SignaturePad } from '@/components/SignaturePad';
-import { Plus, FileText, Receipt, Camera, Clock, ArrowRightLeft, Lock } from 'lucide-react';
+import { Plus, FileText, Receipt, Camera, Clock, ArrowRightLeft, Lock, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -52,8 +52,8 @@ export default function Interventions() {
   const [newType, setNewType] = useState<InterventionType>('chantier');
   const [newDescription, setNewDescription] = useState('');
   const [newClientId, setNewClientId] = useState('');
-  const [noteClient, setNoteClient] = useState('');
-  const [noteTechnicien, setNoteTechnicien] = useState('');
+  const [descriptionClient, setDescriptionClient] = useState('');
+  const [compteRendu, setCompteRendu] = useState('');
   const [notePrivee, setNotePrivee] = useState('');
 
   // Anti-collision
@@ -105,7 +105,7 @@ export default function Interventions() {
       date: newDate,
     });
     setDialogOpen(false);
-    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee('');
+    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee(''); setDescriptionClient(''); setCompteRendu('');
   };
 
   const openDetail = (inter: Intervention) => {
@@ -119,7 +119,7 @@ export default function Interventions() {
     if (!socid) { toast.error('Client non identifié'); return; }
     await createDevisMutation.mutateAsync({
       socid,
-      lines: [{ desc: selectedIntervention.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+      lines: [{ desc: selectedIntervention.description, qty: 1, subprice: 0, tva_tx: 0, product_type: 1 }],
     });
     toast.success('Devis créé à partir de l\'intervention');
   };
@@ -133,6 +133,16 @@ export default function Interventions() {
       lines: [{ desc: selectedIntervention.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
     });
     toast.success('Facture créée à partir de l\'intervention');
+  };
+
+  const handleViewPDF = async () => {
+    if (!selectedIntervention) return;
+    try {
+      await generatePDF('interventions', selectedIntervention.id);
+      toast.success(`Bon d'intervention ${selectedIntervention.ref} généré`);
+    } catch {
+      toast.error('Erreur lors de la génération du PDF');
+    }
   };
 
   return (
@@ -180,12 +190,11 @@ export default function Interventions() {
                   <Input type="time" value={newHeureFin} onChange={(e) => setNewHeureFin(e.target.value)} className="glass border-border/50" />
                 </div>
               </div>
-              <Input placeholder="Description" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="glass border-border/50" />
+              <Input placeholder="Description technique" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="glass border-border/50" />
 
               <div className="space-y-2">
-                <h3 className="text-sm font-medium text-foreground">📋 Avant l'intervention</h3>
-                <Input placeholder="Note demande client" value={noteClient} onChange={(e) => setNoteClient(e.target.value)} className="glass border-border/50" />
-                <Input placeholder="Instructions technicien" value={noteTechnicien} onChange={(e) => setNoteTechnicien(e.target.value)} className="glass border-border/50" />
+                <h3 className="text-sm font-medium text-foreground">📋 Description Client</h3>
+                <Textarea placeholder="Description visible par le client (devis, bon d'intervention)..." value={descriptionClient} onChange={(e) => setDescriptionClient(e.target.value)} className="glass border-border/50 min-h-[60px]" />
               </div>
 
               {role === 'admin' && (
@@ -279,7 +288,7 @@ export default function Interventions() {
                             <Receipt className="h-3.5 w-3.5 text-emerald-400" />
                           </Button>
                         )}
-                        {(i.statut === 'planifié' || i.statut === 'en cours') && (
+                        {(i.statut === 'brouillon' || i.statut === 'validé' || i.statut === 'en cours') && (
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => { setSelectedIntervention(i); handleTransformDevis(); }}>
                             <FileText className="h-3.5 w-3.5" />
                           </Button>
@@ -314,7 +323,22 @@ export default function Interventions() {
                   <div><span className="text-muted-foreground">Date :</span> <span className="text-foreground ml-1">{formatDateFR(selectedIntervention.date)}</span></div>
                   <div><span className="text-muted-foreground">Horaire :</span> <span className="text-foreground ml-1">{selectedIntervention.heureDebut} – {selectedIntervention.heureFin}</span></div>
                 </div>
-                <div className="text-sm"><span className="text-muted-foreground">Description :</span> <span className="text-foreground ml-1">{selectedIntervention.description}</span></div>
+
+                {/* Description Client */}
+                <div className="text-sm space-y-1">
+                  <span className="text-muted-foreground font-medium">Description Client :</span>
+                  <p className="text-foreground bg-accent/10 p-2 rounded">{selectedIntervention.descriptionClient || selectedIntervention.description || '—'}</p>
+                </div>
+
+                {/* Compte-rendu Technique */}
+                <div className="text-sm space-y-1">
+                  <span className="text-muted-foreground font-medium">Compte-rendu Technique :</span>
+                  <Textarea
+                    placeholder="Compte-rendu technique (visible en interne)..."
+                    defaultValue={selectedIntervention.compteRendu || ''}
+                    className="glass border-border/50 min-h-[60px] text-sm"
+                  />
+                </div>
 
                 {/* Notes privées (admin only) */}
                 {role === 'admin' && (
@@ -370,7 +394,7 @@ export default function Interventions() {
                       {createFactureMutation.isPending ? 'Création...' : 'Générer une facture'}
                     </Button>
                   )}
-                  {(selectedIntervention.statut === 'planifié' || selectedIntervention.statut === 'en cours') && (
+                  {(selectedIntervention.statut === 'brouillon' || selectedIntervention.statut === 'validé' || selectedIntervention.statut === 'en cours') && (
                     <Button
                       onClick={handleTransformDevis}
                       disabled={createDevisMutation.isPending}
@@ -380,8 +404,8 @@ export default function Interventions() {
                       {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
                     </Button>
                   )}
-                  <Button variant="outline" className="gap-2 glass border-border/50 h-12 px-6 text-base">
-                    <FileText className="h-4 w-4" /> Générer Bon d'Intervention
+                  <Button onClick={handleViewPDF} variant="outline" className="gap-2 glass border-border/50 h-12 px-6 text-base">
+                    <FileDown className="h-4 w-4" /> Voir le PDF
                   </Button>
                 </div>
               </div>
