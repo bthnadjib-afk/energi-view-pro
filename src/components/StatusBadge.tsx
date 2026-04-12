@@ -9,6 +9,7 @@ const statusStyles: Record<string, string> = {
   'facturé': 'bg-violet-100 text-violet-700 border-violet-200',
   'facturée': 'bg-violet-100 text-violet-700 border-violet-200',
   'payée': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'partiellement payée': 'bg-orange-100 text-orange-700 border-orange-200',
   'impayée': 'bg-amber-100 text-amber-700 border-amber-200',
   'abandonnée': 'bg-red-100 text-red-700 border-red-200',
   'en cours': 'bg-orange-100 text-orange-700 border-orange-200',
