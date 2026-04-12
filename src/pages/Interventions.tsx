@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useDolibarrUsers, useSaveSignatures, useUpdateIntervention } from '@/hooks/useDolibarr';
+import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures } from '@/hooks/useDolibarr';
 import { statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, resolveTechnicianName, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,8 @@ export default function Interventions() {
   const { data: interventions = [] } = useInterventions();
   const { data: clients = [] } = useClients();
   const { data: dolibarrUsers = [] } = useDolibarrUsers();
+  const { data: allDevis = [] } = useDevis();
+  const { data: allFactures = [] } = useFactures();
   const createInterventionMutation = useCreateIntervention();
   const createDevisMutation = useCreateDevis();
   const createFactureMutation = useCreateFacture();
@@ -44,6 +46,38 @@ export default function Interventions() {
   const saveSignaturesMutation = useSaveSignatures();
   const updateMutation = useUpdateIntervention();
   const { role } = useAuth();
+
+  // Cross-reference: find linked devis/factures per intervention
+  const linkedDocsByIntervention = useMemo(() => {
+    const map = new Map<string, { devis: string[]; factures: string[] }>();
+    allDevis.forEach(d => {
+      if (d.note_private) {
+        try {
+          const meta = JSON.parse(d.note_private);
+          if (meta.from_intervention) {
+            const key = meta.intervention_id || meta.from_intervention;
+            const entry = map.get(key) || { devis: [], factures: [] };
+            entry.devis.push(d.ref);
+            map.set(key, entry);
+          }
+        } catch {}
+      }
+    });
+    allFactures.forEach(f => {
+      if (f.note_private) {
+        try {
+          const meta = JSON.parse(f.note_private);
+          if (meta.from_intervention) {
+            const key = meta.intervention_id || meta.from_intervention;
+            const entry = map.get(key) || { devis: [], factures: [] };
+            entry.factures.push(f.ref);
+            map.set(key, entry);
+          }
+        } catch {}
+      }
+    });
+    return map;
+  }, [allDevis, allFactures]);
   const [techFilter, setTechFilter] = useState('all');
   const [statutFilter, setStatutFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -155,9 +189,11 @@ export default function Interventions() {
   const handleTransformDevis = async (inter: Intervention) => {
     const socid = inter.socid;
     if (!socid) { toast.error('Client non identifié'); return; }
+    const notePrivate = JSON.stringify({ from_intervention: inter.ref, intervention_id: inter.id });
     await createDevisMutation.mutateAsync({
       socid,
-      lines: [{ desc: inter.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+      lines: [{ desc: `Intervention ${inter.ref} — ${inter.description || 'Prestation'}`, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+      note_private: notePrivate,
     });
     toast.success('Devis créé depuis l\'intervention');
   };
@@ -165,9 +201,11 @@ export default function Interventions() {
   const handleTransformFacture = async (inter: Intervention) => {
     const socid = inter.socid;
     if (!socid) { toast.error('Client non identifié'); return; }
+    const notePrivate = JSON.stringify({ from_intervention: inter.ref, intervention_id: inter.id });
     await createFactureMutation.mutateAsync({
       socid,
-      lines: [{ desc: inter.description, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+      lines: [{ desc: `Intervention ${inter.ref} — ${inter.description || 'Prestation'}`, qty: 1, subprice: 0, tva_tx: 20, product_type: 1 }],
+      note_private: notePrivate,
     });
     toast.success('Facture créée depuis l\'intervention');
   };
@@ -376,7 +414,25 @@ export default function Interventions() {
                     <td className="py-3 px-2 text-muted-foreground">{formatDateFR(i.date)}</td>
                     <td className="py-3 px-2"><StatusBadge statut={i.statut} /></td>
                     <td className="py-3 px-2">
-                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {/* Linked document badges */}
+                        {(() => {
+                          const linked = linkedDocsByIntervention.get(i.id) || linkedDocsByIntervention.get(i.ref);
+                          return (
+                            <>
+                              {linked?.devis.map(ref => (
+                                <span key={ref} className="inline-flex items-center gap-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200 px-1.5 py-0.5 text-[10px] font-medium" title={`Devis ${ref}`}>
+                                  <FileText className="h-2.5 w-2.5" />{ref}
+                                </span>
+                              ))}
+                              {linked?.factures.map(ref => (
+                                <span key={ref} className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-medium" title={`Facture ${ref}`}>
+                                  <Receipt className="h-2.5 w-2.5" />{ref}
+                                </span>
+                              ))}
+                            </>
+                          );
+                        })()}
                         {i.fk_statut === 3 && (
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Générer facture" onClick={() => handleTransformFacture(i)}>
                             <Receipt className="h-3.5 w-3.5 text-emerald-600" />
@@ -410,6 +466,25 @@ export default function Interventions() {
                   </span>
                 </DialogTitle>
               </DialogHeader>
+              {/* Linked documents */}
+              {(() => {
+                const linked = linkedDocsByIntervention.get(selectedIntervention.id) || linkedDocsByIntervention.get(selectedIntervention.ref);
+                if (!linked || (linked.devis.length === 0 && linked.factures.length === 0)) return null;
+                return (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {linked.devis.map(ref => (
+                      <span key={ref} className="inline-flex items-center gap-1 rounded-full bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-0.5 text-xs font-medium">
+                        <FileText className="h-3 w-3" /> Devis {ref}
+                      </span>
+                    ))}
+                    {linked.factures.map(ref => (
+                      <span key={ref} className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 text-xs font-medium">
+                        <Receipt className="h-3 w-3" /> Facture {ref}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
               <div className="space-y-6 pt-2">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div><span className="text-muted-foreground">Client :</span> <span className="text-foreground ml-1">{selectedIntervention.client}</span></div>

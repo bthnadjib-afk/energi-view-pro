@@ -139,7 +139,7 @@ export function useDeleteIntervention() {
 export function useCreateDevis() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { socid: string; lines: CreateDevisLine[] }) => createDevis(data.socid, data.lines),
+    mutationFn: (data: { socid: string; lines: CreateDevisLine[]; note_private?: string }) => createDevis(data.socid, data.lines, data.note_private),
     onSuccess: () => { toast.success('Devis créé'); qc.invalidateQueries({ queryKey: ['devis'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
@@ -198,7 +198,7 @@ export function useUpdateDevisLines() {
 export function useCreateFacture() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { socid: string; lines: CreateDevisLine[] }) => createFacture(data.socid, data.lines),
+    mutationFn: (data: { socid: string; lines: CreateDevisLine[]; note_private?: string }) => createFacture(data.socid, data.lines, data.note_private),
     onSuccess: () => { toast.success('Facture créée'); qc.invalidateQueries({ queryKey: ['factures'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
