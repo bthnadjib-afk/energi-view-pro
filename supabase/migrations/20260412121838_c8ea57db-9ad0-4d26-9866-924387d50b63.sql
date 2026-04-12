@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS dolibarr_user_id text DEFAULT NULL;
