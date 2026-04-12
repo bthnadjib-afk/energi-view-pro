@@ -1,100 +1,59 @@
 
 
-# Audit complet — Onglet Interventions (données Dolibarr)
+# Traçabilité Intervention ↔ Devis / Facture
 
-## Diagnostic par appel API brut
+## Problèmes identifiés
 
-J'ai interrogé directement l'API Dolibarr (`GET /interventions`) et voici ce que retourne Dolibarr pour chaque intervention créée :
+1. **Aucun lien stocké** : `handleTransformDevis` et `handleTransformFacture` créent un devis/facture sans aucune référence à l'intervention source. Dolibarr supporte `linked_objects` dans le POST mais on ne l'utilise pas.
 
-```text
-dateo: ""          ← vide, pas de timestamp
-datee: ""          ← vide, pas de timestamp  
-datec: 1775999590  ← seul timestamp présent (date création)
-array_options: []  ← tableau vide, pas d'objet
-user_author_id: null
-fk_statut: absent  ← le champ s'appelle "statut" ou "status"
-description: null
-```
+2. **Pas d'indicateur côté Intervention** : après avoir généré un devis ou une facture, rien ne change visuellement sur l'intervention — l'utilisateur peut cliquer plusieurs fois sans savoir qu'un document existe déjà.
 
-## Causes racines identifiées
+3. **Pas d'indicateur côté Devis/Facture** : le devis créé depuis une intervention n'affiche aucune origine.
 
-### P1 — `dateo`/`datee` ne sont pas sauvegardés
-**Cause** : `createIntervention` envoie `datei`, `dateo`, `datee` comme timestamps Unix. Dolibarr Fichinter attend `date` (pas `datei`) pour la date principale. Les champs `dateo`/`datee` ne sont probablement pas des champs natifs de l'API REST Fichinter — Dolibarr les ignore silencieusement.
-**Impact** : Date toujours vide, horaires toujours 08:00–10:00 par défaut.
-**Fix** : Envoyer `date` comme timestamp Unix pour la date. Stocker les heures dans `array_options` (`options_heure_debut`, `options_heure_fin`) puisque Fichinter n'a pas de champs horaires natifs. Utiliser `datec` comme fallback pour l'affichage de date.
-
-### P2 — `array_options` revient en `[]` au lieu d'un objet
-**Cause** : Les extrafields (`options_type`, `options_technicien`, etc.) ne sont **pas configurés** dans l'instance Dolibarr. Quand aucun extrafield n'existe, Dolibarr retourne `[]` au lieu de `{}`.
-**Impact** : Type toujours "chantier", technicien toujours vide.
-**Fix** : Ne pas dépendre des extrafields. Stocker type/technicien/horaires dans `description` ou `note_private` en JSON sérialisé, et les parser au retour. Alternative : utiliser `duration` pour encoder les heures.
-
-### P3 — `fk_statut` absent de la réponse API
-**Cause** : Dolibarr retourne `statut` et `status` (les deux à "0"), pas `fk_statut`. Le mapping lit `d.fk_statut` qui est toujours undefined → 0 → "Brouillon".
-**Impact** : Statut toujours affiché "Brouillon" même après validation.
-**Fix** : Lire `d.statut || d.status` au lieu de `d.fk_statut`.
-
-### P4 — Technicien non résolu
-**Cause** : `user_author_id` est null dans la réponse. `user_creation_id` contient "1" mais n'est pas utilisé. L'assignation `fk_user_assign` n'est pas retournée par l'API GET.
-**Impact** : Technicien toujours vide.
-**Fix** : Utiliser `user_creation_id` comme fallback dans `resolveTechnicianName`. Sérialiser aussi le technicien dans les métadonnées stockées.
-
-### P5 — Description null
-**Cause** : `description` est transmis comme `' '` (espace) mais Dolibarr retourne `null`.
-**Impact** : Mineur, mais empêche d'afficher la description.
-**Fix** : Fallback sur `''`.
-
-## Stratégie de stockage des métadonnées
-
-Puisque les extrafields ne sont pas configurés dans Dolibarr, la solution fiable est de sérialiser les métadonnées (type, technicien, heures) dans le champ `note_private` sous forme JSON :
-
-```text
-note_private = JSON.stringify({
-  type: "panne",
-  technicien: "yassine",
-  heureDebut: "09:00",
-  heureFin: "12:00",
-  notePrivee: "texte libre admin"
-})
-```
-
-Au retour, on parse `note_private` pour extraire ces valeurs. Si le parse échoue (ancienne intervention sans JSON), on utilise les fallbacks actuels.
+4. **Description vide** : la ligne créée a `subprice: 0` et `desc: inter.description` (souvent vide). Pas de référence à l'intervention dans le libellé.
 
 ## Plan de correction
 
-### `src/services/dolibarr.ts`
+### 1. `src/services/dolibarr.ts` — Ajouter `note_private` pour traçabilité
 
-1. **`createIntervention`** : Envoyer `date` (pas `datei`/`dateo`/`datee`) comme timestamp Unix. Sérialiser type, technicien, heures dans `note_private` en JSON.
+- Modifier `createDevis` pour accepter un paramètre optionnel `note_private` (string) et l'inclure dans le body POST.
+- Même chose pour `createFacture`.
+- Ajouter `note_private` dans l'interface `Devis` et le mapping `mapDolibarrDevis`.
+- Ajouter `note_private` dans l'interface `Facture` et le mapping `mapDolibarrFacture`.
 
-2. **`mapDolibarrIntervention`** : 
-   - Lire `fk_statut` depuis `d.statut || d.status` au lieu de `d.fk_statut`
-   - Parser `note_private` comme JSON pour extraire type, technicien, heures
-   - Fallback sur `datec` pour la date si `dateo` est vide
-   - Fallback sur `user_creation_id` pour le technicien
+### 2. `src/pages/Interventions.tsx` — Stocker la ref intervention
 
-3. **`updateIntervention`** : Re-sérialiser les métadonnées dans `note_private` lors de l'édition.
+- `handleTransformDevis` : passer `note_private: JSON.stringify({ from_intervention: inter.ref, intervention_id: inter.id })` lors de la création. Inclure la ref intervention dans le `desc` de la ligne (ex: `"Intervention ${inter.ref} — ${inter.description}"`).
+- `handleTransformFacture` : idem.
+- Après création réussie, stocker dans les métadonnées de l'intervention (via `updateIntervention` note_private) les refs des documents générés (`devis_ref` ou `facture_id`).
+- Afficher un badge/indicateur dans le panneau de détail quand l'intervention a déjà un devis ou facture lié (lu depuis les données devis/factures chargées, en matchant `socid` + `note_private` contenant l'intervention ref).
 
-### `src/pages/Interventions.tsx`
+### 3. `src/pages/Interventions.tsx` — Indicateur visuel dans le tableau
 
-4. **`handleEditSave`** : Passer les métadonnées complètes (type, tech, heures) au `updateMutation` pour qu'elles soient sérialisées dans `note_private`.
+- Dans la liste des interventions, ajouter une colonne ou des badges (icône FileText pour devis, Receipt pour facture) quand un document lié existe.
+- Cross-référencer avec les données `useDevis()` et `useFactures()` en parsant le `note_private` des devis/factures.
 
-### `src/pages/Agenda.tsx`
+### 4. `src/pages/Devis.tsx` — Badge "Depuis intervention"
 
-5. Aucun changement nécessaire — les corrections dans le service suffisent.
+- Dans le tableau et le détail, si `note_private` contient `from_intervention`, afficher un badge avec la ref intervention source (ex: Badge bleu "↩ (PROV)123").
+
+### 5. `src/pages/Factures.tsx` — Badge "Depuis intervention"
+
+- Même logique que pour Devis.
 
 ## Fichiers impactés
 
 | Fichier | Modifications |
 |---------|--------------|
-| `src/services/dolibarr.ts` | `createIntervention`, `updateIntervention`, `mapDolibarrIntervention` — stockage JSON dans note_private, fix fk_statut, fix date |
-| `src/pages/Interventions.tsx` | `handleEditSave` — passer les métadonnées au update |
+| `src/services/dolibarr.ts` | `createDevis`/`createFacture` acceptent `note_private`, interfaces Devis/Facture étendues, mappers mis à jour |
+| `src/pages/Interventions.tsx` | Traçabilité dans `handleTransformDevis`/`handleTransformFacture`, badges documents liés dans tableau + détail |
+| `src/pages/Devis.tsx` | Badge "Depuis intervention [ref]" |
+| `src/pages/Factures.tsx` | Badge "Depuis intervention [ref]" |
 
-## Comportement attendu après correction
+## Résultat attendu
 
-| Champ | Avant | Après |
-|-------|-------|-------|
-| Technicien | Toujours "—" | Nom du technicien assigné |
-| Type | Toujours "Chantier" | Type choisi à la création |
-| Horaire | Toujours 08:00–10:00 | Heures choisies |
-| Date | Toujours "—" | Date de l'intervention |
-| Statut | Toujours "Brouillon" | Statut réel Dolibarr (Validée, En cours, etc.) |
+- Intervention → "Transformer en Devis" → le devis créé porte la ref intervention dans son `note_private` et dans le libellé de la ligne.
+- L'intervention affiche des badges indiquant les documents générés.
+- Le devis et la facture affichent un badge d'origine quand ils proviennent d'une intervention.
+- L'utilisateur ne peut plus perdre la traçabilité entre intervention et documents commerciaux.
 
