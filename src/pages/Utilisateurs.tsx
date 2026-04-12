@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { UserRole, Profile } from '@/hooks/useAuth';
-import { useCreateDolibarrUser } from '@/hooks/useDolibarr';
+import { useCreateDolibarrUser, useUpdateDolibarrUser } from '@/hooks/useDolibarr';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { UserPlus, Shield, ShieldCheck, Wrench as WrenchIcon, Loader2, Trash2 } from 'lucide-react';
+import { UserPlus, Shield, ShieldCheck, Wrench as WrenchIcon, Loader2, Trash2, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -32,6 +32,7 @@ const roleColors: Record<UserRole, string> = {
 
 interface UserWithRole extends Profile {
   role: UserRole;
+  dolibarr_user_id?: string | null;
 }
 
 export default function Utilisateurs() {
@@ -48,6 +49,13 @@ export default function Utilisateurs() {
   const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
   const dolibarrUserMutation = useCreateDolibarrUser();
+  const updateDolibarrUserMutation = useUpdateDolibarrUser();
+
+  // Edit state
+  const [editTarget, setEditTarget] = useState<UserWithRole | null>(null);
+  const [editNom, setEditNom] = useState('');
+  const [editRole, setEditRole] = useState<UserRole>('technicien');
+  const [saving, setSaving] = useState(false);
 
   const fetchUsers = async () => {
     setLoadingUsers(true);
@@ -56,12 +64,12 @@ export default function Utilisateurs() {
       supabase.from('user_roles').select('*'),
     ]);
 
-    const profiles = (profilesRes.data || []) as Profile[];
+    const profiles = (profilesRes.data || []) as (Profile & { dolibarr_user_id?: string | null })[];
     const roles = (rolesRes.data || []) as { user_id: string; role: UserRole }[];
 
     const merged: UserWithRole[] = profiles.map(p => {
       const userRole = roles.find(r => r.user_id === p.id);
-      return { ...p, role: (userRole?.role as UserRole) || 'technicien' };
+      return { ...p, role: (userRole?.role as UserRole) || 'technicien', dolibarr_user_id: p.dolibarr_user_id };
     });
 
     setUsers(merged);
@@ -120,6 +128,42 @@ export default function Utilisateurs() {
     setDeleteTarget(null);
   };
 
+  const handleEdit = async () => {
+    if (!editTarget || !editNom) return;
+    setSaving(true);
+
+    // Update role in Supabase
+    if (editRole !== editTarget.role) {
+      await supabase.from('user_roles').update({ role: editRole } as any).eq('user_id', editTarget.id);
+    }
+
+    // Update name in Supabase profiles
+    await supabase.from('profiles').update({ nom: editNom }).eq('id', editTarget.id);
+
+    // Update in Dolibarr if linked
+    if (editTarget.dolibarr_user_id) {
+      const nameParts = editNom.trim().split(' ');
+      const firstname = nameParts[0] || '';
+      const lastname = nameParts.slice(1).join(' ') || firstname;
+      try {
+        await updateDolibarrUserMutation.mutateAsync({ dolibarrUserId: editTarget.dolibarr_user_id, firstname, lastname });
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    setSaving(false);
+    setEditTarget(null);
+    toast({ title: 'Utilisateur modifié' });
+    fetchUsers();
+  };
+
+  const openEdit = (u: UserWithRole) => {
+    setEditTarget(u);
+    setEditNom(u.nom);
+    setEditRole(u.role);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -135,7 +179,10 @@ export default function Utilisateurs() {
               </Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Nouvel utilisateur</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>Nouvel utilisateur</DialogTitle>
+                <DialogDescription className="sr-only">Formulaire de création utilisateur</DialogDescription>
+              </DialogHeader>
               <div className="space-y-4 pt-2">
                 <Input placeholder="Nom complet" value={newNom} onChange={e => setNewNom(e.target.value)} />
                 <Input placeholder="Email" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
@@ -203,7 +250,7 @@ export default function Utilisateurs() {
                   <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Email</th>
                   <th className="text-left py-3 px-2 text-muted-foreground font-medium">Rôle</th>
                   <th className="text-left py-3 px-2 text-muted-foreground font-medium">Statut</th>
-                  {currentRole === 'admin' && <th className="text-left py-3 px-2 text-muted-foreground font-medium w-16"></th>}
+                  {currentRole === 'admin' && <th className="text-left py-3 px-2 text-muted-foreground font-medium w-24"></th>}
                 </tr>
               </thead>
               <tbody>
@@ -225,9 +272,14 @@ export default function Utilisateurs() {
                       </td>
                       {currentRole === 'admin' && (
                         <td className="py-3 px-2">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(u)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(u)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(u)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -241,6 +293,41 @@ export default function Utilisateurs() {
           </div>
         )}
       </div>
+
+      {/* Edit user dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) setEditTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier l'utilisateur</DialogTitle>
+            <DialogDescription className="sr-only">Modifier le nom et le rôle</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Nom</label>
+              <Input value={editNom} onChange={e => setEditNom(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Email</label>
+              <Input value={editTarget?.email || ''} disabled className="opacity-60" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Rôle</label>
+              <Select value={editRole} onValueChange={(v) => setEditRole(v as UserRole)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Administrateur</SelectItem>
+                  <SelectItem value="secretaire">Secrétaire</SelectItem>
+                  <SelectItem value="technicien">Technicien</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={handleEdit} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Enregistrer les modifications
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
