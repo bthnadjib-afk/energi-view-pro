@@ -82,9 +82,10 @@ Deno.serve(async (req) => {
     if (dolibarrApiUrl && dolibarrApiKey) {
       let dolibarrId = profile?.dolibarr_user_id;
 
-      // Fallback: search by email if no stored ID
+      // Fallback: search by email OR login if no stored ID
       if (!dolibarrId && profile?.email) {
         try {
+          // Try by email first
           const searchUrl = `${dolibarrApiUrl}/users?sqlfilters=(t.email='${encodeURIComponent(profile.email)}')`;
           const searchResp = await fetch(searchUrl, {
             headers: { DOLAPIKEY: dolibarrApiKey, Accept: "application/json" },
@@ -94,6 +95,25 @@ Deno.serve(async (req) => {
             if (Array.isArray(users) && users.length > 0) {
               dolibarrId = String(users[0].id);
             }
+          } else {
+            await searchResp.text(); // consume body
+          }
+
+          // Fallback: search by login (email prefix)
+          if (!dolibarrId) {
+            const login = profile.email.split("@")[0];
+            const loginSearchUrl = `${dolibarrApiUrl}/users?sqlfilters=(t.login='${encodeURIComponent(login)}')`;
+            const loginResp = await fetch(loginSearchUrl, {
+              headers: { DOLAPIKEY: dolibarrApiKey, Accept: "application/json" },
+            });
+            if (loginResp.ok) {
+              const loginUsers = await loginResp.json();
+              if (Array.isArray(loginUsers) && loginUsers.length > 0) {
+                dolibarrId = String(loginUsers[0].id);
+              }
+            } else {
+              await loginResp.text(); // consume body
+            }
           }
         } catch (e) {
           console.error("Dolibarr user search failed:", e);
@@ -101,7 +121,6 @@ Deno.serve(async (req) => {
       }
 
       if (dolibarrId) {
-        // Attempt DELETE on Dolibarr
         const deleteUrl = `${dolibarrApiUrl}/users/${dolibarrId}`;
         const deleteResp = await fetch(deleteUrl, {
           method: "DELETE",
@@ -118,34 +137,33 @@ Deno.serve(async (req) => {
             errorMessage = errorBody;
           }
 
-          // SOFT DELETE FALLBACK: try disabling user (statut=0) instead
-          // Uncomment the block below to enable soft-delete fallback:
-          /*
+          // Soft delete fallback: disable user (statut=0)
           const disableResp = await fetch(`${dolibarrApiUrl}/users/${dolibarrId}`, {
             method: "PUT",
-            headers: { DOLAPIKEY: dolibarrApiKey, "Content-Type": "application/json", Accept: "application/json" },
+            headers: {
+              DOLAPIKEY: dolibarrApiKey,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
             body: JSON.stringify({ statut: 0 }),
           });
-          if (disableResp.ok) {
-            // Dolibarr user disabled, proceed with Supabase deletion
-          } else {
-          */
-            // Block Supabase deletion — return Dolibarr error
+
+          if (!disableResp.ok) {
+            const disableErr = await disableResp.text();
             return new Response(
               JSON.stringify({
-                error: `Suppression Dolibarr échouée : ${errorMessage}`,
+                error: `Suppression Dolibarr échouée : ${errorMessage}. Désactivation aussi échouée: ${disableErr}`,
                 dolibarr_error: true,
               }),
               { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
-          /*
           }
-          */
+          // User disabled in Dolibarr, proceed with Supabase deletion
         }
       }
     }
 
-    // --- Step 3: Delete from Supabase (only if Dolibarr succeeded or user not in Dolibarr) ---
+    // --- Step 3: Delete from Supabase ---
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(user_id);
     if (deleteError) {
       return new Response(JSON.stringify({ error: deleteError.message }), {
