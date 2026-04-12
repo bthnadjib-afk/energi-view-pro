@@ -138,8 +138,14 @@ export default function Interventions() {
   const handleViewPDF = async () => {
     if (!selectedIntervention) return;
     try {
-      await generatePDF('interventions', selectedIntervention.id);
-      toast.success(`Bon d'intervention ${selectedIntervention.ref} généré`);
+      await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
+      const url = await downloadPDFUrl('ficheinter', selectedIntervention.ref);
+      if (url) {
+        window.open(url, '_blank');
+        toast.success(`Bon d'intervention ${selectedIntervention.ref} ouvert`);
+      } else {
+        toast.success(`Bon d'intervention ${selectedIntervention.ref} généré`);
+      }
     } catch {
       toast.error('Erreur lors de la génération du PDF');
     }

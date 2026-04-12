@@ -129,8 +129,14 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
   const handleViewPDF = async () => {
     setGeneratingPDF(true);
     try {
-      await generatePDF('proposals', devis.id);
-      toast.success(`PDF du devis ${devis.ref} généré`);
+      await generatePDF('propale', devis.id, devis.ref, 'azur');
+      const url = await downloadPDFUrl('propale', devis.ref);
+      if (url) {
+        window.open(url, '_blank');
+        toast.success(`PDF du devis ${devis.ref} ouvert`);
+      } else {
+        toast.success(`PDF du devis ${devis.ref} généré`);
+      }
     } catch {
       toast.error('Erreur lors de la génération du PDF');
     }
