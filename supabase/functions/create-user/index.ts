@@ -134,13 +134,36 @@ Deno.serve(async (req) => {
           const doliData = await doliResp.json();
           dolibarrUserId = String(doliData);
         } else {
-          // Fallback: if user already exists, fetch by login
           const errText = await doliResp.text();
           console.error("Dolibarr user creation failed:", errText);
-          if (errText.includes("existe") || errText.includes("already exists")) {
-            try {
-              const searchResp = await fetch(
-                `${dolibarrApiUrl}/users?sqlfilters=(login='${login}')`,
+
+          // Fallback: search by login then by email
+          try {
+            const loginFilter = encodeURIComponent(`(login='${login}')`);
+            const searchResp = await fetch(
+              `${dolibarrApiUrl}/users?sqlfilters=${loginFilter}&limit=1`,
+              {
+                method: "GET",
+                headers: {
+                  DOLAPIKEY: dolibarrApiKey,
+                  Accept: "application/json",
+                },
+              }
+            );
+            if (searchResp.ok) {
+              const users = await searchResp.json();
+              if (Array.isArray(users) && users.length > 0) {
+                dolibarrUserId = String(users[0].id);
+              }
+            } else {
+              console.error("Dolibarr search by login failed:", await searchResp.text());
+            }
+
+            // If not found by login, try by email
+            if (!dolibarrUserId) {
+              const emailFilter = encodeURIComponent(`(email='${email}')`);
+              const emailResp = await fetch(
+                `${dolibarrApiUrl}/users?sqlfilters=${emailFilter}&limit=1`,
                 {
                   method: "GET",
                   headers: {
@@ -149,15 +172,17 @@ Deno.serve(async (req) => {
                   },
                 }
               );
-              if (searchResp.ok) {
-                const users = await searchResp.json();
+              if (emailResp.ok) {
+                const users = await emailResp.json();
                 if (Array.isArray(users) && users.length > 0) {
                   dolibarrUserId = String(users[0].id);
                 }
+              } else {
+                console.error("Dolibarr search by email failed:", await emailResp.text());
               }
-            } catch (searchErr) {
-              console.error("Dolibarr search fallback error:", searchErr);
             }
+          } catch (searchErr) {
+            console.error("Dolibarr search fallback error:", searchErr);
           }
         }
 
