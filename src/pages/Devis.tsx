@@ -3,7 +3,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis, useUpdateDevisLines } from '@/hooks/useDolibarr';
 import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, openPDFInNewTab, downloadPDFUrl, sendDevisByEmail, DEVIS_STATUTS, type Devis as DevisType } from '@/services/dolibarr';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown, Pencil, Search, Filter } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown, Pencil, Search, Filter, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -638,7 +638,24 @@ export default function Devis() {
                     <td className="py-3 px-2">
                       {expandedId === d.id ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                     </td>
-                    <td className="py-3 px-2 font-mono text-xs text-foreground">{d.ref}</td>
+                    <td className="py-3 px-2 font-mono text-xs text-foreground">
+                      <div className="flex items-center gap-1.5">
+                        {d.ref}
+                        {(() => {
+                          try {
+                            const meta = d.note_private ? JSON.parse(d.note_private) : null;
+                            if (meta?.from_intervention) {
+                              return (
+                                <span className="inline-flex items-center gap-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200 px-1.5 py-0.5 text-[10px] font-medium" title={`Depuis intervention ${meta.from_intervention}`}>
+                                  <Zap className="h-2.5 w-2.5" />↩ {meta.from_intervention}
+                                </span>
+                              );
+                            }
+                          } catch {}
+                          return null;
+                        })()}
+                      </div>
+                    </td>
                     <td className="py-3 px-2 text-foreground">{d.client}</td>
                     <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(d.date)}</td>
                     <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">
