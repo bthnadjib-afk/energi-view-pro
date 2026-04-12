@@ -1,84 +1,92 @@
 
 
-# Audit Factures — Branchements existants et manquants
+# Audit complet — Onglet Devis
 
-## Ce qui fonctionne déjà
+## Ce qui fonctionne
 
-| Action | API Dolibarr | UI | Status |
-|--------|-------------|-----|--------|
-| Créer facture brouillon | `POST /invoices` | Dialog + lignes | ✅ |
-| Supprimer brouillon | `DELETE /invoices/{id}` | AlertDialog, fk_statut===0 | ✅ |
-| Valider facture | `POST /invoices/{id}/validate` | Bouton dans detail | ✅ |
-| Enregistrer paiement | `POST /invoices/{id}/payments` | Dialog paiement | ✅ |
-| Modifier lignes brouillon | `PUT /invoices/{id}` | Dialog edit lines | ✅ |
-| Voir PDF | `PUT /documents/builddoc` | Bouton PDF | ✅ |
-| Envoyer par email | `POST /invoices/{id}/sendByEmail` | Dialog email | ✅ |
-| Liste + stats | `GET /invoices` | Table + StatCards | ✅ |
+| Action | API Dolibarr | Status |
+|--------|-------------|--------|
+| Créer devis brouillon | `POST /proposals` | ✅ |
+| Supprimer brouillon | `DELETE /proposals/{id}` | ✅ |
+| Valider devis | `POST /proposals/{id}/validate` | ✅ |
+| Classer signé/refusé | `POST /proposals/{id}/close` | ✅ |
+| Convertir en facture | Conversion mutation | ✅ |
+| Créer acompte | Acompte mutation | ✅ |
+| Voir PDF | `PUT /documents/builddoc` propal | ✅ |
+| Envoyer par email | `sendDevisByEmail` | ✅ |
+| Lignes avec marges | Mapping `pa_ht` | ✅ |
+| Signature client | `SignaturePad` | ✅ |
 
 ## Problèmes identifiés
 
-### 1. Pas de rafraîchissement live après validation/paiement
-Quand on valide une facture (`validateFactureMutation.mutate`), le `onSuccess` du mutation ferme le dialog (`setSelectedFacture(null)`) **mais** le cache React Query est invalidé en parallèle. La facture dans `selectedFacture` locale n'est pas mise à jour → si l'utilisateur re-clique avant le refetch, il voit l'ancien statut. 
+### P1 — Pas de rafraîchissement live après validation/signature/refus
+`validateMutation.mutate(devis.id)` et `closeMutation.mutate(...)` utilisent `mutate` sans `await`. Le statut dans `selectedFacture` locale n'est pas mis à jour immédiatement. L'utilisateur voit l'ancien statut s'il re-clique avant le refetch.
 
-**Correction** : Après validation/paiement, fermer le dialog ET attendre l'invalidation. Utiliser `mutateAsync` + `await` pour séquencer.
+**Correction** : `mutateAsync` + `await` + fermer le détail expandé après succès.
 
-### 2. Paiement utilise `montantTTC` pour `closepaidinvoices` mais `amount` est libre
-L'utilisateur peut modifier le montant, mais la comparaison `paymentAmount >= selectedFacture.montantTTC` ne tient pas compte des paiements partiels précédents (le `reste_a_payer` de Dolibarr n'est pas récupéré).
+### P2 — Pas de filtres ni recherche
+Aucun filtre par statut, client ou recherche texte. Contrairement à Factures qui vient d'être corrigé.
 
-**Correction** : Ajouter `reste_a_payer` au type `Facture` et au mapping, puis l'utiliser pour pré-remplir le montant et déterminer si `closepaidinvoices = 'yes'`.
+**Correction** : Ajouter `filterStatut`, `filterClient`, `searchQuery` identiques à Factures.
 
-### 3. Facture type `Facture` n'a pas de `lignes` — l'éditeur de brouillon charge un placeholder
-Ligne 112 : `setEditLines([{ desc: 'Chargement...', ...}])`. Les vraies lignes ne sont pas récupérées depuis Dolibarr.
+### P3 — Pas d'éditeur de lignes pour brouillons existants
+Le bouton "Modifier" (icône Pencil) n'existe pas dans `DevisDetail`. On peut seulement créer un nouveau devis, pas modifier les lignes d'un brouillon existant. Le hook `useUpdateDevis` est importé mais jamais utilisé dans le composant.
 
-**Correction** : Ajouter `lignes` au type `Facture`, les mapper depuis `d.lines` dans `mapDolibarrFacture`, et les charger dans l'éditeur.
+**Correction** : Ajouter un dialog d'édition de lignes dans `DevisDetail` pour les brouillons (`fk_statut === 0`), pré-rempli avec les lignes existantes.
 
-### 4. Pas de filtre/recherche sur la liste
-Contrairement aux Interventions qui ont des filtres, les Factures n'ont aucun filtre (par client, statut, période).
+### P4 — Conversion et acompte ne sont pas `await`
+`onConvert={() => convertMutation.mutate(d.id)}` et `onAcompte(...)` utilisent `mutate` sans attendre. Pas de feedback séquencé.
 
-**Correction** : Ajouter des filtres basiques (statut, client, recherche texte).
+**Correction** : Passer à `mutateAsync` avec try/catch.
 
-### 5. Le statut Dolibarr `fk_statut=2` (Payée partiellement) n'est pas géré
-`getFactureStatutLabel` ne retourne que "Brouillon", "Impayée" ou "Payée". Dolibarr a aussi un statut intermédiaire quand un paiement partiel est enregistré.
+### P5 — Pas de date de validité / fin de validité
+Le type `Devis` ne contient pas `fin_validite` (champ Dolibarr `fin_validite`). Cette info est utile pour savoir si un devis est expiré.
 
-**Correction** : Enrichir `getFactureStatutLabel` avec les vrais statuts Dolibarr (0=Brouillon, 1=Validée non payée, 2=Payée partiellement — via `sumpayed`, 3=Abandonnée).
+**Correction** : Ajouter `finValidite` au type et au mapping, afficher un badge "Expiré" si la date est passée.
+
+### P6 — `prixAchat` non transmis à Dolibarr lors de la création
+Ligne 345 : les lignes envoyées à `createDevis` ne contiennent pas `pa_ht` (prix d'achat). La marge ne sera pas stockée côté Dolibarr.
+
+**Correction** : Ajouter `pa_ht: l.prixAchat` dans le mapping des lignes envoyées.
 
 ## Plan de correction
 
-### Fichier `src/services/dolibarr.ts`
+### `src/services/dolibarr.ts`
+1. Ajouter `finValidite: string` au type `Devis`
+2. Mapper `d.fin_validite` dans `mapDolibarrDevis`
+3. Vérifier que `CreateDevisLine` inclut `pa_ht`
 
-1. **Enrichir le type `Facture`** : ajouter `lignes: DevisLigne[]`, `resteAPayer: number`, `totalPaye: number`
-2. **Enrichir `mapDolibarrFacture`** : mapper `d.lines`, `d.remaintopay`, `d.sumpayed`
-3. **Enrichir `getFactureStatutLabel`** : gérer les paiements partiels (`fk_statut >= 1 && !paye && totalPaye > 0` → "Partiellement payée")
+### `src/pages/Devis.tsx`
+1. **Async séquencé** : `validateMutation.mutate` → `await validateMutation.mutateAsync` + collapse expanded row
+2. **Async pour close** : idem pour `closeMutation` (signé/refusé)
+3. **Async pour convert/acompte** : `mutateAsync` avec try/catch
+4. **Filtres** : ajouter `filterStatut` (Tous/Brouillon/Validé/Signé/Refusé/Facturé), `searchQuery`, `filterClient`
+5. **Éditeur brouillon** : dialog de modification de lignes pour `fk_statut === 0`, pré-rempli avec `devis.lignes`, utilisant `useUpdateDevis`
+6. **Prix d'achat** : ajouter `pa_ht: l.prixAchat` dans `handleCreate`
+7. **Badge expiré** : afficher un indicateur si `finValidite < today`
 
-### Fichier `src/pages/Factures.tsx`
-
-1. **Validation** : remplacer `validateFactureMutation.mutate(id, { onSuccess })` par `await validateFactureMutation.mutateAsync(id)` puis `setSelectedFacture(null)`
-2. **Paiement** : pré-remplir avec `resteAPayer` au lieu de `montantTTC`, utiliser `closepaidinvoices = resteAPayer - paymentAmount <= 0.01 ? 'yes' : 'no'`
-3. **Éditeur brouillon** : charger les vraies lignes depuis `selectedFacture.lignes` au lieu du placeholder
-4. **Filtres** : ajouter un filtre par statut (Tous/Brouillon/Impayée/Payée) et une recherche par ref/client
-5. **Bouton "Classer abandonnée"** : pour les factures validées impayées, ajouter une action Dolibarr `POST /invoices/{id}/setnopaid` ou `PUT` avec fk_statut=3
-
-### Fichier `src/components/StatusBadge.tsx`
-
-Vérifier que "Partiellement payée" a une couleur distincte (orange).
+### `src/components/StatusBadge.tsx`
+Vérifier que "Facturé" a un style distinct (violet — déjà présent ✅).
 
 ## Fichiers impactés
 
 | Fichier | Modifications |
 |---------|--------------|
-| `src/services/dolibarr.ts` | Type Facture + mapping lignes/resteAPayer + statut labels enrichis |
-| `src/pages/Factures.tsx` | Séquençage async, filtres, lignes réelles, pré-remplissage paiement |
-| `src/components/StatusBadge.tsx` | Couleur "Partiellement payée" |
+| `src/services/dolibarr.ts` | Type Devis + mapping finValidite + CreateDevisLine pa_ht |
+| `src/pages/Devis.tsx` | Séquençage async, filtres, éditeur brouillon, pa_ht, badge expiré |
 
 ## Comportement attendu de chaque action sur Dolibarr
 
-| Action ElectroPro | Appel API Dolibarr | Effet dans Dolibarr |
+| Action ElectroPro | Appel API | Effet Dolibarr |
 |---|---|---|
-| **Créer facture** | `POST /invoices` avec socid + lines | Crée une facture en **brouillon** (fk_statut=0). Pas de numérotation définitive. |
-| **Modifier lignes** | `PUT /invoices/{id}` avec lines | Remplace les lignes de la facture brouillon. Seul fk_statut=0 est modifiable. |
-| **Valider** | `POST /invoices/{id}/validate` | Passe la facture en **validée** (fk_statut=1). Attribue un numéro définitif (ex: FA2504-0001). Irréversible. |
-| **Enregistrer paiement** | `POST /invoices/{id}/payments` | Crée un règlement dans Dolibarr. Si `closepaidinvoices=yes`, passe paye=1. Sinon la facture reste en "partiellement payée". |
-| **Voir PDF** | `PUT /documents/builddoc` modulepart=facture | Génère le PDF côté serveur Dolibarr avec le template choisi (crabe). Retourne le fichier en base64. |
-| **Envoyer email** | `POST /invoices/{id}/sendByEmail` | Dolibarr envoie le mail via son SMTP configuré avec le PDF en PJ. |
-| **Supprimer** | `DELETE /invoices/{id}` | Supprime définitivement la facture. Uniquement possible sur les brouillons (fk_statut=0). |
+| **Créer devis** | `POST /proposals` | Crée un brouillon (fk_statut=0). Ref provisoire. |
+| **Modifier lignes** | `PUT /proposals/{id}` | Remplace les lignes. Uniquement fk_statut=0. |
+| **Valider** | `POST /proposals/{id}/validate` | Passe en Validé (fk_statut=1). Ref définitive. Irréversible. |
+| **Classer Signé** | `POST /proposals/{id}/close` status=2 | Passe en Signé (fk_statut=2). Permet conversion en facture. |
+| **Classer Refusé** | `POST /proposals/{id}/close` status=3 | Passe en Refusé (fk_statut=3). Archivé. |
+| **Convertir en facture** | Crée facture brouillon depuis le devis | Facture liée au devis dans Dolibarr. Devis passe en Facturé (fk_statut=4). |
+| **Créer acompte** | `POST /invoices` type=3 | Facture d'acompte liée. |
+| **Voir PDF** | `PUT /documents/builddoc` modulepart=propal | Génère PDF côté Dolibarr avec template azur. |
+| **Envoyer email** | `POST /proposals/{id}/sendByEmail` | Mail via SMTP Dolibarr avec PDF en PJ. |
+| **Supprimer** | `DELETE /proposals/{id}` | Suppression définitive. Brouillons uniquement. |
 
