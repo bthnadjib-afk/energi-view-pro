@@ -1,85 +1,77 @@
 
 
-# Audit complet — Onglet Interventions
+# Audit complet — Onglet Clients
 
 ## Ce qui fonctionne
 
 | Action | API Dolibarr | Status |
 |--------|-------------|--------|
-| Créer intervention brouillon | `POST /interventions` | ✅ |
-| Supprimer brouillon | `DELETE /interventions/{id}` | ✅ |
-| Valider | `POST /interventions/{id}/validate` | ✅ |
-| Démarrer (En cours) | `POST /interventions/{id}/close` status=2 | ✅ |
-| Terminer | `POST /interventions/{id}/close` status=3 | ✅ |
-| Transformer en Devis | `POST /proposals` | ✅ |
-| Générer Facture | `POST /invoices` | ✅ |
-| Anti-collision planning | `checkCollision()` | ✅ |
-| Voir PDF | `PUT /documents/builddoc` ficheinter | ✅ |
-| Envoyer email | `sendInterventionByEmail` | ✅ |
-| Filtres (technicien/statut/type) | — | ✅ |
-| Signatures client + technicien | `useSaveSignatures` | ✅ |
-| Note privée admin | `note_private` | ✅ |
+| Créer client | `POST /thirdparties` | ✅ |
+| Modifier client | `PUT /thirdparties/{id}` | ✅ |
+| Supprimer client | `DELETE /thirdparties/{id}` | ⚠️ pas async |
+| Recherche par nom/ville | Filtre local | ✅ |
+| Historique devis/interventions/emails | Combiné + trié | ✅ |
+| Édition inline (mode edit) | Dialog détail | ✅ |
+| Autocomplétion adresse | API adresse.data.gouv.fr | ✅ |
 
 ## Problèmes identifiés
 
-### P1 — Pas de rafraîchissement live après validation/démarrage/terminaison
-Lignes 410, 432, 438 : `validateMutation.mutate(id, { onSuccess })` et `closeMutation.mutate(...)` utilisent `mutate` avec un callback `onSuccess` qui ferme le dialog. Mais le cache React Query est invalidé en parallèle dans le hook. Si l'utilisateur rouvre le détail avant le refetch, il voit l'ancien statut.
+### P1 — Suppression utilise `mutate` au lieu de `mutateAsync`
+Ligne 182 : `deleteClientMutation.mutate(c.id)` dans le `AlertDialogAction`. Pas séquencé — le dialog se ferme immédiatement sans attendre la confirmation Dolibarr.
 
-**Correction** : `await mutateAsync(...)` puis `setDetailOpen(false)`.
+**Correction** : `await deleteClientMutation.mutateAsync(c.id)`.
 
-### P2 — Suppression et transformation ne sont pas `await`
-Ligne 424 : `deleteMutation.mutate(id); setDetailOpen(false)` — pas séquencé. Idem pour `handleTransformDevis` et `handleTransformFacture` qui sont async mais appelés via `onClick` direct dans les actions de table (lignes 318, 323) sans `await` et avec un bug : `setSelectedIntervention(i)` suivi immédiatement de `handleTransformDevis()` — mais `selectedIntervention` n'est pas encore mis à jour (setState est async).
+### P2 — Pas d'autocomplétion dans le mode édition
+Le formulaire de création utilise `AddressAutocomplete` (ligne 125), mais le formulaire d'édition (lignes 219-225) utilise un simple `Input` pour l'adresse. Pas de cohérence.
 
-**Correction** : Passer l'intervention en paramètre aux fonctions de transformation au lieu de dépendre de `selectedIntervention`.
+**Correction** : Remplacer l'input adresse en mode édition par `AddressAutocomplete`.
 
-### P3 — Pas de recherche texte
-Contrairement aux Factures et Devis corrigés, pas de barre de recherche par ref/client.
+### P3 — Recherche limitée (nom/ville seulement)
+La recherche ne couvre ni le téléphone, ni l'email, ni le code postal.
 
-**Correction** : Ajouter un `searchQuery` filtrant par ref et client.
+**Correction** : Étendre le filtre pour inclure `email`, `telephone`, `codePostal`.
 
-### P4 — Pas d'édition d'intervention existante (brouillon)
-`useUpdateIntervention` est importé dans `useDolibarr.ts` mais jamais utilisé dans la page. Un brouillon ne peut pas être modifié (description, technicien, horaires, type).
+### P4 — `projetsEnCours` toujours à 0
+Ligne 821 : `parseInt(d.nb_prospects || d.nb_projects || '0', 10)`. Ces champs Dolibarr ne contiennent probablement pas ce qu'on attend. Le compteur "en cours" devrait plutôt être calculé localement depuis les devis/interventions chargés.
 
-**Correction** : Ajouter un bouton "Modifier" dans le détail pour les brouillons (fk_statut=0), ouvrant un dialog d'édition pré-rempli.
+**Correction** : Calculer `projetsEnCours` côté client en comptant les devis non clos + interventions non terminées pour chaque client.
 
-### P5 — Signatures utilisent `mutate` au lieu de `mutateAsync`
-Lignes 388, 398 : `saveSignaturesMutation.mutate(...)` sans await. Le toast "Signature enregistrée" s'affiche avant la confirmation Dolibarr.
+### P5 — Pas de code postal affiché dans le détail
+Le détail client (lignes 234-239) affiche Adresse, Ville, Téléphone, Email mais pas le Code Postal.
 
-**Correction** : `await saveSignaturesMutation.mutateAsync(...)`.
+**Correction** : Ajouter le code postal dans l'affichage détail.
+
+### P6 — Historique ne montre pas les factures
+L'historique combine devis + interventions + emails, mais pas les factures. Or le hook `useFactures` n'est même pas importé.
+
+**Correction** : Ajouter les factures dans l'historique client.
 
 ## Plan de correction
 
-### `src/pages/Interventions.tsx`
+### `src/pages/Clients.tsx`
 
-1. **Async séquencé** : remplacer tous les `.mutate()` par `await .mutateAsync()` pour valider, démarrer, terminer, supprimer, signatures
-2. **Bug transformation** : passer l'intervention en paramètre à `handleTransformDevis(inter)` et `handleTransformFacture(inter)` au lieu de dépendre de `selectedIntervention`
-3. **Recherche texte** : ajouter `searchQuery` + input de recherche, filtrant par `ref` et `client`
-4. **Édition brouillon** : ajouter un dialog de modification pour fk_statut=0 (description, technicien, type, date, horaires) utilisant `useUpdateIntervention`
-5. **Importer useUpdateIntervention** dans la page
+1. **Suppression async** : `await deleteClientMutation.mutateAsync(c.id)` dans le AlertDialogAction
+2. **Autocomplétion édition** : remplacer `<Input placeholder="Adresse">` en mode edit par `<AddressAutocomplete>`
+3. **Recherche étendue** : filtrer aussi par email, téléphone, code postal
+4. **Projets en cours calculés** : compter les devis (fk_statut 0-2) + interventions (fk_statut 0-2) par client depuis les données déjà chargées
+5. **Code postal dans détail** : ajouter une ligne CP dans la vue info
+6. **Factures dans historique** : importer `useFactures`, ajouter les factures dans `clientHistory`
 
 ### `src/services/dolibarr.ts`
 
-Aucune modification nécessaire — le type `Intervention` et `updateIntervention` existent déjà.
+Aucune modification nécessaire — les types et fonctions existent déjà.
 
-## Fichiers impactés
+## Fichier impacté
 
 | Fichier | Modifications |
 |---------|--------------|
-| `src/pages/Interventions.tsx` | Séquençage async, recherche texte, édition brouillon, fix transformation |
+| `src/pages/Clients.tsx` | Async suppression, autocomplétion édition, recherche étendue, projets calculés, CP détail, factures dans historique |
 
 ## Comportement attendu de chaque action sur Dolibarr
 
 | Action ElectroPro | Appel API | Effet Dolibarr |
 |---|---|---|
-| **Créer** | `POST /interventions` | Brouillon (fk_statut=0). Ref provisoire. |
-| **Modifier** | `PUT /interventions/{id}` | Met à jour description, technicien, horaires. Brouillons uniquement. |
-| **Valider** | `POST /interventions/{id}/validate` | Passe en Validée (fk_statut=1). Ref définitive. |
-| **Démarrer** | `POST /interventions/{id}/close` status=2 | Passe en En cours (fk_statut=2). |
-| **Terminer** | `POST /interventions/{id}/close` status=3 | Passe en Terminée (fk_statut=3). Irréversible. |
-| **Transformer Devis** | `POST /proposals` | Crée un devis brouillon avec la description de l'intervention. |
-| **Générer Facture** | `POST /invoices` | Crée une facture brouillon depuis l'intervention terminée. |
-| **Signatures** | `PUT /interventions/{id}` array_options | Stocke les signatures base64 dans les champs extrafields Dolibarr. |
-| **PDF** | `PUT /documents/builddoc` ficheinter | Génère le PDF template "soleil" côté Dolibarr. |
-| **Email** | `POST /interventions/{id}/sendByEmail` | Envoie via SMTP Dolibarr avec PDF en PJ. |
-| **Supprimer** | `DELETE /interventions/{id}` | Suppression définitive. Brouillons uniquement. |
+| **Créer** | `POST /thirdparties` | Crée un tiers dans Dolibarr (client) |
+| **Modifier** | `PUT /thirdparties/{id}` | Met à jour nom, adresse, tel, email |
+| **Supprimer** | `DELETE /thirdparties/{id}` | Supprime le tiers. Échoue si des documents liés existent. |
 
