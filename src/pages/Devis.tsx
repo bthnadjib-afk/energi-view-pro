@@ -1,9 +1,9 @@
 import { useState, Fragment, useEffect, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis, useUpdateDevis } from '@/hooks/useDolibarr';
-import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, openPDFInNewTab, downloadPDFUrl, sendDevisByEmail, type Devis as DevisType } from '@/services/dolibarr';
+import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis, useUpdateDevisLines } from '@/hooks/useDolibarr';
+import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, openPDFInNewTab, downloadPDFUrl, sendDevisByEmail, DEVIS_STATUTS, type Devis as DevisType } from '@/services/dolibarr';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown, Pencil } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown, Pencil, Search, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -39,17 +39,20 @@ function AcompteBadge({ montantHT }: { montantHT: number }) {
   );
 }
 
-function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, acomptePending }: {
+function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPending, acomptePending, onCollapse }: {
   devis: DevisType;
   clients: { id: string; nom: string; email: string }[];
+  produits: { id: string; ref: string; label: string; prixHT: number; tauxTVA: number; type: string; prixAchat?: number }[];
   onConvert: () => void;
   onAcompte: () => void;
   convertPending: boolean;
   acomptePending: boolean;
+  onCollapse: () => void;
 }) {
   const validateMutation = useValidateDevis();
   const closeMutation = useCloseDevis();
   const deleteMutation = useDeleteDevis();
+  const updateLinesMutation = useUpdateDevisLines();
   const { user } = useAuth();
 
   const [showSignature, setShowSignature] = useState(false);
@@ -60,6 +63,8 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
   const [emailTemplates, setEmailTemplates] = useState<{ id: string; nom: string; objet: string; corps: string }[]>([]);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editLines, setEditLines] = useState<LigneForm[]>([]);
 
   const client = clients.find(c => c.id === devis.socid);
 
@@ -75,6 +80,9 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
   const totalAchatHT = devis.lignes.reduce((s, l) => s + (l.prixAchat || 0) * l.quantite, 0);
   const totalMarge = totalVenteHT - totalAchatHT;
   const totalPctMarge = totalVenteHT > 0 ? (totalMarge / totalVenteHT) * 100 : 0;
+
+  // Expired check
+  const isExpired = devis.finValidite && new Date(devis.finValidite) < new Date() && devis.fk_statut <= 1;
 
   useEffect(() => {
     if (emailOpen) {
@@ -112,16 +120,36 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
     setEmailOpen(false);
   };
 
-  const handleAccepter = (signatureDataUrl: string) => {
-    closeMutation.mutate({ id: devis.id, status: 2 }, {
-      onSuccess: () => {
-        toast.success('Devis signé — Créer une facture d\'acompte ?', {
-          action: { label: 'Créer acompte', onClick: onAcompte },
-          duration: 8000,
-        });
-      }
-    });
+  const handleValidate = async () => {
+    try {
+      await validateMutation.mutateAsync(devis.id);
+      onCollapse();
+    } catch {}
+  };
+
+  const handleAccepter = async (signatureDataUrl: string) => {
+    try {
+      await closeMutation.mutateAsync({ id: devis.id, status: 2 });
+      toast.success('Devis signé — Créer une facture d\'acompte ?', {
+        action: { label: 'Créer acompte', onClick: onAcompte },
+        duration: 8000,
+      });
+      onCollapse();
+    } catch {}
     setShowSignature(false);
+  };
+
+  const handleRefuser = async () => {
+    try {
+      await closeMutation.mutateAsync({ id: devis.id, status: 3 });
+      onCollapse();
+    } catch {}
+  };
+
+  const handleConvert = async () => {
+    try {
+      onConvert();
+    } catch {}
   };
 
   const handleViewPDF = async () => {
@@ -142,14 +170,47 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
     setGeneratingPDF(false);
   };
 
+  const openEditLines = () => {
+    setEditLines(devis.lignes.map(l => ({
+      desc: l.designation,
+      qty: l.quantite,
+      subprice: l.prixUnitaire,
+      tva_tx: 20,
+      product_type: 0,
+      productId: '',
+      prixAchat: l.prixAchat || 0,
+    })));
+    setEditOpen(true);
+  };
+
+  const handleSaveLines = async () => {
+    if (!devis.socid) return;
+    try {
+      await updateLinesMutation.mutateAsync({
+        id: devis.id,
+        socid: devis.socid,
+        lines: editLines.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx || 20, product_type: l.product_type, pa_ht: l.prixAchat })),
+      });
+      setEditOpen(false);
+      onCollapse();
+    } catch {}
+  };
+
+  const emptyLigne = (): LigneForm => ({ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '', prixAchat: 0 });
+
   const isDraft = devis.fk_statut === 0;
   const isValidated = devis.fk_statut === 1;
   const isSigned = devis.fk_statut === 2;
 
   return (
     <tr>
-      <td colSpan={7} className="p-0">
+      <td colSpan={8} className="p-0">
         <div className="bg-muted/50 p-4 mx-2 mb-2 rounded-lg space-y-4 border border-border">
+          {isExpired && (
+            <div className="bg-red-100 border border-red-200 text-red-700 px-3 py-2 rounded-md text-xs font-medium">
+              ⚠️ Ce devis est expiré (fin de validité : {formatDateFR(devis.finValidite)})
+            </div>
+          )}
           <p className="text-xs font-medium text-muted-foreground mb-2">Détail des lignes (HT)</p>
           <table className="w-full text-xs">
             <thead>
@@ -185,7 +246,10 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
           <div className="flex flex-wrap gap-3 pt-3 border-t border-border">
             {isDraft && (
               <>
-                <Button onClick={() => validateMutation.mutate(devis.id)} disabled={validateMutation.isPending} className="gap-2">
+                <Button onClick={openEditLines} variant="outline" className="gap-2">
+                  <Pencil className="h-4 w-4" /> Modifier les lignes
+                </Button>
+                <Button onClick={handleValidate} disabled={validateMutation.isPending} className="gap-2">
                   <FileCheck className="h-4 w-4" /> {validateMutation.isPending ? 'Validation...' : 'Valider'}
                 </Button>
                 <AlertDialog>
@@ -211,10 +275,10 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
                 <Button onClick={() => setShowSignature(true)} disabled={closeMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                   <CheckCircle2 className="h-4 w-4" /> Classer Signé
                 </Button>
-                <Button onClick={() => closeMutation.mutate({ id: devis.id, status: 3 })} disabled={closeMutation.isPending} variant="outline" className="gap-2 border-destructive/30 text-destructive">
+                <Button onClick={handleRefuser} disabled={closeMutation.isPending} variant="outline" className="gap-2 border-destructive/30 text-destructive">
                   <XCircle className="h-4 w-4" /> Classer Refusé
                 </Button>
-                <Button onClick={onConvert} disabled={convertPending} variant="outline" className="gap-2">
+                <Button onClick={handleConvert} disabled={convertPending} variant="outline" className="gap-2">
                   <ArrowRightLeft className="h-4 w-4" /> {convertPending ? 'Conversion...' : 'Générer Facture'}
                 </Button>
               </>
@@ -222,7 +286,7 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
 
             {isSigned && (
               <>
-                <Button onClick={onConvert} disabled={convertPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                <Button onClick={handleConvert} disabled={convertPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                   <ArrowRightLeft className="h-4 w-4" /> {convertPending ? 'Conversion...' : 'Générer Facture'}
                 </Button>
                 <Button onClick={onAcompte} disabled={acomptePending} variant="outline" className="gap-2">
@@ -249,6 +313,7 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
             </div>
           )}
 
+          {/* Email dialog */}
           <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
             <DialogContent className="max-w-lg">
               <DialogHeader><DialogTitle>Envoyer par email</DialogTitle></DialogHeader>
@@ -280,6 +345,73 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Edit lines dialog */}
+          <Dialog open={editOpen} onOpenChange={setEditOpen}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Modifier les lignes — {devis.ref}</DialogTitle></DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-foreground">Lignes</h3>
+                    <Button variant="outline" size="sm" onClick={() => setEditLines([...editLines, emptyLigne()])} className="gap-1">
+                      <Plus className="h-3 w-3" /> Ajouter
+                    </Button>
+                  </div>
+                  {editLines.map((l, i) => (
+                    <div key={i} className="space-y-2 p-3 rounded-lg bg-muted/50 border border-border">
+                      <Select value={l.productId || '__libre__'} onValueChange={(v) => {
+                        const updated = [...editLines];
+                        if (v === '__libre__') {
+                          updated[i] = { ...updated[i], productId: '', desc: '' };
+                        } else {
+                          const p = produits.find(pr => pr.id === v);
+                          if (p) {
+                            updated[i] = { ...updated[i], productId: v, desc: `[${p.ref}] ${p.label}`, subprice: p.prixHT, tva_tx: p.tauxTVA || 20, product_type: p.type === 'main_oeuvre' ? 1 : 0, prixAchat: p.prixAchat || 0 };
+                          }
+                        }
+                        setEditLines(updated);
+                      }}>
+                        <SelectTrigger className="text-xs"><SelectValue placeholder="Sélectionner un article" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__libre__">✏️ Ligne libre</SelectItem>
+                          {produits.map(p => (
+                            <SelectItem key={p.id} value={p.id}>
+                              [{p.ref}] — {p.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-5">
+                          <Input placeholder="Désignation" value={l.desc} onChange={e => { const u = [...editLines]; u[i].desc = e.target.value; setEditLines(u); }} className="text-xs" />
+                        </div>
+                        <div className="col-span-2">
+                          <Input type="number" placeholder="Qté" value={l.qty} onChange={e => { const u = [...editLines]; u[i].qty = Number(e.target.value); setEditLines(u); }} className="text-xs" />
+                        </div>
+                        <div className="col-span-2">
+                          <Input type="number" placeholder="Prix HT" value={l.subprice} onChange={e => { const u = [...editLines]; u[i].subprice = Number(e.target.value); setEditLines(u); }} className="text-xs" />
+                        </div>
+                        <div className="col-span-2">
+                          <Input type="number" placeholder="PA HT" value={l.prixAchat} onChange={e => { const u = [...editLines]; u[i].prixAchat = Number(e.target.value); setEditLines(u); }} className="text-xs" />
+                        </div>
+                        <div className="col-span-1">
+                          {editLines.length > 1 && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditLines(editLines.filter((_, idx) => idx !== i))}>
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button onClick={handleSaveLines} disabled={updateLinesMutation.isPending} className="w-full h-12 text-base">
+                  {updateLinesMutation.isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </td>
     </tr>
@@ -298,6 +430,11 @@ export default function Devis() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [socid, setSocid] = useState('');
   const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '', prixAchat: 0 }]);
+
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatut, setFilterStatut] = useState('all');
+  const [filterClient, setFilterClient] = useState('all');
 
   const emptyLigne = (): LigneForm => ({ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '', prixAchat: 0 });
   const addLigne = () => setLignes([...lignes, emptyLigne()]);
@@ -342,12 +479,32 @@ export default function Devis() {
     if (!socid || lignes.length === 0 || !lignes[0].desc) return;
     await createDevisMutation.mutateAsync({
       socid,
-      lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx || 20, product_type: l.product_type })),
+      lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx || 20, product_type: l.product_type, pa_ht: l.prixAchat })),
     });
     setDialogOpen(false);
     setSocid('');
     setLignes([emptyLigne()]);
   };
+
+  // Filtered devis
+  const filteredDevis = useMemo(() => {
+    return devis.filter(d => {
+      if (filterStatut !== 'all' && d.fk_statut !== Number(filterStatut)) return false;
+      if (filterClient !== 'all' && d.socid !== filterClient) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        if (!d.ref.toLowerCase().includes(q) && !d.client.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [devis, filterStatut, filterClient, searchQuery]);
+
+  // Unique clients from devis for filter
+  const devisClients = useMemo(() => {
+    const map = new Map<string, string>();
+    devis.forEach(d => { if (d.socid) map.set(d.socid, d.client); });
+    return Array.from(map.entries());
+  }, [devis]);
 
   return (
     <div className="space-y-6">
@@ -433,6 +590,32 @@ export default function Devis() {
         </Dialog>
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Rechercher par ref ou client..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9" />
+        </div>
+        <Select value={filterStatut} onValueChange={setFilterStatut}>
+          <SelectTrigger className="w-[180px]"><Filter className="h-4 w-4 mr-2" /><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les statuts</SelectItem>
+            {Object.entries(DEVIS_STATUTS).map(([k, v]) => (
+              <SelectItem key={k} value={k}>{v}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterClient} onValueChange={setFilterClient}>
+          <SelectTrigger className="w-[200px]"><SelectValue placeholder="Tous les clients" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les clients</SelectItem>
+            {devisClients.map(([id, nom]) => (
+              <SelectItem key={id} value={id}>{nom}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -442,13 +625,14 @@ export default function Devis() {
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Référence</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Client</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Date</th>
+                <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Fin validité</th>
                 <th className="text-right py-3 px-2 text-muted-foreground font-medium">Montant HT</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Statut</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium w-10"></th>
               </tr>
             </thead>
             <tbody>
-              {devis.map((d) => (
+              {filteredDevis.map((d) => (
                 <Fragment key={d.id}>
                   <tr className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => setExpandedId(expandedId === d.id ? null : d.id)}>
                     <td className="py-3 px-2">
@@ -457,6 +641,13 @@ export default function Devis() {
                     <td className="py-3 px-2 font-mono text-xs text-foreground">{d.ref}</td>
                     <td className="py-3 px-2 text-foreground">{d.client}</td>
                     <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(d.date)}</td>
+                    <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">
+                      {d.finValidite ? (
+                        <span className={cn(new Date(d.finValidite) < new Date() && d.fk_statut <= 1 ? 'text-red-500 font-medium' : '')}>
+                          {formatDateFR(d.finValidite)}
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td className="py-3 px-2 text-right font-medium text-foreground">{d.montantHT.toLocaleString('fr-FR')} €</td>
                     <td className="py-3 px-2"><StatusBadge statut={d.statut} /></td>
                     <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
@@ -483,14 +674,19 @@ export default function Devis() {
                     <DevisDetail
                       devis={d}
                       clients={clients}
-                      onConvert={() => convertMutation.mutate(d.id)}
-                      onAcompte={() => acompteMutation.mutate({ socid: d.socid || '', montantHT: d.montantHT, devisRef: d.ref })}
+                      produits={produits}
+                      onConvert={async () => { try { await convertMutation.mutateAsync(d.id); setExpandedId(null); } catch {} }}
+                      onAcompte={async () => { try { await acompteMutation.mutateAsync({ socid: d.socid || '', montantHT: d.montantHT, devisRef: d.ref }); } catch {} }}
                       convertPending={convertMutation.isPending}
                       acomptePending={acompteMutation.isPending}
+                      onCollapse={() => setExpandedId(null)}
                     />
                   )}
                 </Fragment>
               ))}
+              {filteredDevis.length === 0 && (
+                <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">Aucun devis trouvé</td></tr>
+              )}
             </tbody>
           </table>
         </div>

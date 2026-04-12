@@ -39,6 +39,7 @@ export interface Devis {
   statut: string;
   fk_statut: number;
   lignes: DevisLigne[];
+  finValidite: string;
 }
 
 export type InterventionType = 'devis_sur_place' | 'panne' | 'sav' | 'chantier' | 'realisation';
@@ -379,6 +380,7 @@ export interface CreateDevisLine {
   subprice: number;
   tva_tx: number;
   product_type?: number;
+  pa_ht?: number;
 }
 
 export async function createDevis(socid: string, lines: CreateDevisLine[]): Promise<string> {
@@ -766,6 +768,7 @@ function mapDolibarrDevis(d: any): Devis {
       totalHT: parseFloat(l.total_ht) || 0,
       prixAchat: parseFloat(l.pa_ht) || 0,
     })),
+    finValidite: parseDolibarrDate(d.fin_validite || d.duree_validite || ''),
   };
 }
 
