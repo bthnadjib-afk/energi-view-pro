@@ -101,17 +101,36 @@ function DevisDetail({ devis, clients, onConvert, onAcompte, convertPending, aco
   const handleSendEmail = async () => {
     if (!emailDest || !emailObjet) return;
     setSendingEmail(true);
-    await supabase.from('email_history').insert({
-      user_id: user?.id || '',
-      client_id: devis.socid || '',
-      document_ref: devis.ref,
-      destinataire: emailDest,
-      objet: emailObjet,
-      message: emailMessage,
-    });
+    try {
+      // First generate PDF so Dolibarr can attach it
+      await generatePDF('propale', devis.id, devis.ref, 'azur');
+      // Send via Dolibarr API
+      await sendDevisByEmail(devis.id, emailDest, emailObjet, emailMessage);
+      // Also log in local history
+      await supabase.from('email_history').insert({
+        user_id: user?.id || '',
+        client_id: devis.socid || '',
+        document_ref: devis.ref,
+        destinataire: emailDest,
+        objet: emailObjet,
+        message: emailMessage,
+      });
+      toast.success('Devis envoyé par email via Dolibarr');
+    } catch (e: any) {
+      console.warn('Email send error:', e);
+      // Fallback: at least save in history
+      await supabase.from('email_history').insert({
+        user_id: user?.id || '',
+        client_id: devis.socid || '',
+        document_ref: devis.ref,
+        destinataire: emailDest,
+        objet: emailObjet,
+        message: emailMessage,
+      });
+      toast.warning('Email enregistré localement — l\'envoi Dolibarr a échoué');
+    }
     setSendingEmail(false);
     setEmailOpen(false);
-    toast.success('Email enregistré dans l\'historique');
   };
 
   const handleAccepter = (signatureDataUrl: string) => {
