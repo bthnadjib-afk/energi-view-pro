@@ -166,7 +166,7 @@ function resolveClientName(socid: string | undefined, clients: Client[], fallbac
 // --- Raw fetch (no client resolution) ---
 
 async function fetchClientsRaw(): Promise<Client[]> {
-  const result = await dolibarrGet<any[]>('/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=100');
+  const result = await dolibarrGet<any[]>('/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=500');
   if (!result) return [];
   return result.map(mapDolibarrClient);
 }
