@@ -277,7 +277,16 @@ export function useBulkDeleteFactures() {
 export function useCreateDolibarrUser() {
   return useMutation({
     mutationFn: (data: { login: string; firstname: string; lastname: string; email: string }) => createDolibarrUser(data),
-    onSuccess: () => { toast.success('Utilisateur synchronisé avec Dolibarr'); },
-    onError: () => { toast.warning('Synchro Dolibarr échouée'); },
+    onSuccess: (result, variables) => {
+      toast.success('Utilisateur synchronisé avec Dolibarr');
+    },
+    onError: (error: any) => {
+      const msg = error?.message || String(error);
+      if (msg.includes('existe déjà') || msg.includes('already exist')) {
+        toast.success('Utilisateur Dolibarr existant lié avec succès');
+      } else {
+        toast.warning(`Synchro Dolibarr échouée : ${msg}`);
+      }
+    },
   });
 }
