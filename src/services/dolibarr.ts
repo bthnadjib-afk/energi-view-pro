@@ -10,6 +10,7 @@ export interface Facture {
   client: string;
   socid?: string;
   date: string;
+  montantHT: number;
   montantTTC: number;
   statut: 'payée' | 'impayée' | 'en retard';
 }
@@ -19,6 +20,7 @@ export interface DevisLigne {
   quantite: number;
   prixUnitaire: number;
   totalHT: number;
+  prixAchat?: number;
 }
 
 export interface Devis {
@@ -27,12 +29,15 @@ export interface Devis {
   client: string;
   socid?: string;
   date: string;
+  montantHT: number;
   montantTTC: number;
   statut: 'brouillon' | 'en attente' | 'accepté' | 'refusé';
   lignes: DevisLigne[];
 }
 
 export type InterventionType = 'devis_sur_place' | 'panne' | 'sav' | 'chantier' | 'realisation';
+
+export type InterventionStatut = 'brouillon' | 'validé' | 'en cours' | 'terminé' | 'facturé' | 'annulé';
 
 export interface Intervention {
   id: string;
@@ -43,9 +48,11 @@ export interface Intervention {
   date: string;
   heureDebut: string;
   heureFin: string;
-  statut: 'planifié' | 'en cours' | 'terminé' | 'annulé';
+  statut: InterventionStatut;
   type: InterventionType;
   description: string;
+  descriptionClient?: string;
+  compteRendu?: string;
   noteClient?: string;
   noteTechnicien?: string;
   noteFinChantier?: string;
@@ -72,8 +79,9 @@ export interface Produit {
   label: string;
   description: string;
   prixHT: number;
+  prixAchat?: number;
   tauxTVA: number;
-  type: 'service' | 'produit';
+  type: 'main_oeuvre' | 'fourniture';
   categorie: string;
 }
 
@@ -113,7 +121,6 @@ let clientsCachePromise: Promise<Client[]> | null = null;
 async function getClientsCache(): Promise<Client[]> {
   if (!clientsCachePromise) {
     clientsCachePromise = fetchClientsRaw();
-    // Expire cache after 60s
     setTimeout(() => { clientsCachePromise = null; }, 60000);
   }
   return clientsCachePromise;
@@ -128,19 +135,19 @@ function resolveClientName(socid: string | undefined, clients: Client[], fallbac
 // --- Mock Data ---
 
 export const mockFactures: Facture[] = [
-  { id: '1', ref: 'FA-2024-001', client: 'Copropriété Les Érables', date: '2024-12-15', montantTTC: 8500, statut: 'payée' },
-  { id: '2', ref: 'FA-2024-002', client: 'M. Dupont Jean', date: '2024-12-18', montantTTC: 3200, statut: 'payée' },
-  { id: '3', ref: 'FA-2024-003', client: 'SCI Bâtiment Central', date: '2025-01-05', montantTTC: 15400, statut: 'impayée' },
-  { id: '4', ref: 'FA-2024-004', client: 'Mme. Martin Sophie', date: '2025-01-10', montantTTC: 1850, statut: 'payée' },
-  { id: '5', ref: 'FA-2024-005', client: 'Restaurant Le Provençal', date: '2025-01-20', montantTTC: 6700, statut: 'en retard' },
-  { id: '6', ref: 'FA-2025-006', client: 'Hôtel Bellevue', date: '2025-02-01', montantTTC: 12300, statut: 'impayée' },
-  { id: '7', ref: 'FA-2025-007', client: 'M. Bernard Luc', date: '2025-02-10', montantTTC: 2100, statut: 'payée' },
-  { id: '8', ref: 'FA-2025-008', client: 'Copropriété Résidence du Parc', date: '2025-03-01', montantTTC: 9800, statut: 'payée' },
+  { id: '1', ref: 'FA-2024-001', client: 'Copropriété Les Érables', date: '2024-12-15', montantHT: 7083, montantTTC: 8500, statut: 'payée' },
+  { id: '2', ref: 'FA-2024-002', client: 'M. Dupont Jean', date: '2024-12-18', montantHT: 2667, montantTTC: 3200, statut: 'payée' },
+  { id: '3', ref: 'FA-2024-003', client: 'SCI Bâtiment Central', date: '2025-01-05', montantHT: 12833, montantTTC: 15400, statut: 'impayée' },
+  { id: '4', ref: 'FA-2024-004', client: 'Mme. Martin Sophie', date: '2025-01-10', montantHT: 1542, montantTTC: 1850, statut: 'payée' },
+  { id: '5', ref: 'FA-2024-005', client: 'Restaurant Le Provençal', date: '2025-01-20', montantHT: 5583, montantTTC: 6700, statut: 'en retard' },
+  { id: '6', ref: 'FA-2025-006', client: 'Hôtel Bellevue', date: '2025-02-01', montantHT: 10250, montantTTC: 12300, statut: 'impayée' },
+  { id: '7', ref: 'FA-2025-007', client: 'M. Bernard Luc', date: '2025-02-10', montantHT: 1750, montantTTC: 2100, statut: 'payée' },
+  { id: '8', ref: 'FA-2025-008', client: 'Copropriété Résidence du Parc', date: '2025-03-01', montantHT: 8167, montantTTC: 9800, statut: 'payée' },
 ];
 
 export const mockDevis: Devis[] = [
   {
-    id: '1', ref: 'DE-2025-001', client: 'Copropriété Les Chênes', date: '2025-03-10', montantTTC: 7800, statut: 'en attente',
+    id: '1', ref: 'DE-2025-001', client: 'Copropriété Les Chênes', date: '2025-03-10', montantHT: 6600, montantTTC: 7800, statut: 'en attente',
     lignes: [
       { designation: 'Mise aux normes NF C 15-100 - Parties communes', quantite: 1, prixUnitaire: 4200, totalHT: 4200 },
       { designation: 'Remplacement tableau général', quantite: 1, prixUnitaire: 1800, totalHT: 1800 },
@@ -148,7 +155,7 @@ export const mockDevis: Devis[] = [
     ],
   },
   {
-    id: '2', ref: 'DE-2025-002', client: 'M. Leroy Pierre', date: '2025-03-12', montantTTC: 3200, statut: 'en attente',
+    id: '2', ref: 'DE-2025-002', client: 'M. Leroy Pierre', date: '2025-03-12', montantHT: 2660, montantTTC: 3200, statut: 'en attente',
     lignes: [
       { designation: 'Installation tableau électrique complet', quantite: 1, prixUnitaire: 1500, totalHT: 1500 },
       { designation: 'Pose prises et interrupteurs', quantite: 18, prixUnitaire: 55, totalHT: 990 },
@@ -156,14 +163,14 @@ export const mockDevis: Devis[] = [
     ],
   },
   {
-    id: '3', ref: 'DE-2025-003', client: 'SCI Immobilière du Sud', date: '2025-03-15', montantTTC: 24500, statut: 'accepté',
+    id: '3', ref: 'DE-2025-003', client: 'SCI Immobilière du Sud', date: '2025-03-15', montantHT: 21000, montantTTC: 24500, statut: 'accepté',
     lignes: [
       { designation: 'Rénovation complète électricité - 6 appartements', quantite: 6, prixUnitaire: 3200, totalHT: 19200 },
       { designation: 'Main d\'œuvre installation', quantite: 40, prixUnitaire: 45, totalHT: 1800 },
     ],
   },
   {
-    id: '4', ref: 'DE-2025-004', client: 'Mme. Garcia Ana', date: '2025-03-20', montantTTC: 1950, statut: 'en attente',
+    id: '4', ref: 'DE-2025-004', client: 'Mme. Garcia Ana', date: '2025-03-20', montantHT: 940, montantTTC: 1950, statut: 'en attente',
     lignes: [
       { designation: 'Dépannage et diagnostic panne générale', quantite: 1, prixUnitaire: 250, totalHT: 250 },
       { designation: 'Remplacement disjoncteur différentiel 30mA', quantite: 3, prixUnitaire: 180, totalHT: 540 },
@@ -171,7 +178,7 @@ export const mockDevis: Devis[] = [
     ],
   },
   {
-    id: '5', ref: 'DE-2025-005', client: 'Boulangerie Chez Paul', date: '2025-03-25', montantTTC: 5600, statut: 'refusé',
+    id: '5', ref: 'DE-2025-005', client: 'Boulangerie Chez Paul', date: '2025-03-25', montantHT: 4400, montantTTC: 5600, statut: 'refusé',
     lignes: [
       { designation: 'Installation four professionnel triphasé', quantite: 1, prixUnitaire: 2800, totalHT: 2800 },
       { designation: 'Mise en conformité local professionnel', quantite: 1, prixUnitaire: 1600, totalHT: 1600 },
@@ -181,13 +188,13 @@ export const mockDevis: Devis[] = [
 
 export const mockInterventions: Intervention[] = [
   { id: '1', ref: 'INT-2025-001', client: 'M. Dupont Jean', technicien: 'Thomas Moreau', date: '2025-04-11', heureDebut: '08:00', heureFin: '10:00', statut: 'en cours', type: 'panne', description: 'Dépannage panne tableau électrique' },
-  { id: '2', ref: 'INT-2025-002', client: 'Copropriété Les Érables', technicien: 'Lucas Martin', date: '2025-04-11', heureDebut: '09:00', heureFin: '12:00', statut: 'planifié', type: 'chantier', description: 'Mise aux normes NF C 15-100' },
-  { id: '3', ref: 'INT-2025-003', client: 'Restaurant Le Provençal', technicien: 'Thomas Moreau', date: '2025-04-12', heureDebut: '14:00', heureFin: '17:00', statut: 'planifié', type: 'realisation', description: 'Installation éclairage LED salle' },
+  { id: '2', ref: 'INT-2025-002', client: 'Copropriété Les Érables', technicien: 'Lucas Martin', date: '2025-04-11', heureDebut: '09:00', heureFin: '12:00', statut: 'validé', type: 'chantier', description: 'Mise aux normes NF C 15-100' },
+  { id: '3', ref: 'INT-2025-003', client: 'Restaurant Le Provençal', technicien: 'Thomas Moreau', date: '2025-04-12', heureDebut: '14:00', heureFin: '17:00', statut: 'validé', type: 'realisation', description: 'Installation éclairage LED salle' },
   { id: '4', ref: 'INT-2025-004', client: 'Mme. Martin Sophie', technicien: 'Nicolas Petit', date: '2025-04-09', heureDebut: '08:00', heureFin: '11:00', statut: 'terminé', type: 'chantier', description: 'Remplacement tableau divisionnaire' },
-  { id: '5', ref: 'INT-2025-005', client: 'SCI Bâtiment Central', technicien: 'Lucas Martin', date: '2025-04-08', heureDebut: '09:00', heureFin: '16:00', statut: 'terminé', type: 'realisation', description: 'Câblage réseau RJ45 bureaux' },
-  { id: '6', ref: 'INT-2025-006', client: 'Hôtel Bellevue', technicien: 'Nicolas Petit', date: '2025-04-14', heureDebut: '10:00', heureFin: '12:00', statut: 'planifié', type: 'devis_sur_place', description: 'Diagnostic installation générale' },
+  { id: '5', ref: 'INT-2025-005', client: 'SCI Bâtiment Central', technicien: 'Lucas Martin', date: '2025-04-08', heureDebut: '09:00', heureFin: '16:00', statut: 'facturé', type: 'realisation', description: 'Câblage réseau RJ45 bureaux' },
+  { id: '6', ref: 'INT-2025-006', client: 'Hôtel Bellevue', technicien: 'Nicolas Petit', date: '2025-04-14', heureDebut: '10:00', heureFin: '12:00', statut: 'brouillon', type: 'devis_sur_place', description: 'Diagnostic installation générale' },
   { id: '7', ref: 'INT-2025-007', client: 'M. Bernard Luc', technicien: 'Thomas Moreau', date: '2025-04-07', heureDebut: '13:00', heureFin: '15:00', statut: 'annulé', type: 'sav', description: 'Installation borne recharge véhicule' },
-  { id: '8', ref: 'INT-2025-008', client: 'Copropriété Résidence du Parc', technicien: 'Lucas Martin', date: '2025-04-15', heureDebut: '08:00', heureFin: '17:00', statut: 'planifié', type: 'chantier', description: 'Remplacement colonnes montantes' },
+  { id: '8', ref: 'INT-2025-008', client: 'Copropriété Résidence du Parc', technicien: 'Lucas Martin', date: '2025-04-15', heureDebut: '08:00', heureFin: '17:00', statut: 'validé', type: 'chantier', description: 'Remplacement colonnes montantes' },
 ];
 
 export const mockClients: Client[] = [
@@ -204,16 +211,16 @@ export const mockClients: Client[] = [
 ];
 
 export const mockProduits: Produit[] = [
-  { id: '1', ref: 'SRV-001', label: 'Installation tableau électrique', description: 'Fourniture et pose d\'un tableau électrique complet NF C 15-100', prixHT: 1500, tauxTVA: 10, type: 'service', categorie: 'Installation' },
-  { id: '2', ref: 'SRV-002', label: 'Mise aux normes NF C 15-100', description: 'Diagnostic et mise en conformité de l\'installation électrique', prixHT: 4200, tauxTVA: 10, type: 'service', categorie: 'Mise aux normes' },
-  { id: '3', ref: 'SRV-003', label: 'Forfait dépannage urgence', description: 'Intervention d\'urgence dépannage électrique (1h)', prixHT: 150, tauxTVA: 20, type: 'service', categorie: 'Dépannage' },
-  { id: '4', ref: 'SRV-004', label: 'Tirage de câble RJ45', description: 'Tirage et raccordement câble réseau catégorie 6', prixHT: 45, tauxTVA: 20, type: 'service', categorie: 'Réseau' },
-  { id: '5', ref: 'SRV-005', label: 'Installation borne de recharge VE', description: 'Fourniture et pose borne de recharge véhicule électrique 7kW', prixHT: 1800, tauxTVA: 10, type: 'service', categorie: 'Installation' },
-  { id: '6', ref: 'PRD-001', label: 'Disjoncteur différentiel 30mA', description: 'Disjoncteur différentiel type A 30mA 40A', prixHT: 85, tauxTVA: 20, type: 'produit', categorie: 'Matériel' },
-  { id: '7', ref: 'PRD-002', label: 'Câble R2V 3G2.5', description: 'Câble électrique R2V 3G2.5mm² - au mètre', prixHT: 3.5, tauxTVA: 20, type: 'produit', categorie: 'Matériel' },
-  { id: '8', ref: 'SRV-006', label: 'Diagnostic électrique complet', description: 'Diagnostic de l\'installation avec rapport détaillé', prixHT: 250, tauxTVA: 20, type: 'service', categorie: 'Diagnostic' },
-  { id: '9', ref: 'SRV-007', label: 'Installation éclairage LED', description: 'Fourniture et pose éclairage LED intérieur/extérieur', prixHT: 75, tauxTVA: 10, type: 'service', categorie: 'Installation' },
-  { id: '10', ref: 'SRV-008', label: 'Rénovation électrique appartement', description: 'Rénovation complète installation électrique appartement T3', prixHT: 3200, tauxTVA: 10, type: 'service', categorie: 'Rénovation' },
+  { id: '1', ref: 'MO001', label: 'Installation tableau électrique', description: 'Fourniture et pose d\'un tableau électrique complet NF C 15-100', prixHT: 1500, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Installation' },
+  { id: '2', ref: 'MO002', label: 'Mise aux normes NF C 15-100', description: 'Diagnostic et mise en conformité de l\'installation électrique', prixHT: 4200, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Mise aux normes' },
+  { id: '3', ref: 'MO003', label: 'Forfait dépannage urgence', description: 'Intervention d\'urgence dépannage électrique (1h)', prixHT: 150, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Dépannage' },
+  { id: '4', ref: 'MO004', label: 'Tirage de câble RJ45', description: 'Tirage et raccordement câble réseau catégorie 6', prixHT: 45, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Réseau' },
+  { id: '5', ref: 'MO005', label: 'Installation borne de recharge VE', description: 'Fourniture et pose borne de recharge véhicule électrique 7kW', prixHT: 1800, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Installation' },
+  { id: '6', ref: '0001', label: 'Disjoncteur différentiel 30mA', description: 'Disjoncteur différentiel type A 30mA 40A', prixHT: 85, prixAchat: 42, tauxTVA: 0, type: 'fourniture', categorie: 'Matériel' },
+  { id: '7', ref: '0002', label: 'Câble R2V 3G2.5', description: 'Câble électrique R2V 3G2.5mm² - au mètre', prixHT: 3.5, prixAchat: 1.8, tauxTVA: 0, type: 'fourniture', categorie: 'Matériel' },
+  { id: '8', ref: 'MO006', label: 'Diagnostic électrique complet', description: 'Diagnostic de l\'installation avec rapport détaillé', prixHT: 250, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Diagnostic' },
+  { id: '9', ref: 'MO007', label: 'Installation éclairage LED', description: 'Fourniture et pose éclairage LED intérieur/extérieur', prixHT: 75, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Installation' },
+  { id: '10', ref: 'MO008', label: 'Rénovation électrique appartement', description: 'Rénovation complète installation électrique appartement T3', prixHT: 3200, tauxTVA: 0, type: 'main_oeuvre', categorie: 'Rénovation' },
 ];
 
 // --- Raw fetch (no client resolution) ---
@@ -230,7 +237,6 @@ export async function fetchFactures(): Promise<Facture[]> {
   const result = await dolibarrCall<any[]>('/invoices?sortfield=t.rowid&sortorder=DESC&limit=50');
   if (!result) return mockFactures;
   const mapped = result.map(mapDolibarrFacture);
-  // Resolve client names
   try {
     const clients = await getClientsCache();
     return mapped.map(f => ({ ...f, client: resolveClientName(f.socid, clients, f.client) }));
@@ -282,6 +288,10 @@ export async function createClient(data: { nom: string; adresse?: string; codePo
   return result || '';
 }
 
+export async function deleteClient(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/thirdparties/${id}`, 'DELETE');
+}
+
 export async function createIntervention(data: { socid: string; description: string; date: string }): Promise<string> {
   const socidInt = parseInt(data.socid, 10) || data.socid;
   const ts = toUnixTimestamp(data.date);
@@ -312,6 +322,18 @@ export async function validateDevis(id: string): Promise<string | null> {
 
 export async function closeDevis(id: string, status: number): Promise<string | null> {
   return dolibarrCall<string>(`/proposals/${id}/close`, 'POST', { status });
+}
+
+export async function deleteDevis(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/proposals/${id}`, 'DELETE');
+}
+
+export async function deleteFacture(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/invoices/${id}`, 'DELETE');
+}
+
+export async function deleteProduit(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/products/${id}`, 'DELETE');
 }
 
 // --- Dolibarr user sync ---
@@ -377,23 +399,47 @@ export async function convertDevisToFacture(devisId: string): Promise<string | n
   return dolibarrCall<string>(`/proposals/${devisId}/createinvoice`, 'POST');
 }
 
-export async function createAcompteFacture(socid: string, montantTTC: number, devisRef: string): Promise<string> {
-  const tauxAcompte = montantTTC > 5000 ? 0.3 : 0.5;
-  const montantAcompte = Math.round(montantTTC * tauxAcompte * 100) / 100;
-  const montantHT = Math.round(montantAcompte / 1.2 * 100) / 100;
+export async function createAcompteFacture(socid: string, montantHT: number, devisRef: string): Promise<string> {
+  const tauxAcompte = montantHT > 5000 ? 0.3 : 0.5;
+  const montantAcompte = Math.round(montantHT * tauxAcompte * 100) / 100;
   const result = await dolibarrCall<string>('/invoices', 'POST', {
     socid: parseInt(socid, 10) || socid,
-    type: 3, // Acompte
+    type: 3,
     date: toUnixTimestamp(new Date().toISOString()),
     lines: [{
       desc: `Acompte ${Math.round(tauxAcompte * 100)}% — ${devisRef}`,
       qty: 1,
-      subprice: montantHT,
-      tva_tx: 20,
+      subprice: montantAcompte,
+      tva_tx: 0,
       product_type: 1,
     }],
   });
   return result || '';
+}
+
+// --- PDF generation via Dolibarr builddoc ---
+
+export async function generatePDF(module: 'proposals' | 'invoices' | 'interventions', id: string): Promise<string | null> {
+  const result = await dolibarrCall<any>(`/${module}/${id}/builddoc`, 'PUT', {
+    langcode: 'fr_FR',
+    outputlangs: 'fr_FR',
+  });
+  if (!result) return null;
+  // Return document download URL
+  return result?.filename || result;
+}
+
+export async function downloadPDF(module: 'proposals' | 'invoices' | 'interventions', id: string, ref: string): Promise<void> {
+  const result = await dolibarrCall<any>(`/documents/download`, 'GET');
+  // Fallback: open builddoc and try to get the file
+  const built = await generatePDF(module, id);
+  if (built) {
+    toast_info(`PDF généré : ${ref}`);
+  }
+}
+
+function toast_info(msg: string) {
+  console.log(msg);
 }
 
 export async function testDolibarrConnection(): Promise<boolean> {
@@ -424,6 +470,7 @@ function mapDolibarrFacture(d: any): Facture {
     client: d.thirdparty?.name || d.nom || d.client_nom || `Client #${d.socid}`,
     socid: String(d.socid || ''),
     date: parseDolibarrDate(d.date || d.datef || d.date_creation),
+    montantHT: parseFloat(d.total_ht) || 0,
     montantTTC: parseFloat(d.total_ttc) || 0,
     statut,
   };
@@ -438,6 +485,7 @@ function mapDolibarrDevis(d: any): Devis {
     client: d.thirdparty?.name || d.nom || `Client #${d.socid}`,
     socid: String(d.socid || ''),
     date: parseDolibarrDate(d.date || d.datep || d.date_creation),
+    montantHT: parseFloat(d.total_ht) || 0,
     montantTTC: parseFloat(d.total_ttc) || 0,
     statut,
     lignes: (d.lines || []).map((l: any) => ({
@@ -445,12 +493,20 @@ function mapDolibarrDevis(d: any): Devis {
       quantite: parseFloat(l.qty) || 0,
       prixUnitaire: parseFloat(l.subprice) || 0,
       totalHT: parseFloat(l.total_ht) || 0,
+      prixAchat: parseFloat(l.pa_ht) || 0,
     })),
   };
 }
 
 function mapDolibarrIntervention(d: any): Intervention {
-  const statutMap: Record<string, Intervention['statut']> = { '0': 'planifié', '1': 'en cours', '2': 'terminé', '3': 'annulé' };
+  const statutMap: Record<string, InterventionStatut> = {
+    '0': 'brouillon',
+    '1': 'validé',
+    '2': 'en cours',
+    '3': 'terminé',
+    '4': 'facturé',
+    '5': 'annulé',
+  };
   const technicien = d.array_options?.options_technicien || d.user_author?.firstname && `${d.user_author.firstname} ${d.user_author.lastname || ''}`.trim() || '';
   return {
     id: String(d.id),
@@ -461,9 +517,11 @@ function mapDolibarrIntervention(d: any): Intervention {
     date: parseDolibarrDate(d.datei || d.dateo || d.date || d.date_creation),
     heureDebut: '08:00',
     heureFin: '10:00',
-    statut: statutMap[String(d.fk_statut)] || 'planifié',
+    statut: statutMap[String(d.fk_statut)] || 'brouillon',
     type: 'chantier',
     description: d.description || '',
+    descriptionClient: d.note_public || '',
+    compteRendu: d.note_private || '',
   };
 }
 
@@ -487,21 +545,25 @@ function mapDolibarrProduit(d: any): Produit {
     label: d.label || '',
     description: d.description || '',
     prixHT: parseFloat(d.price) || 0,
-    tauxTVA: parseFloat(d.tva_tx) || 20,
-    type: d.type === '1' ? 'service' : 'produit',
+    prixAchat: parseFloat(d.cost_price) || 0,
+    tauxTVA: parseFloat(d.tva_tx) || 0,
+    type: d.type === '1' ? 'main_oeuvre' : 'fourniture',
     categorie: '',
   };
 }
 
 // Helpers
-export function getAcompteBadge(montantTTC: number): { label: string; variant: 'green' | 'orange' } {
-  return montantTTC > 5000
-    ? { label: 'Acompte 30% requis', variant: 'green' }
-    : { label: 'Acompte 50% requis', variant: 'orange' };
+export function getAcompteBadge(montantHT: number): { label: string; variant: 'green' | 'orange'; taux: number } {
+  const taux = montantHT > 5000 ? 30 : 50;
+  return {
+    label: `Acompte ${taux}%`,
+    variant: taux === 30 ? 'green' : 'orange',
+    taux,
+  };
 }
 
 export const techniciens = ['Thomas Moreau', 'Lucas Martin', 'Nicolas Petit'];
-export const statutsIntervention = ['planifié', 'en cours', 'terminé', 'annulé'] as const;
+export const statutsIntervention: InterventionStatut[] = ['brouillon', 'validé', 'en cours', 'terminé', 'facturé', 'annulé'];
 export const typesIntervention: { value: InterventionType; label: string }[] = [
   { value: 'devis_sur_place', label: 'Devis sur place' },
   { value: 'panne', label: 'Panne' },
