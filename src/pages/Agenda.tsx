@@ -224,6 +224,16 @@ export default function Agenda() {
           </Button>
         </div>
 
+        {/* Type legend */}
+        <div className="flex flex-wrap gap-3 mb-4 text-xs text-muted-foreground">
+          {Object.entries(TYPE_LABELS).map(([key, label]) => (
+            <div key={key} className="flex items-center gap-1">
+              <span className={`inline-block w-2 h-2 rounded-full ${TYPE_COLORS[key as InterventionType] || 'bg-muted-foreground'}`} />
+              {label}
+            </div>
+          ))}
+        </div>
+
         {/* Day headers */}
         <div className="grid grid-cols-7 gap-1 mb-2">
           {DAY_NAMES.map((d) => (
