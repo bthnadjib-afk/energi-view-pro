@@ -189,7 +189,7 @@ export const FACTURE_STATUTS: Record<number, string> = {
 
 export const INTERVENTION_STATUTS: Record<number, string> = {
   0: 'Brouillon',
-  1: 'Validée',
+  1: 'En cours',
   2: 'En cours',
   3: 'Terminée',
   4: 'Facturée',
