@@ -106,7 +106,16 @@ export function useCloseIntervention() {
   });
 }
 
-export function useUpdateIntervention() {
+export function useSetInterventionStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { id: string; status: number }) => setInterventionStatus(data.id, data.status),
+    onSuccess: () => { toast.success('Statut intervention mis à jour'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: {
