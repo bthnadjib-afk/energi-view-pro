@@ -661,10 +661,17 @@ export default function Interventions() {
                         </AlertDialogContent>
                       </AlertDialog>
                       <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
-                        <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
+                        <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération du document...' : 'Voir le PDF'}
                       </Button>
-                    </>
-                  )}
+                      <Button
+                        onClick={() => selectedIntervention?.ref && generatePDFMutation.mutate({ ref: selectedIntervention.ref })}
+                        disabled={generatePDFMutation.isPending}
+                        variant="outline"
+                        className="gap-2"
+                      >
+                        <RefreshCw className={cn("h-4 w-4", generatePDFMutation.isPending && "animate-spin")} />
+                        {generatePDFMutation.isPending ? 'Génération...' : 'Générer le PDF'}
+                      </Button>
 
                   {selectedIntervention.fk_statut === 1 && (
                      <Button onClick={async () => { await statusMutation.mutateAsync({ id: selectedIntervention.id, status: 2 }); setDetailOpen(false); }} disabled={statusMutation.isPending} className="gap-2 bg-orange-500 hover:bg-orange-600">
@@ -687,7 +694,16 @@ export default function Interventions() {
                         <ArrowRightLeft className="h-4 w-4" /> {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
                       </Button>
                       <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
-                        <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
+                        <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération du document...' : 'Voir le PDF'}
+                      </Button>
+                      <Button
+                        onClick={() => selectedIntervention?.ref && generatePDFMutation.mutate({ ref: selectedIntervention.ref })}
+                        disabled={generatePDFMutation.isPending}
+                        variant="outline"
+                        className="gap-2"
+                      >
+                        <RefreshCw className={cn("h-4 w-4", generatePDFMutation.isPending && "animate-spin")} />
+                        {generatePDFMutation.isPending ? 'Génération...' : 'Générer le PDF'}
                       </Button>
                       <Button onClick={() => {
                         const c = clients.find(cl => cl.id === selectedIntervention.socid);
