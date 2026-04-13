@@ -35,6 +35,14 @@ const TYPE_LABELS: Record<InterventionType, string> = {
   chantier: 'Chantier',
 };
 
+const TYPE_COLORS: Record<InterventionType, string> = {
+  devis: 'bg-blue-500',
+  panne: 'bg-amber-500',
+  panne_urgence: 'bg-red-500',
+  sav: 'bg-violet-500',
+  chantier: 'bg-emerald-500',
+};
+
 const statusColor: Record<string, string> = {
   'Brouillon': 'bg-muted-foreground',
   'Validée': 'bg-blue-500',
@@ -198,9 +206,19 @@ export default function Agenda() {
           <Button variant="ghost" size="icon" onClick={prev} className="text-muted-foreground hover:text-foreground">
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <h2 className="text-lg font-semibold text-foreground">
-            {MONTH_NAMES[month]} {year}
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-foreground">
+              {MONTH_NAMES[month]} {year}
+            </h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); }}
+              className="text-xs"
+            >
+              Aujourd'hui
+            </Button>
+          </div>
           <Button variant="ghost" size="icon" onClick={next} className="text-muted-foreground hover:text-foreground">
             <ChevronRight className="h-5 w-5" />
           </Button>
