@@ -378,26 +378,35 @@ export async function createIntervention(data: {
   const endTime = data.heureFin || '10:00';
   const dateTimestamp = Math.floor(new Date(`${baseDate}T12:00:00`).getTime() / 1000);
   
-  // Serialize metadata into note_private as JSON
-  const metadata = JSON.stringify({
-    type: data.type || 'devis',
-    technicien: data.fk_user_assign || '',
-    heureDebut: startTime,
-    heureFin: endTime,
-    dateIntervention: baseDate,
-    notePrivee: data.note_private || '',
-  });
-  
   const body: any = {
     socid: socidInt,
     fk_soc: socidInt,
     fk_project: 0,
     description: data.description || ' ',
     date: dateTimestamp,
-    note_private: metadata,
   };
   
   if (data.fk_user_assign) body.fk_user_assign = data.fk_user_assign;
+
+  // Use extrafields if available, otherwise fallback to note_private JSON
+  const extrafields = getExtrafieldsProbeResult();
+  if (extrafields && (extrafields['type_intervention'] || extrafields['heure_debut'] || extrafields['heure_fin'])) {
+    body.array_options = {};
+    if (extrafields['type_intervention']) body.array_options.options_type_intervention = data.type || 'devis';
+    if (extrafields['heure_debut']) body.array_options.options_heure_debut = startTime;
+    if (extrafields['heure_fin']) body.array_options.options_heure_fin = endTime;
+    body.note_private = data.note_private || '';
+  } else {
+    // Fallback: serialize metadata into note_private as JSON
+    body.note_private = JSON.stringify({
+      type: data.type || 'devis',
+      technicien: data.fk_user_assign || '',
+      heureDebut: startTime,
+      heureFin: endTime,
+      dateIntervention: baseDate,
+      notePrivee: data.note_private || '',
+    });
+  }
   
   const result = await dolibarrCall<string>('/interventions', 'POST', body);
   return result || '';
