@@ -933,7 +933,7 @@ export function getAcompteBadge(montantHT: number): { label: string; variant: 'g
   };
 }
 
-export const statutsIntervention: string[] = ['Brouillon', 'Validée', 'En cours', 'Terminée', 'Facturée', 'Annulée'];
+export const statutsIntervention: string[] = ['Brouillon', 'Validée', 'En cours', 'Terminée', 'Fermée'];
 export const typesIntervention: { value: InterventionType; label: string }[] = [
   { value: 'devis', label: 'Devis' },
   { value: 'panne', label: 'Panne' },
