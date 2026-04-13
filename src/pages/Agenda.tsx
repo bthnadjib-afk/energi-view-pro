@@ -253,10 +253,10 @@ export default function Agenda() {
                     <div
                       key={inter.id}
                       className="rounded px-1 py-0.5 text-[10px] leading-tight text-foreground truncate bg-muted/50"
-                      title={`${inter.ref} - ${inter.client}`}
+                      title={`${inter.ref} - ${inter.client} (${TYPE_LABELS[inter.type] || inter.type})`}
                       onClick={(e) => { e.stopPropagation(); setSelected(inter); }}
                     >
-                      <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${statusColor[inter.statut] || 'bg-muted-foreground'}`} />
+                      <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${TYPE_COLORS[inter.type] || 'bg-muted-foreground'}`} />
                       <span className="hidden sm:inline">{inter.client.split(' ').slice(0, 2).join(' ')}</span>
                       <span className="sm:hidden">{inter.ref.split('-').pop()}</span>
                     </div>
