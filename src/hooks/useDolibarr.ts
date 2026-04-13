@@ -5,6 +5,7 @@ import {
   createIntervention, updateIntervention, deleteIntervention, validateIntervention, closeIntervention, setInterventionStatus, reopenIntervention,
   createDevis, updateDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
   createFacture, validateFacture, deleteFacture, updateFactureLines,
+  setFactureToDraft, setFactureToUnpaid, setDevisToDraft,
   convertDevisToFacture, createAcompteFacture,
   createProduit, deleteProduit, updateProduit,
   bulkDeleteDevis, bulkDeleteFactures,
@@ -231,6 +232,34 @@ export function useDeleteFacture() {
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
+
+// --- Set to draft / unpaid ---
+
+export function useSetFactureToDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => setFactureToDraft(id),
+    onSuccess: () => { toast.success('Facture repassée en brouillon'); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useSetFactureToUnpaid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => setFactureToUnpaid(id),
+    onSuccess: () => { toast.success('Facture repassée en impayée'); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useSetDevisToDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => setDevisToDraft(id),
+    onSuccess: () => { toast.success('Devis repassé en brouillon'); qc.invalidateQueries({ queryKey: ['devis'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
 
 // --- Convert & Acompte ---
 
