@@ -62,15 +62,8 @@ export interface Intervention {
   fk_statut: number;
   type: InterventionType;
   description: string;
-  descriptionClient?: string;
-  compteRendu?: string;
-  noteClient?: string;
-  noteTechnicien?: string;
-  noteFinChantier?: string;
-  notePrivee?: string;
-  signatureBase64?: string;
-  signatureTechnicien?: string;
-  photos?: string[];
+  descriptionClient?: string;  // note_public
+  compteRendu?: string;        // from note_private metadata notePrivee
 }
 
 export interface Client {
