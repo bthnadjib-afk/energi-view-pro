@@ -779,6 +779,26 @@ export default function Interventions() {
         technicien={collisionInfo.technicien}
         creneauExistant={collisionInfo.creneauExistant}
       />
+
+      {/* PDF Preview dialog */}
+      <Dialog open={pdfPreviewOpen} onOpenChange={(open) => { setPdfPreviewOpen(open); if (!open && pdfPreviewUrl) { URL.revokeObjectURL(pdfPreviewUrl); setPdfPreviewUrl(null); } }}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Aperçu PDF — {selectedIntervention?.ref}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {pdfPreviewUrl ? (
+              <iframe
+                src={pdfPreviewUrl}
+                className="w-full h-full rounded-md border border-border"
+                title="Aperçu PDF"
+              />
+            ) : (
+              <p className="text-muted-foreground text-center py-8">Chargement...</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
