@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
 import { useClients, useCreateClient, useDeleteClient, useUpdateClient, useDevis, useInterventions, useFactures } from '@/hooks/useDolibarr';
 import { UserPlus, Search, Mail, History, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -77,7 +78,10 @@ export default function Clients() {
   });
 
   const handleCreate = async () => {
-    if (!nom.trim()) return;
+    if (!nom.trim() || !adresse.trim() || !codePostal.trim() || !ville.trim() || !telephone.trim() || !email.trim()) {
+      toast.error('Tous les champs sont obligatoires');
+      return;
+    }
     await createClientMutation.mutateAsync({ nom, ville, telephone, email, adresse, codePostal });
     setNom(''); setVille(''); setTelephone(''); setEmail(''); setAdresse(''); setCodePostal('');
     setDialogOpen(false);
@@ -154,14 +158,14 @@ export default function Clients() {
             <DialogHeader><DialogTitle>Nouveau client</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
               <Input placeholder="Nom du client *" value={nom} onChange={e => setNom(e.target.value)} />
-              <AddressAutocomplete value={adresse} onSelect={({ rue, codePostal: cp, ville: v }) => { setAdresse(rue); setCodePostal(cp); setVille(v); }} placeholder="Adresse (autocomplétion)" />
+              <AddressAutocomplete value={adresse} onSelect={({ rue, codePostal: cp, ville: v }) => { setAdresse(rue); setCodePostal(cp); setVille(v); }} placeholder="Adresse * (autocomplétion)" />
               <div className="grid grid-cols-2 gap-3">
-                <Input placeholder="Code postal" value={codePostal} onChange={e => setCodePostal(e.target.value)} />
-                <Input placeholder="Ville" value={ville} onChange={e => setVille(e.target.value)} />
+                <Input placeholder="Code postal *" value={codePostal} onChange={e => setCodePostal(e.target.value)} />
+                <Input placeholder="Ville *" value={ville} onChange={e => setVille(e.target.value)} />
               </div>
-              <Input placeholder="Téléphone" value={telephone} onChange={e => setTelephone(e.target.value)} />
-              <Input placeholder="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} />
-              <Button className="w-full" onClick={handleCreate} disabled={createClientMutation.isPending || !nom.trim()}>
+              <Input placeholder="Téléphone *" value={telephone} onChange={e => setTelephone(e.target.value)} />
+              <Input placeholder="Email *" type="email" value={email} onChange={e => setEmail(e.target.value)} />
+              <Button className="w-full" onClick={handleCreate} disabled={createClientMutation.isPending || !nom.trim() || !adresse.trim() || !codePostal.trim() || !ville.trim() || !telephone.trim() || !email.trim()}>
                 {createClientMutation.isPending ? 'Création...' : 'Enregistrer'}
               </Button>
             </div>

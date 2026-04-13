@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures } from '@/hooks/useDolibarr';
+import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures, useCreateClient } from '@/hooks/useDolibarr';
+import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, resolveTechnicianName, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -40,12 +41,22 @@ export default function Interventions() {
   const createInterventionMutation = useCreateIntervention();
   const createDevisMutation = useCreateDevis();
   const createFactureMutation = useCreateFacture();
+  const createClientMutation = useCreateClient();
   const validateMutation = useValidateIntervention();
   const deleteMutation = useDeleteIntervention();
   const closeMutation = useCloseIntervention();
   const saveSignaturesMutation = useSaveSignatures();
   const updateMutation = useUpdateIntervention();
   const { role } = useAuth();
+
+  // New client inline form state
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [ncNom, setNcNom] = useState('');
+  const [ncAdresse, setNcAdresse] = useState('');
+  const [ncCodePostal, setNcCodePostal] = useState('');
+  const [ncVille, setNcVille] = useState('');
+  const [ncTelephone, setNcTelephone] = useState('');
+  const [ncEmail, setNcEmail] = useState('');
 
   // Cross-reference: find linked devis/factures per intervention
   const linkedDocsByIntervention = useMemo(() => {
@@ -141,8 +152,31 @@ export default function Interventions() {
     return true;
   });
 
+  const resetNewClientForm = () => {
+    setShowNewClientForm(false);
+    setNcNom(''); setNcAdresse(''); setNcCodePostal(''); setNcVille(''); setNcTelephone(''); setNcEmail('');
+  };
+
   const handleCreate = async () => {
-    if (!newClientId || !newDate) {
+    let clientId = newClientId;
+
+    // If creating a new client inline
+    if (showNewClientForm) {
+      if (!ncNom.trim() || !ncAdresse.trim() || !ncCodePostal.trim() || !ncVille.trim() || !ncTelephone.trim() || !ncEmail.trim()) {
+        toast.error('Tous les champs du client sont obligatoires');
+        return;
+      }
+      try {
+        const result = await createClientMutation.mutateAsync({
+          nom: ncNom, adresse: ncAdresse, codePostal: ncCodePostal, ville: ncVille, telephone: ncTelephone, email: ncEmail,
+        });
+        clientId = String(result);
+      } catch {
+        return; // error already shown by mutation
+      }
+    }
+
+    if (!clientId || !newDate) {
       toast.error('Veuillez remplir client et date');
       return;
     }
@@ -176,7 +210,7 @@ export default function Interventions() {
     const selectedUser = dolibarrUsers.find(u => u.fullname === newTech);
     
     await createInterventionMutation.mutateAsync({
-      socid: newClientId,
+      socid: clientId,
       description: newDescription || ' ',
       date: newDate,
       heureDebut: newHeureDebut,
@@ -187,6 +221,7 @@ export default function Interventions() {
     });
     setDialogOpen(false);
     setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee(''); setNewType('devis');
+    resetNewClientForm();
   };
 
   const openDetail = (inter: Intervention) => {
@@ -327,12 +362,32 @@ export default function Interventions() {
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Nouvelle intervention (Brouillon)</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
-              <Select value={newClientId} onValueChange={setNewClientId}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
-                <SelectContent>
-                  {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              {!showNewClientForm ? (
+                <div className="space-y-2">
+                  <Select value={newClientId} onValueChange={(v) => { if (v === '__new__') { setShowNewClientForm(true); setNewClientId(''); } else { setNewClientId(v); } }}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
+                    <SelectContent>
+                      {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>)}
+                      <SelectItem value="__new__" className="text-primary font-medium">＋ Nouveau client</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-foreground">Nouveau client</h3>
+                    <Button variant="ghost" size="sm" onClick={() => { resetNewClientForm(); }} className="text-xs">Annuler</Button>
+                  </div>
+                  <Input placeholder="Nom du client *" value={ncNom} onChange={e => setNcNom(e.target.value)} />
+                  <AddressAutocomplete value={ncAdresse} onSelect={({ rue, codePostal: cp, ville: v }) => { setNcAdresse(rue); setNcCodePostal(cp); setNcVille(v); }} placeholder="Adresse *" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input placeholder="Code postal *" value={ncCodePostal} onChange={e => setNcCodePostal(e.target.value)} />
+                    <Input placeholder="Ville *" value={ncVille} onChange={e => setNcVille(e.target.value)} />
+                  </div>
+                  <Input placeholder="Téléphone *" value={ncTelephone} onChange={e => setNcTelephone(e.target.value)} />
+                  <Input placeholder="Email *" type="email" value={ncEmail} onChange={e => setNcEmail(e.target.value)} />
+                </div>
+              )}
               <Select value={newType} onValueChange={(v) => setNewType(v as InterventionType)}>
                 <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
                 <SelectContent>
