@@ -81,7 +81,7 @@ export function AddressAutocomplete({ value, onSelect, placeholder = 'Adresse', 
         />
       </div>
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-lg glass-strong shadow-xl overflow-hidden">
+        <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-background shadow-xl overflow-hidden">
           {suggestions.map((s, i) => (
             <button
               key={i}
