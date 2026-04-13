@@ -128,6 +128,10 @@ export default function Interventions() {
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signatureTechData, setSignatureTechData] = useState<string | null>(null);
 
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
+
   // Resolve technician names — technicien field may contain an ID, so always try to resolve
   const resolvedInterventions = interventions.map(i => {
     // Try resolving the stored technicien value as an ID first, then user_author_id
@@ -256,18 +260,22 @@ export default function Interventions() {
 
   const handleViewPDF = async () => {
     if (!selectedIntervention) return;
+    setGeneratingPDF(true);
     try {
-      const url = await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
+      let url = await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
+      if (!url) {
+        url = await downloadPDFUrl('ficheinter', selectedIntervention.ref);
+      }
       if (url) {
-        openPDFInNewTab(url, `${selectedIntervention.ref}.pdf`);
-        toast.success(`PDF ${selectedIntervention.ref} téléchargé`);
+        setPdfPreviewUrl(url);
+        setPdfPreviewOpen(true);
       } else {
-        const dlUrl = await downloadPDFUrl('ficheinter', selectedIntervention.ref);
-        if (dlUrl) openPDFInNewTab(dlUrl, `${selectedIntervention.ref}.pdf`);
-        else toast.error('PDF non disponible');
+        toast.error('PDF non disponible');
       }
     } catch (e: any) {
       toast.error(`Erreur PDF : ${e.message || e}`);
+    } finally {
+      setGeneratingPDF(false);
     }
   };
 
@@ -650,8 +658,8 @@ export default function Interventions() {
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
-                      <Button onClick={handleViewPDF} variant="outline" className="gap-2">
-                        <FileDown className="h-4 w-4" /> Voir le PDF
+                      <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
+                        <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
                       </Button>
                     </>
                   )}
@@ -676,8 +684,8 @@ export default function Interventions() {
                       <Button onClick={() => handleTransformDevis(selectedIntervention)} disabled={createDevisMutation.isPending} variant="outline" className="gap-2">
                         <ArrowRightLeft className="h-4 w-4" /> {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
                       </Button>
-                      <Button onClick={handleViewPDF} variant="outline" className="gap-2">
-                        <FileDown className="h-4 w-4" /> Voir le PDF
+                      <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
+                        <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
                       </Button>
                       <Button onClick={() => {
                         const c = clients.find(cl => cl.id === selectedIntervention.socid);
@@ -771,6 +779,26 @@ export default function Interventions() {
         technicien={collisionInfo.technicien}
         creneauExistant={collisionInfo.creneauExistant}
       />
+
+      {/* PDF Preview dialog */}
+      <Dialog open={pdfPreviewOpen} onOpenChange={(open) => { setPdfPreviewOpen(open); if (!open && pdfPreviewUrl) { URL.revokeObjectURL(pdfPreviewUrl); setPdfPreviewUrl(null); } }}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Aperçu PDF — {selectedIntervention?.ref}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {pdfPreviewUrl ? (
+              <iframe
+                src={pdfPreviewUrl}
+                className="w-full h-full rounded-md border border-border"
+                title="Aperçu PDF"
+              />
+            ) : (
+              <p className="text-muted-foreground text-center py-8">Chargement...</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
