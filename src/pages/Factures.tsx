@@ -439,7 +439,36 @@ export default function Factures() {
                     </>
                   )}
 
-                  {/* Payment button for validated unpaid invoices */}
+                  {/* Validated → back to draft */}
+                  {selectedFacture.fk_statut === 1 && !selectedFacture.paye && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={async () => {
+                        await setToDraftMutation.mutateAsync(selectedFacture.id);
+                        setSelectedFacture(null);
+                      }}
+                      disabled={setToDraftMutation.isPending}
+                    >
+                      {setToDraftMutation.isPending ? 'En cours...' : 'Repasser en brouillon'}
+                    </Button>
+                  )}
+
+                  {/* Paid → back to unpaid */}
+                  {selectedFacture.paye && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={async () => {
+                        await setToUnpaidMutation.mutateAsync(selectedFacture.id);
+                        setSelectedFacture(null);
+                      }}
+                      disabled={setToUnpaidMutation.isPending}
+                    >
+                      {setToUnpaidMutation.isPending ? 'En cours...' : 'Repasser en impayée'}
+                    </Button>
+                  )}
+
                   {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && selectedFacture.fk_statut !== 3 && (
                     <Button
                       variant="outline"
