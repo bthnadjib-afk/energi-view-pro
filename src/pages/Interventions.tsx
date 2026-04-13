@@ -16,19 +16,19 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
 const typeLabels: Record<InterventionType, string> = {
-  devis_sur_place: 'Devis sur place',
+  devis: 'Devis',
   panne: 'Panne',
+  panne_urgence: 'Panne urgence',
   sav: 'SAV',
   chantier: 'Chantier',
-  realisation: 'Réalisation',
 };
 
 const typeColors: Record<InterventionType, string> = {
-  devis_sur_place: 'bg-blue-100 text-blue-700 border-blue-200',
+  devis: 'bg-blue-100 text-blue-700 border-blue-200',
   panne: 'bg-red-100 text-red-700 border-red-200',
+  panne_urgence: 'bg-rose-100 text-rose-700 border-rose-200',
   sav: 'bg-orange-100 text-orange-700 border-orange-200',
   chantier: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  realisation: 'bg-violet-100 text-violet-700 border-violet-200',
 };
 
 export default function Interventions() {
@@ -93,14 +93,14 @@ export default function Interventions() {
   const [editDate, setEditDate] = useState('');
   const [editHeureDebut, setEditHeureDebut] = useState('08:00');
   const [editHeureFin, setEditHeureFin] = useState('10:00');
-  const [editType, setEditType] = useState<InterventionType>('chantier');
+  const [editType, setEditType] = useState<InterventionType>('devis');
   const [editNotePrivee, setEditNotePrivee] = useState('');
 
   const [newTech, setNewTech] = useState('');
   const [newDate, setNewDate] = useState('');
   const [newHeureDebut, setNewHeureDebut] = useState('08:00');
   const [newHeureFin, setNewHeureFin] = useState('10:00');
-  const [newType, setNewType] = useState<InterventionType>('chantier');
+  const [newType, setNewType] = useState<InterventionType>('devis');
   const [newDescription, setNewDescription] = useState('');
   const [newClientId, setNewClientId] = useState('');
   const [notePrivee, setNotePrivee] = useState('');
@@ -144,6 +144,10 @@ export default function Interventions() {
   const handleCreate = async () => {
     if (!newClientId || !newDate) {
       toast.error('Veuillez remplir client et date');
+      return;
+    }
+    if (!newDescription.trim()) {
+      toast.error('La description est obligatoire');
       return;
     }
 
