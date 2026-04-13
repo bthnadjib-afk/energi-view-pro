@@ -261,6 +261,8 @@ export async function fetchDevis(): Promise<Devis[]> {
 }
 
 export async function fetchInterventions(): Promise<Intervention[]> {
+  // Probe extrafields on first call (lazy, cached)
+  await probeFichinterExtrafields();
   const result = await dolibarrGet<any[]>('/interventions?sortfield=t.rowid&sortorder=DESC&limit=500');
   if (!result) return [];
   const mapped = result.map(mapDolibarrIntervention);
