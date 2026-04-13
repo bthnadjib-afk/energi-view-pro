@@ -598,7 +598,8 @@ export default function Interventions() {
                   </div>
                 )}
 
-                {/* Signatures */}
+                {/* Signatures - only when validated/en cours (fk_statut >= 1) */}
+                {selectedIntervention.fk_statut >= 1 && (
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-foreground">✅ Signatures</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -622,6 +623,7 @@ export default function Interventions() {
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-3 pt-2">
@@ -631,7 +633,7 @@ export default function Interventions() {
                         <Pencil className="h-4 w-4" /> Modifier
                       </Button>
                       <Button onClick={async () => { await validateMutation.mutateAsync(selectedIntervention.id); setDetailOpen(false); }} disabled={validateMutation.isPending} className="gap-2">
-                        <FileCheck className="h-4 w-4" /> {validateMutation.isPending ? 'Validation...' : 'Valider'}
+                        <Play className="h-4 w-4" /> {validateMutation.isPending ? 'Démarrage...' : 'Démarrer l\'intervention'}
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -648,6 +650,9 @@ export default function Interventions() {
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
+                      <Button onClick={handleViewPDF} variant="outline" className="gap-2">
+                        <FileDown className="h-4 w-4" /> Voir le PDF
+                      </Button>
                     </>
                   )}
 
@@ -664,27 +669,27 @@ export default function Interventions() {
                   )}
 
                   {selectedIntervention.fk_statut >= 1 && (
-                    <Button onClick={() => handleTransformFacture(selectedIntervention)} disabled={createFactureMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-                      <Receipt className="h-4 w-4" /> {createFactureMutation.isPending ? 'Création...' : 'Générer une facture'}
-                    </Button>
+                    <>
+                      <Button onClick={() => handleTransformFacture(selectedIntervention)} disabled={createFactureMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                        <Receipt className="h-4 w-4" /> {createFactureMutation.isPending ? 'Création...' : 'Générer une facture'}
+                      </Button>
+                      <Button onClick={() => handleTransformDevis(selectedIntervention)} disabled={createDevisMutation.isPending} variant="outline" className="gap-2">
+                        <ArrowRightLeft className="h-4 w-4" /> {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
+                      </Button>
+                      <Button onClick={handleViewPDF} variant="outline" className="gap-2">
+                        <FileDown className="h-4 w-4" /> Voir le PDF
+                      </Button>
+                      <Button onClick={() => {
+                        const c = clients.find(cl => cl.id === selectedIntervention.socid);
+                        setEmailDest(c?.email || '');
+                        setEmailObjet(`Bon d'intervention ${selectedIntervention.ref}`);
+                        setEmailMessage('');
+                        setEmailOpen(true);
+                      }} variant="outline" className="gap-2">
+                        <Send className="h-4 w-4" /> Envoyer par email
+                      </Button>
+                    </>
                   )}
-
-                  <Button onClick={() => handleTransformDevis(selectedIntervention)} disabled={createDevisMutation.isPending} variant="outline" className="gap-2">
-                    <ArrowRightLeft className="h-4 w-4" /> {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
-                  </Button>
-
-                  <Button onClick={handleViewPDF} variant="outline" className="gap-2">
-                    <FileDown className="h-4 w-4" /> Voir le PDF
-                  </Button>
-                  <Button onClick={() => {
-                    const c = clients.find(cl => cl.id === selectedIntervention.socid);
-                    setEmailDest(c?.email || '');
-                    setEmailObjet(`Bon d'intervention ${selectedIntervention.ref}`);
-                    setEmailMessage('');
-                    setEmailOpen(true);
-                  }} variant="outline" className="gap-2">
-                    <Send className="h-4 w-4" /> Envoyer par email
-                  </Button>
                 </div>
 
                 {/* Email dialog */}
