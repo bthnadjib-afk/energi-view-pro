@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useSetInterventionStatus, useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures, useCreateClient } from '@/hooks/useDolibarr';
+import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useSetInterventionStatus, useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures, useCreateClient, useGenerateInterventionPDF } from '@/hooks/useDolibarr';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, resolveTechnicianName, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
 import { SignaturePad } from '@/components/SignaturePad';
-import { Plus, FileText, Receipt, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send, Play, CheckCircle2, Search, Pencil } from 'lucide-react';
+import { Plus, FileText, Receipt, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send, Play, CheckCircle2, Search, Pencil, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -48,6 +48,7 @@ export default function Interventions() {
   const statusMutation = useSetInterventionStatus();
   const saveSignaturesMutation = useSaveSignatures();
   const updateMutation = useUpdateIntervention();
+  const generatePDFMutation = useGenerateInterventionPDF();
   const { role } = useAuth();
 
   // New client inline form state
