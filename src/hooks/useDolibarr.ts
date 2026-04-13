@@ -116,6 +116,7 @@ export function useSetInterventionStatus() {
 }
 
 export function useUpdateIntervention() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: {
       id: string;

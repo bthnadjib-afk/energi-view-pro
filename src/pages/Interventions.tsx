@@ -665,15 +665,15 @@ export default function Interventions() {
                   )}
 
                   {selectedIntervention.fk_statut === 1 && (
-                    <Button onClick={async () => { await closeMutation.mutateAsync({ id: selectedIntervention.id, status: 2 }); setDetailOpen(false); }} disabled={closeMutation.isPending} className="gap-2 bg-orange-500 hover:bg-orange-600">
-                      <Play className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Démarrer (En cours)'}
-                    </Button>
+                     <Button onClick={async () => { await statusMutation.mutateAsync({ id: selectedIntervention.id, status: 2 }); setDetailOpen(false); }} disabled={statusMutation.isPending} className="gap-2 bg-orange-500 hover:bg-orange-600">
+                       <Play className="h-4 w-4" /> {statusMutation.isPending ? '...' : 'Démarrer (En cours)'}
+                     </Button>
                   )}
 
                   {selectedIntervention.fk_statut === 2 && (
-                    <Button onClick={async () => { await closeMutation.mutateAsync({ id: selectedIntervention.id, status: 3 }); setDetailOpen(false); }} disabled={closeMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-                      <CheckCircle2 className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Terminer'}
-                    </Button>
+                     <Button onClick={async () => { await statusMutation.mutateAsync({ id: selectedIntervention.id, status: 3 }); setDetailOpen(false); }} disabled={statusMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                       <CheckCircle2 className="h-4 w-4" /> {statusMutation.isPending ? '...' : 'Terminer'}
+                     </Button>
                   )}
 
                   {selectedIntervention.fk_statut >= 1 && (
