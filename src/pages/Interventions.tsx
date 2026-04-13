@@ -186,7 +186,7 @@ export default function Interventions() {
       note_private: notePrivee || undefined,
     });
     setDialogOpen(false);
-    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee('');
+    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee(''); setNewType('devis');
   };
 
   const openDetail = (inter: Intervention) => {
