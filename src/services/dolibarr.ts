@@ -515,8 +515,13 @@ export async function validateIntervention(id: string): Promise<string | null> {
 }
 
 export async function closeIntervention(id: string): Promise<string | null> {
-  // Swagger: POST /interventions/{id}/close — NO body parameters
+  // Swagger: POST /interventions/{id}/close — NO body parameters — sets status to closed (5)
   return dolibarrCall<string>(`/interventions/${id}/close`, 'POST');
+}
+
+// For intermediate status transitions (1→2 En cours, 2→3 Terminée) — use PUT
+export async function setInterventionStatus(id: string, status: number): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${id}`, 'PUT', { fk_statut: status });
 }
 
 export async function reopenIntervention(id: string): Promise<string | null> {

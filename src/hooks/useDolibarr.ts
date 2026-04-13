@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, fetchDolibarrUsers,
   createClient, deleteClient, updateClient,
-  createIntervention, updateIntervention, deleteIntervention, validateIntervention, closeIntervention,
+  createIntervention, updateIntervention, deleteIntervention, validateIntervention, closeIntervention, setInterventionStatus,
   createDevis, updateDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
   createFacture, validateFacture, deleteFacture, updateFactureLines,
   convertDevisToFacture, createAcompteFacture,
