@@ -905,17 +905,29 @@ export async function updateDolibarrUser(dolibarrUserId: string, data: { firstna
   return dolibarrCall<string>(`/users/${dolibarrUserId}`, 'PUT', data);
 }
 
-// --- Signature persistence ---
+// --- Signature persistence (now via Supabase table) ---
 
-export async function saveInterventionSignatures(id: string, signatureClient?: string, signatureTech?: string): Promise<string | null> {
-  const body: any = {};
-  if (signatureClient || signatureTech) {
-    body.note_public = [
-      signatureClient ? `[SIGNATURE_CLIENT]${signatureClient}[/SIGNATURE_CLIENT]` : '',
-      signatureTech ? `[SIGNATURE_TECH]${signatureTech}[/SIGNATURE_TECH]` : '',
-    ].filter(Boolean).join('\n');
-  }
-  return dolibarrCall<string>(`/interventions/${id}`, 'PUT', body);
+export async function saveInterventionSignatures(id: string, signatureClient?: string, signatureTech?: string, ref?: string): Promise<void> {
+  const { error: upsertError } = await supabase
+    .from('intervention_signatures')
+    .upsert({
+      intervention_id: id,
+      intervention_ref: ref || null,
+      signature_client: signatureClient || null,
+      signature_tech: signatureTech || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'intervention_id' });
+  if (upsertError) throw upsertError;
+}
+
+export async function getInterventionSignatures(interventionId: string): Promise<{ signature_client: string | null; signature_tech: string | null } | null> {
+  const { data, error } = await supabase
+    .from('intervention_signatures')
+    .select('signature_client, signature_tech')
+    .eq('intervention_id', interventionId)
+    .maybeSingle();
+  if (error) { console.warn('Error fetching signatures:', error); return null; }
+  return data;
 }
 
 // --- Email variable replacement ---
