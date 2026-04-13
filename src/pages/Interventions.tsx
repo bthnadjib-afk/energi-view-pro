@@ -672,8 +672,9 @@ export default function Interventions() {
                         <RefreshCw className={cn("h-4 w-4", generatePDFMutation.isPending && "animate-spin")} />
                         {generatePDFMutation.isPending ? 'Génération...' : 'Générer le PDF'}
                       </Button>
+                    </>
+                  )}
 
-                  {selectedIntervention.fk_statut === 1 && (
                      <Button onClick={async () => { await statusMutation.mutateAsync({ id: selectedIntervention.id, status: 2 }); setDetailOpen(false); }} disabled={statusMutation.isPending} className="gap-2 bg-orange-500 hover:bg-orange-600">
                        <Play className="h-4 w-4" /> {statusMutation.isPending ? '...' : 'Démarrer (En cours)'}
                      </Button>
