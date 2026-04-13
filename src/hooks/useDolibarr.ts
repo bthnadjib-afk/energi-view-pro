@@ -365,6 +365,19 @@ export function useSaveSignatures() {
   });
 }
 
+// --- Generate Intervention PDF (manual trigger) ---
+
+export function useGenerateInterventionPDF() {
+  return useMutation({
+    mutationFn: async ({ ref }: { ref: string }) => {
+      const { triggerFichinterBuilddoc } = await import('@/services/dolibarr');
+      return triggerFichinterBuilddoc(ref);
+    },
+    onSuccess: () => toast.success('PDF généré avec succès'),
+    onError: (e: any) => toast.error(`Erreur lors de la génération du PDF, veuillez réessayer manuellement`),
+  });
+}
+
 export function useUpdateFactureLines() {
   const qc = useQueryClient();
   return useMutation({
