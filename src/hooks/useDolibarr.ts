@@ -370,11 +370,11 @@ export function useSaveSignatures() {
 export function useGenerateInterventionPDF() {
   return useMutation({
     mutationFn: async ({ ref }: { ref: string }) => {
-      const { triggerFichinterBuilddoc } = await import('@/services/dolibarr');
-      return triggerFichinterBuilddoc(ref);
+      const { ensureFichinterPdfReady } = await import('@/services/dolibarr');
+      return ensureFichinterPdfReady(ref);
     },
     onSuccess: () => toast.success('PDF généré avec succès'),
-    onError: (e: any) => toast.error(`Erreur lors de la génération du PDF, veuillez réessayer manuellement`),
+    onError: () => toast.error('Erreur lors de la génération du PDF, veuillez réessayer manuellement'),
   });
 }
 

@@ -412,14 +412,15 @@ export async function createIntervention(data: {
   
   const result = await dolibarrCall<string>('/interventions', 'POST', body);
   const newId = result || '';
-  // Auto-trigger PDF generation in background
   if (newId) {
     try {
       const inter = await dolibarrGet<any>(`/interventions/${newId}`);
       if (inter?.ref) {
-        triggerFichinterBuilddoc(inter.ref).catch(e => console.warn('Auto builddoc after create failed:', e));
+        await ensureFichinterPdfReady(inter.ref);
       }
-    } catch (e) { console.warn('Could not fetch ref for builddoc:', e); }
+    } catch (e) {
+      console.warn('Auto builddoc after create failed:', e);
+    }
   }
   return newId;
 }
@@ -561,13 +562,14 @@ export async function deleteIntervention(id: string): Promise<string | null> {
 
 export async function validateIntervention(id: string): Promise<string | null> {
   const result = await dolibarrCall<string>(`/interventions/${id}/validate`, 'POST');
-  // Auto-trigger PDF generation after validation
   try {
     const inter = await dolibarrGet<any>(`/interventions/${id}`);
     if (inter?.ref) {
-      triggerFichinterBuilddoc(inter.ref).catch(e => console.warn('Auto builddoc after validate failed:', e));
+      await ensureFichinterPdfReady(inter.ref);
     }
-  } catch (e) { console.warn('Could not fetch ref for builddoc:', e); }
+  } catch (e) {
+    console.warn('Auto builddoc after validate failed:', e);
+  }
   return result;
 }
 
@@ -592,6 +594,16 @@ export async function setDevisInvoiced(id: string): Promise<string | null> {
 
 // --- Fichinter builddoc utility ---
 
+function wait(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function downloadFichinterPdfContent(ref: string): Promise<any | null> {
+  return dolibarrGet<any>(
+    `/documents/download?modulepart=fichinter&original_file=${encodeURIComponent(`${ref}/${ref}.pdf`)}`
+  );
+}
+
 export async function triggerFichinterBuilddoc(ref: string): Promise<any> {
   return dolibarrCall<any>('/documents/builddoc', 'PUT', {
     modulepart: 'fichinter',
@@ -599,6 +611,21 @@ export async function triggerFichinterBuilddoc(ref: string): Promise<any> {
     doctemplate: 'soleil',
     langcode: 'fr_FR',
   });
+}
+
+export async function ensureFichinterPdfReady(ref: string): Promise<string> {
+  await triggerFichinterBuilddoc(ref);
+
+  let pdfResult = await downloadFichinterPdfContent(ref);
+  if (pdfResult?.content) return base64ToBlobUrl(pdfResult.content);
+
+  await triggerFichinterBuilddoc(ref);
+  await wait(2000);
+
+  pdfResult = await downloadFichinterPdfContent(ref);
+  if (pdfResult?.content) return base64ToBlobUrl(pdfResult.content);
+
+  throw new Error('Erreur lors de la génération du PDF, veuillez réessayer manuellement');
 }
 
 // --- PDF generation via Dolibarr builddoc ---
@@ -619,9 +646,8 @@ export async function generatePDF(
   ref: string,
   model?: string
 ): Promise<string | null> {
-  // fichinter not supported by builddoc — try direct download fallback
   if (modulepart === 'fichinter') {
-    return generateFichinterPDF(ref);
+    return ensureFichinterPdfReady(ref);
   }
   const defaultModel = modulepart === 'propal' ? 'azur' : 'crabe';
   const result = await dolibarrCall<any>('/documents/builddoc', 'PUT', {
@@ -636,36 +662,7 @@ export async function generatePDF(
 }
 
 async function generateFichinterPDF(ref: string): Promise<string | null> {
-  // Step 1: Try builddoc
-  try {
-    const result = await triggerFichinterBuilddoc(ref);
-    if (result?.content) return base64ToBlobUrl(result.content);
-  } catch (e) {
-    console.warn('builddoc fichinter failed, trying direct download...');
-  }
-  // Step 2: Try downloading existing PDF
-  try {
-    const dlResult = await dolibarrCall<any>(
-      `/documents/download?modulepart=fichinter&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`,
-      'GET'
-    );
-    if (dlResult?.content) return base64ToBlobUrl(dlResult.content);
-  } catch (e) {
-    console.warn('Direct download failed:', e);
-  }
-  // Step 3: Retry — trigger builddoc then wait and download
-  try {
-    await triggerFichinterBuilddoc(ref);
-    await new Promise(r => setTimeout(r, 1500));
-    const dlResult = await dolibarrCall<any>(
-      `/documents/download?modulepart=fichinter&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`,
-      'GET'
-    );
-    if (dlResult?.content) return base64ToBlobUrl(dlResult.content);
-  } catch (e) {
-    console.warn('Retry builddoc+download failed:', e);
-  }
-  throw new Error('PDF intervention non disponible. Veuillez réessayer avec le bouton "Générer le PDF".');
+  return ensureFichinterPdfReady(ref);
 }
 
 export function openPDFInNewTab(blobUrl: string, filename: string) {
