@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil, Search, XCircle, Zap } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines } from '@/hooks/useDolibarr';
+import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid } from '@/hooks/useDolibarr';
 import { formatDateFR, generatePDF, openPDFInNewTab, sendFactureByEmail, type CreateDevisLine, type Facture } from '@/services/dolibarr';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,8 @@ export default function Factures() {
   const validateFactureMutation = useValidateFacture();
   const addPaymentMutation = useAddPayment();
   const updateLinesMutation = useUpdateFactureLines();
+  const setToDraftMutation = useSetFactureToDraft();
+  const setToUnpaidMutation = useSetFactureToUnpaid();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedFacture, setSelectedFacture] = useState<Facture | null>(null);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -437,7 +439,36 @@ export default function Factures() {
                     </>
                   )}
 
-                  {/* Payment button for validated unpaid invoices */}
+                  {/* Validated → back to draft */}
+                  {selectedFacture.fk_statut === 1 && !selectedFacture.paye && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={async () => {
+                        await setToDraftMutation.mutateAsync(selectedFacture.id);
+                        setSelectedFacture(null);
+                      }}
+                      disabled={setToDraftMutation.isPending}
+                    >
+                      {setToDraftMutation.isPending ? 'En cours...' : 'Repasser en brouillon'}
+                    </Button>
+                  )}
+
+                  {/* Paid → back to unpaid */}
+                  {selectedFacture.paye && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={async () => {
+                        await setToUnpaidMutation.mutateAsync(selectedFacture.id);
+                        setSelectedFacture(null);
+                      }}
+                      disabled={setToUnpaidMutation.isPending}
+                    >
+                      {setToUnpaidMutation.isPending ? 'En cours...' : 'Repasser en impayée'}
+                    </Button>
+                  )}
+
                   {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && selectedFacture.fk_statut !== 3 && (
                     <Button
                       variant="outline"

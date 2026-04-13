@@ -35,6 +35,14 @@ const TYPE_LABELS: Record<InterventionType, string> = {
   chantier: 'Chantier',
 };
 
+const TYPE_COLORS: Record<InterventionType, string> = {
+  devis: 'bg-blue-500',
+  panne: 'bg-amber-500',
+  panne_urgence: 'bg-red-500',
+  sav: 'bg-violet-500',
+  chantier: 'bg-emerald-500',
+};
+
 const statusColor: Record<string, string> = {
   'Brouillon': 'bg-muted-foreground',
   'Validée': 'bg-blue-500',
@@ -198,12 +206,32 @@ export default function Agenda() {
           <Button variant="ghost" size="icon" onClick={prev} className="text-muted-foreground hover:text-foreground">
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <h2 className="text-lg font-semibold text-foreground">
-            {MONTH_NAMES[month]} {year}
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-foreground">
+              {MONTH_NAMES[month]} {year}
+            </h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); }}
+              className="text-xs"
+            >
+              Aujourd'hui
+            </Button>
+          </div>
           <Button variant="ghost" size="icon" onClick={next} className="text-muted-foreground hover:text-foreground">
             <ChevronRight className="h-5 w-5" />
           </Button>
+        </div>
+
+        {/* Type legend */}
+        <div className="flex flex-wrap gap-3 mb-4 text-xs text-muted-foreground">
+          {Object.entries(TYPE_LABELS).map(([key, label]) => (
+            <div key={key} className="flex items-center gap-1">
+              <span className={`inline-block w-2 h-2 rounded-full ${TYPE_COLORS[key as InterventionType] || 'bg-muted-foreground'}`} />
+              {label}
+            </div>
+          ))}
         </div>
 
         {/* Day headers */}
@@ -235,10 +263,10 @@ export default function Agenda() {
                     <div
                       key={inter.id}
                       className="rounded px-1 py-0.5 text-[10px] leading-tight text-foreground truncate bg-muted/50"
-                      title={`${inter.ref} - ${inter.client}`}
+                      title={`${inter.ref} - ${inter.client} (${TYPE_LABELS[inter.type] || inter.type})`}
                       onClick={(e) => { e.stopPropagation(); setSelected(inter); }}
                     >
-                      <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${statusColor[inter.statut] || 'bg-muted-foreground'}`} />
+                      <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${TYPE_COLORS[inter.type] || 'bg-muted-foreground'}`} />
                       <span className="hidden sm:inline">{inter.client.split(' ').slice(0, 2).join(' ')}</span>
                       <span className="sm:hidden">{inter.ref.split('-').pop()}</span>
                     </div>

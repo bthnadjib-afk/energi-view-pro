@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { UserPlus, Shield, ShieldCheck, Wrench as WrenchIcon, Loader2, Trash2, Pencil } from 'lucide-react';
+import { UserPlus, Shield, ShieldCheck, Wrench as WrenchIcon, Loader2, Trash2, Pencil, Power } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -159,6 +159,13 @@ export default function Utilisateurs() {
     setEditRole(u.role);
   };
 
+  const handleToggleActif = async (u: UserWithRole) => {
+    const newActif = !u.actif;
+    await supabase.from('profiles').update({ actif: newActif }).eq('id', u.id);
+    toast({ title: newActif ? 'Compte activé' : 'Compte désactivé' });
+    fetchUsers();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -261,9 +268,16 @@ export default function Utilisateurs() {
                         </span>
                       </td>
                       <td className="py-3 px-2">
-                        <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs', u.actif ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}>
+                        <button
+                          onClick={() => currentRole === 'admin' ? handleToggleActif(u) : undefined}
+                          className={cn(
+                            'inline-flex rounded-full px-2 py-0.5 text-xs cursor-pointer transition-colors',
+                            u.actif ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          )}
+                          title={currentRole === 'admin' ? (u.actif ? 'Cliquer pour désactiver' : 'Cliquer pour activer') : undefined}
+                        >
                           {u.actif ? 'Actif' : 'Inactif'}
-                        </span>
+                        </button>
                       </td>
                       {currentRole === 'admin' && (
                         <td className="py-3 px-2">

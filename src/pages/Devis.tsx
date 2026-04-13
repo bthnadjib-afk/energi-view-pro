@@ -1,6 +1,6 @@
 import { useState, Fragment, useEffect, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis, useUpdateDevisLines } from '@/hooks/useDolibarr';
+import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis, useUpdateDevisLines, useSetDevisToDraft } from '@/hooks/useDolibarr';
 import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, openPDFInNewTab, downloadPDFUrl, sendDevisByEmail, DEVIS_STATUTS, type Devis as DevisType } from '@/services/dolibarr';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown, Pencil, Search, Filter, Zap } from 'lucide-react';
@@ -53,6 +53,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const closeMutation = useCloseDevis();
   const deleteMutation = useDeleteDevis();
   const updateLinesMutation = useUpdateDevisLines();
+  const setToDraftMutation = useSetDevisToDraft();
   const { user } = useAuth();
 
   const [showSignature, setShowSignature] = useState(false);
@@ -272,6 +273,17 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
 
             {isValidated && (
               <>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={async () => {
+                    await setToDraftMutation.mutateAsync(devis.id);
+                    onCollapse();
+                  }}
+                  disabled={setToDraftMutation.isPending}
+                >
+                  {setToDraftMutation.isPending ? 'En cours...' : 'Repasser en brouillon'}
+                </Button>
                 <Button onClick={() => setShowSignature(true)} disabled={closeMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                   <CheckCircle2 className="h-4 w-4" /> Classer Signé
                 </Button>
