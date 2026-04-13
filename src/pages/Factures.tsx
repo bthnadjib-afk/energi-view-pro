@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil, Search, XCircle, Zap } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines } from '@/hooks/useDolibarr';
+import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid } from '@/hooks/useDolibarr';
 import { formatDateFR, generatePDF, openPDFInNewTab, sendFactureByEmail, type CreateDevisLine, type Facture } from '@/services/dolibarr';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,8 @@ export default function Factures() {
   const validateFactureMutation = useValidateFacture();
   const addPaymentMutation = useAddPayment();
   const updateLinesMutation = useUpdateFactureLines();
+  const setToDraftMutation = useSetFactureToDraft();
+  const setToUnpaidMutation = useSetFactureToUnpaid();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedFacture, setSelectedFacture] = useState<Facture | null>(null);
   const [emailOpen, setEmailOpen] = useState(false);
