@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
 import { useClients, useCreateClient, useDeleteClient, useUpdateClient, useDevis, useInterventions, useFactures } from '@/hooks/useDolibarr';
 import { UserPlus, Search, Mail, History, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
