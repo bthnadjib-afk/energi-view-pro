@@ -97,7 +97,35 @@ export interface DolibarrUser {
   fullname: string;
 }
 
-// --- Proxy call ---
+// --- Extrafields probe for interventions (fichinter) ---
+
+let _extrafieldsProbeResult: Record<string, any> | null | undefined = undefined;
+
+export async function probeFichinterExtrafields(): Promise<Record<string, any> | null> {
+  if (_extrafieldsProbeResult !== undefined) return _extrafieldsProbeResult;
+  try {
+    const result = await dolibarrGet<any[]>('/setup/extrafields?elementtype=fichinter');
+    if (result && Array.isArray(result) && result.length > 0) {
+      const fields: Record<string, any> = {};
+      result.forEach((f: any) => { fields[f.name || f.attrname] = f; });
+      _extrafieldsProbeResult = fields;
+      console.info('Extrafields fichinter détectés:', Object.keys(fields));
+    } else {
+      _extrafieldsProbeResult = null;
+      console.info('Aucun extrafield fichinter — fallback note_private JSON');
+    }
+  } catch {
+    _extrafieldsProbeResult = null;
+    console.warn('Probe extrafields fichinter échouée — fallback note_private JSON');
+  }
+  return _extrafieldsProbeResult;
+}
+
+export function getExtrafieldsProbeResult(): Record<string, any> | null | undefined {
+  return _extrafieldsProbeResult;
+}
+
+
 
 async function dolibarrCall<T>(endpoint: string, method = 'GET', data?: unknown): Promise<T | null> {
   try {
@@ -609,15 +637,15 @@ export async function downloadPDFUrl(
   modulepart: DolibarrModulepart,
   ref: string
 ): Promise<string | null> {
+  // For fichinter, use the fallback logic
+  if (modulepart === 'fichinter') {
+    return generateFichinterPDF(ref);
+  }
   const result = await dolibarrGet<any>(
     `/documents/download?modulepart=${modulepart}&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`
   );
   if (!result?.content) return null;
-  const byteChars = atob(result.content);
-  const byteArray = new Uint8Array(byteChars.length);
-  for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
-  const blob = new Blob([byteArray], { type: 'application/pdf' });
-  return URL.createObjectURL(blob);
+  return base64ToBlobUrl(result.content);
 }
 
 // --- Send by email via Edge Function + PDF attachment ---
