@@ -77,7 +77,10 @@ export default function Clients() {
   });
 
   const handleCreate = async () => {
-    if (!nom.trim()) return;
+    if (!nom.trim() || !adresse.trim() || !codePostal.trim() || !ville.trim() || !telephone.trim() || !email.trim()) {
+      toast.error('Tous les champs sont obligatoires');
+      return;
+    }
     await createClientMutation.mutateAsync({ nom, ville, telephone, email, adresse, codePostal });
     setNom(''); setVille(''); setTelephone(''); setEmail(''); setAdresse(''); setCodePostal('');
     setDialogOpen(false);
