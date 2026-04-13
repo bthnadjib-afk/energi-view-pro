@@ -658,8 +658,8 @@ export default function Interventions() {
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
-                      <Button onClick={handleViewPDF} variant="outline" className="gap-2">
-                        <FileDown className="h-4 w-4" /> Voir le PDF
+                      <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
+                        <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
                       </Button>
                     </>
                   )}
@@ -684,8 +684,8 @@ export default function Interventions() {
                       <Button onClick={() => handleTransformDevis(selectedIntervention)} disabled={createDevisMutation.isPending} variant="outline" className="gap-2">
                         <ArrowRightLeft className="h-4 w-4" /> {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
                       </Button>
-                      <Button onClick={handleViewPDF} variant="outline" className="gap-2">
-                        <FileDown className="h-4 w-4" /> Voir le PDF
+                      <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
+                        <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
                       </Button>
                       <Button onClick={() => {
                         const c = clients.find(cl => cl.id === selectedIntervention.socid);
