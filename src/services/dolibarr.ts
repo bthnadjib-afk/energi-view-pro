@@ -48,6 +48,14 @@ export type InterventionType = 'devis' | 'panne' | 'panne_urgence' | 'sav' | 'ch
 
 export type InterventionStatut = string;
 
+export interface InterventionLine {
+  id: string;
+  description: string;
+  date: string;
+  duree: number; // duration in seconds
+  rang: number;
+}
+
 export interface Intervention {
   id: string;
   ref: string;
@@ -62,8 +70,9 @@ export interface Intervention {
   fk_statut: number;
   type: InterventionType;
   description: string;
-  descriptionClient?: string;  // note_public
-  compteRendu?: string;        // from note_private metadata notePrivee
+  descriptionClient?: string;
+  compteRendu?: string;
+  lines?: InterventionLine[];
 }
 
 export interface Client {
@@ -1059,7 +1068,7 @@ export function getAcompteBadge(montantHT: number): { label: string; variant: 'g
 }
 
 // Index-aligned with Dolibarr native statuts: 0=Brouillon, 1=Validée, 2=En cours, 3=Terminée, (4 n'existe pas), 5=Fermée
-export const statutsIntervention: string[] = ['Brouillon', 'Validée', 'En cours', 'Terminée'];
+export const statutsIntervention: string[] = ['Brouillon', 'Validée', 'En cours', 'Terminée', 'Fermée'];
 export const typesIntervention: { value: InterventionType; label: string }[] = [
   { value: 'devis', label: 'Devis' },
   { value: 'panne', label: 'Panne' },
