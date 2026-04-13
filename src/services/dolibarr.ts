@@ -85,7 +85,6 @@ export interface Produit {
   prixAchat?: number;
   tauxTVA: number;
   type: 'main_oeuvre' | 'fourniture';
-  categorie: string;
 }
 
 export interface DolibarrUser {
@@ -188,11 +187,10 @@ export const FACTURE_STATUTS: Record<number, string> = {
 
 export const INTERVENTION_STATUTS: Record<number, string> = {
   0: 'Brouillon',
-  1: 'En cours',
+  1: 'Validée',
   2: 'En cours',
   3: 'Terminée',
-  4: 'Facturée',
-  5: 'Annulée',
+  5: 'Fermée',
 };
 
 export function getDevisStatutLabel(fk_statut: number): string {
@@ -442,7 +440,26 @@ export async function deleteFacture(id: string): Promise<string | null> {
 }
 
 export async function convertDevisToFacture(devisId: string): Promise<string | null> {
-  return dolibarrCall<string>(`/proposals/${devisId}/createinvoice`, 'POST');
+  // Standard approach: GET devis, then POST /invoices with same lines
+  const devis = await dolibarrCall<any>(`/proposals/${devisId}`, 'GET');
+  if (!devis) throw new Error('Devis introuvable');
+  const lines = (devis.lines || []).map((l: any) => ({
+    desc: l.desc || l.label || '',
+    qty: parseFloat(l.qty) || 1,
+    subprice: parseFloat(l.subprice) || 0,
+    tva_tx: parseFloat(l.tva_tx) || 0,
+    product_type: parseInt(l.product_type || '0', 10),
+    pa_ht: parseFloat(l.pa_ht) || 0,
+  }));
+  const result = await dolibarrCall<string>('/invoices', 'POST', {
+    socid: parseInt(devis.socid, 10) || devis.socid,
+    type: 0,
+    date: toUnixTimestamp(new Date().toISOString()),
+    lines,
+    linked_objects: { propal: devisId },
+    note_private: `Facture créée depuis devis ${devis.ref || devisId}`,
+  });
+  return result;
 }
 
 export async function createAcompteFacture(socid: string, montantHT: number, devisRef: string): Promise<string> {
@@ -552,33 +569,65 @@ export async function downloadPDFUrl(
   return URL.createObjectURL(blob);
 }
 
-// --- Send by email via Dolibarr SMTP ---
+// --- Send by email via Edge Function + PDF attachment ---
+// sendByEmail endpoints don't exist in standard Dolibarr REST API.
+// New flow: generate PDF first, then send via edge function SMTP.
 
-export async function sendDevisByEmail(id: string, to: string, subject: string, message: string): Promise<any> {
-  return dolibarrCall<any>(`/proposals/${id}/sendByEmail`, 'POST', {
-    sendto: to,
-    subject,
-    message,
-    model: 'azur',
+export async function sendDocumentByEmail(
+  modulepart: DolibarrModulepart,
+  id: string,
+  ref: string,
+  to: string,
+  subject: string,
+  message: string,
+  model?: string
+): Promise<void> {
+  // Step 1: Generate PDF via builddoc
+  const defaultModel = modulepart === 'propal' ? 'azur' : modulepart === 'facture' ? 'crabe' : 'soleil';
+  await dolibarrCall<any>('/documents/builddoc', 'PUT', {
+    modulepart,
+    original_file: `${ref}/${ref}.pdf`,
+    doctemplate: model || defaultModel,
+    langcode: 'fr_FR',
   });
+
+  // Step 2: Download the generated PDF as base64
+  const pdfResult = await dolibarrCall<any>(
+    `/documents/download?modulepart=${modulepart}&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`,
+    'GET'
+  );
+  if (!pdfResult?.content) throw new Error('Impossible de récupérer le PDF généré');
+
+  // Step 3: Send via edge function SMTP
+  const { error } = await supabase.functions.invoke('send-email-smtp', {
+    body: {
+      to,
+      subject,
+      message,
+      pdfBase64: pdfResult.content,
+      pdfFilename: `${ref}.pdf`,
+    },
+  });
+  if (error) throw error;
 }
 
-export async function sendFactureByEmail(id: string, to: string, subject: string, message: string): Promise<any> {
-  return dolibarrCall<any>(`/invoices/${id}/sendByEmail`, 'POST', {
-    sendto: to,
-    subject,
-    message,
-    model: 'crabe',
-  });
+// Legacy wrappers for backward compatibility
+export async function sendDevisByEmail(id: string, to: string, subject: string, message: string): Promise<void> {
+  const devis = await dolibarrCall<any>(`/proposals/${id}`, 'GET');
+  const ref = devis?.ref || `PR-${id}`;
+  return sendDocumentByEmail('propal', id, ref, to, subject, message);
 }
 
-export async function sendInterventionByEmail(id: string, to: string, subject: string, message: string): Promise<any> {
-  return dolibarrCall<any>(`/interventions/${id}/sendByEmail`, 'POST', {
-    sendto: to,
-    subject,
-    message,
-    model: 'soleil',
-  });
+export async function sendFactureByEmail(id: string, to: string, subject: string, message: string): Promise<void> {
+  const facture = await dolibarrCall<any>(`/invoices/${id}`, 'GET');
+  const ref = facture?.ref || `FA-${id}`;
+  return sendDocumentByEmail('facture', id, ref, to, subject, message);
+}
+
+export async function sendInterventionByEmail(id: string, to: string, subject: string, message: string): Promise<void> {
+  const intervention = await dolibarrCall<any>(`/interventions/${id}`, 'GET');
+  const ref = intervention?.ref || `FI-${id}`;
+  return sendDocumentByEmail('fichinter', id, ref, to, subject, message);
 }
 
 // --- Bulk operations ---
@@ -858,7 +907,6 @@ function mapDolibarrClient(d: any): Client {
     ville: d.town || '',
     telephone: d.phone || '',
     email: d.email || '',
-    projetsEnCours: parseInt(d.nb_prospects || d.nb_projects || '0', 10),
   };
 }
 
@@ -872,7 +920,6 @@ function mapDolibarrProduit(d: any): Produit {
     prixAchat: parseFloat(d.cost_price) || 0,
     tauxTVA: parseFloat(d.tva_tx) || 0,
     type: d.type === '1' ? 'main_oeuvre' : 'fourniture',
-    categorie: '',
   };
 }
 
