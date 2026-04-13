@@ -44,7 +44,7 @@ export interface Devis {
   note_private?: string;
 }
 
-export type InterventionType = 'devis_sur_place' | 'panne' | 'sav' | 'chantier' | 'realisation';
+export type InterventionType = 'devis' | 'panne' | 'panne_urgence' | 'sav' | 'chantier';
 
 export type InterventionStatut = string;
 
@@ -362,7 +362,7 @@ export async function createIntervention(data: {
   
   // Serialize metadata into note_private as JSON
   const metadata = JSON.stringify({
-    type: data.type || 'chantier',
+    type: data.type || 'devis',
     technicien: data.fk_user_assign || '',
     heureDebut: startTime,
     heureFin: endTime,
@@ -829,7 +829,9 @@ function mapDolibarrIntervention(d: any): Intervention {
     || (d.user_author?.firstname ? `${d.user_author.firstname} ${d.user_author.lastname || ''}`.trim() : '')
     || (d.user_creation_id ? String(d.user_creation_id) : '');
   
-  const interventionType = meta?.type || d.array_options?.options_type || 'chantier';
+  const rawType = meta?.type || d.array_options?.options_type || 'devis';
+  // Migrate legacy types
+  const interventionType = rawType === 'devis_sur_place' ? 'devis' : rawType === 'realisation' ? 'chantier' : rawType;
   const heureDebut = meta?.heureDebut || parseDolibarrTime(d.dateo) || '08:00';
   const heureFin = meta?.heureFin || parseDolibarrTime(d.datee) || '10:00';
   
@@ -894,9 +896,9 @@ export function getAcompteBadge(montantHT: number): { label: string; variant: 'g
 
 export const statutsIntervention: string[] = ['Brouillon', 'Validée', 'En cours', 'Terminée', 'Facturée', 'Annulée'];
 export const typesIntervention: { value: InterventionType; label: string }[] = [
-  { value: 'devis_sur_place', label: 'Devis sur place' },
+  { value: 'devis', label: 'Devis' },
   { value: 'panne', label: 'Panne' },
+  { value: 'panne_urgence', label: 'Panne urgence' },
   { value: 'sav', label: 'SAV' },
   { value: 'chantier', label: 'Chantier' },
-  { value: 'realisation', label: 'Réalisation' },
 ];

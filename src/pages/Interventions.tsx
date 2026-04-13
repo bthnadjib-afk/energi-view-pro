@@ -16,19 +16,19 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
 const typeLabels: Record<InterventionType, string> = {
-  devis_sur_place: 'Devis sur place',
+  devis: 'Devis',
   panne: 'Panne',
+  panne_urgence: 'Panne urgence',
   sav: 'SAV',
   chantier: 'Chantier',
-  realisation: 'Réalisation',
 };
 
 const typeColors: Record<InterventionType, string> = {
-  devis_sur_place: 'bg-blue-100 text-blue-700 border-blue-200',
+  devis: 'bg-blue-100 text-blue-700 border-blue-200',
   panne: 'bg-red-100 text-red-700 border-red-200',
+  panne_urgence: 'bg-rose-100 text-rose-700 border-rose-200',
   sav: 'bg-orange-100 text-orange-700 border-orange-200',
   chantier: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  realisation: 'bg-violet-100 text-violet-700 border-violet-200',
 };
 
 export default function Interventions() {
@@ -93,14 +93,14 @@ export default function Interventions() {
   const [editDate, setEditDate] = useState('');
   const [editHeureDebut, setEditHeureDebut] = useState('08:00');
   const [editHeureFin, setEditHeureFin] = useState('10:00');
-  const [editType, setEditType] = useState<InterventionType>('chantier');
+  const [editType, setEditType] = useState<InterventionType>('devis');
   const [editNotePrivee, setEditNotePrivee] = useState('');
 
   const [newTech, setNewTech] = useState('');
   const [newDate, setNewDate] = useState('');
   const [newHeureDebut, setNewHeureDebut] = useState('08:00');
   const [newHeureFin, setNewHeureFin] = useState('10:00');
-  const [newType, setNewType] = useState<InterventionType>('chantier');
+  const [newType, setNewType] = useState<InterventionType>('devis');
   const [newDescription, setNewDescription] = useState('');
   const [newClientId, setNewClientId] = useState('');
   const [notePrivee, setNotePrivee] = useState('');
@@ -146,6 +146,10 @@ export default function Interventions() {
       toast.error('Veuillez remplir client et date');
       return;
     }
+    if (!newDescription.trim()) {
+      toast.error('La description est obligatoire');
+      return;
+    }
 
     const slots: InterventionSlot[] = resolvedInterventions.map(i => ({
       technicien: i.technicien,
@@ -182,7 +186,7 @@ export default function Interventions() {
       note_private: notePrivee || undefined,
     });
     setDialogOpen(false);
-    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee('');
+    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee(''); setNewType('devis');
   };
 
   const openDetail = (inter: Intervention) => {
@@ -254,19 +258,40 @@ export default function Interventions() {
     setEditDate(selectedIntervention.date || '');
     setEditHeureDebut(selectedIntervention.heureDebut || '08:00');
     setEditHeureFin(selectedIntervention.heureFin || '10:00');
-    setEditType(selectedIntervention.type || 'chantier');
+    setEditType(selectedIntervention.type || 'devis');
     setEditNotePrivee(selectedIntervention.compteRendu || '');
     setEditOpen(true);
   };
 
   const handleEditSave = async () => {
     if (!selectedIntervention) return;
+    if (!editDescription.trim()) {
+      toast.error('La description est obligatoire');
+      return;
+    }
+
+    // Collision check on edit
+    const slots: InterventionSlot[] = resolvedInterventions
+      .filter(i => i.id !== selectedIntervention.id)
+      .map(i => ({ technicien: i.technicien, date: i.date, heureDebut: i.heureDebut, heureFin: i.heureFin, ref: i.ref }));
+    const collision = checkCollision(
+      { technicien: editTech, date: editDate, heureDebut: editHeureDebut, heureFin: editHeureFin },
+      slots
+    );
+    if (collision) {
+      setCollisionInfo({
+        technicien: editTech,
+        creneauExistant: `${collision.ref || 'Intervention'} — ${collision.date} de ${collision.heureDebut} à ${collision.heureFin}`,
+      });
+      setCollisionOpen(true);
+      return;
+    }
     const selectedUser = dolibarrUsers.find(u => u.fullname === editTech);
     const dateTimestamp = editDate ? Math.floor(new Date(`${editDate}T12:00:00`).getTime() / 1000) : undefined;
     
     // Serialize metadata into note_private as JSON
     const metadata = JSON.stringify({
-      type: editType || 'chantier',
+      type: editType || 'devis',
       technicien: selectedUser?.id || editTech || '',
       heureDebut: editHeureDebut || '08:00',
       heureFin: editHeureFin || '10:00',
