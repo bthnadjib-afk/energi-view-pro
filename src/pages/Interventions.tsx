@@ -362,12 +362,32 @@ export default function Interventions() {
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Nouvelle intervention (Brouillon)</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
-              <Select value={newClientId} onValueChange={setNewClientId}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
-                <SelectContent>
-                  {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              {!showNewClientForm ? (
+                <div className="space-y-2">
+                  <Select value={newClientId} onValueChange={(v) => { if (v === '__new__') { setShowNewClientForm(true); setNewClientId(''); } else { setNewClientId(v); } }}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
+                    <SelectContent>
+                      {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>)}
+                      <SelectItem value="__new__" className="text-primary font-medium">＋ Nouveau client</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-foreground">Nouveau client</h3>
+                    <Button variant="ghost" size="sm" onClick={() => { resetNewClientForm(); }} className="text-xs">Annuler</Button>
+                  </div>
+                  <Input placeholder="Nom du client *" value={ncNom} onChange={e => setNcNom(e.target.value)} />
+                  <AddressAutocomplete value={ncAdresse} onSelect={({ rue, codePostal: cp, ville: v }) => { setNcAdresse(rue); setNcCodePostal(cp); setNcVille(v); }} placeholder="Adresse *" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input placeholder="Code postal *" value={ncCodePostal} onChange={e => setNcCodePostal(e.target.value)} />
+                    <Input placeholder="Ville *" value={ncVille} onChange={e => setNcVille(e.target.value)} />
+                  </div>
+                  <Input placeholder="Téléphone *" value={ncTelephone} onChange={e => setNcTelephone(e.target.value)} />
+                  <Input placeholder="Email *" type="email" value={ncEmail} onChange={e => setNcEmail(e.target.value)} />
+                </div>
+              )}
               <Select value={newType} onValueChange={(v) => setNewType(v as InterventionType)}>
                 <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
                 <SelectContent>
