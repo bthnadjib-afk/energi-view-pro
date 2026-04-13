@@ -128,6 +128,10 @@ export default function Interventions() {
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signatureTechData, setSignatureTechData] = useState<string | null>(null);
 
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
+
   // Resolve technician names — technicien field may contain an ID, so always try to resolve
   const resolvedInterventions = interventions.map(i => {
     // Try resolving the stored technicien value as an ID first, then user_author_id
@@ -256,18 +260,22 @@ export default function Interventions() {
 
   const handleViewPDF = async () => {
     if (!selectedIntervention) return;
+    setGeneratingPDF(true);
     try {
-      const url = await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
+      let url = await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
+      if (!url) {
+        url = await downloadPDFUrl('ficheinter', selectedIntervention.ref);
+      }
       if (url) {
-        openPDFInNewTab(url, `${selectedIntervention.ref}.pdf`);
-        toast.success(`PDF ${selectedIntervention.ref} téléchargé`);
+        setPdfPreviewUrl(url);
+        setPdfPreviewOpen(true);
       } else {
-        const dlUrl = await downloadPDFUrl('ficheinter', selectedIntervention.ref);
-        if (dlUrl) openPDFInNewTab(dlUrl, `${selectedIntervention.ref}.pdf`);
-        else toast.error('PDF non disponible');
+        toast.error('PDF non disponible');
       }
     } catch (e: any) {
       toast.error(`Erreur PDF : ${e.message || e}`);
+    } finally {
+      setGeneratingPDF(false);
     }
   };
 
