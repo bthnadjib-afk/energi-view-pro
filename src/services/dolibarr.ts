@@ -952,22 +952,23 @@ function parseNotePrivateMetadata(notePrivate: string | null | undefined): {
 
 function mapDolibarrIntervention(d: any): Intervention {
   const fk_statut = Number(d.fk_statut ?? d.statut ?? d.status) || 0;
+  const opts = d.array_options || {};
   
-  // Parse metadata from note_private JSON
+  // Parse metadata from note_private JSON (fallback)
   const meta = parseNotePrivateMetadata(d.note_private);
   
-  const technicien = meta?.technicien
-    || d.array_options?.options_technicien
+  // Priority: extrafields > note_private JSON > defaults
+  const technicien = opts.options_technicien
+    || meta?.technicien
     || (d.user_author?.firstname ? `${d.user_author.firstname} ${d.user_author.lastname || ''}`.trim() : '')
     || (d.user_creation_id ? String(d.user_creation_id) : '');
   
-  const rawType = meta?.type || d.array_options?.options_type || 'devis';
-  // Migrate legacy types
+  const rawType = opts.options_type_intervention || meta?.type || opts.options_type || 'devis';
   const interventionType = rawType === 'devis_sur_place' ? 'devis' : rawType === 'realisation' ? 'chantier' : rawType;
-  const heureDebut = meta?.heureDebut || parseDolibarrTime(d.dateo) || '08:00';
-  const heureFin = meta?.heureFin || parseDolibarrTime(d.datee) || '10:00';
   
-  // Date: prioritize metadata dateIntervention, then Dolibarr fields, datec as last resort
+  const heureDebut = opts.options_heure_debut || meta?.heureDebut || parseDolibarrTime(d.dateo) || '08:00';
+  const heureFin = opts.options_heure_fin || meta?.heureFin || parseDolibarrTime(d.datee) || '10:00';
+  
   const rawDate = meta?.dateIntervention || d.datest || d.datei || d.dateo || d.date || d.date_creation || d.datec;
   
   return {
