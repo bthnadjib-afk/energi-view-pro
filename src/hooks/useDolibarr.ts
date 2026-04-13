@@ -100,8 +100,8 @@ export function useValidateIntervention() {
 export function useCloseIntervention() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { id: string; status: number }) => closeIntervention(data.id, data.status),
-    onSuccess: () => { toast.success('Statut intervention mis à jour'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    mutationFn: (id: string) => closeIntervention(id),
+    onSuccess: () => { toast.success('Intervention fermée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
