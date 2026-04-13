@@ -265,6 +265,27 @@ export default function Interventions() {
 
   const handleEditSave = async () => {
     if (!selectedIntervention) return;
+    if (!editDescription.trim()) {
+      toast.error('La description est obligatoire');
+      return;
+    }
+
+    // Collision check on edit
+    const slots: InterventionSlot[] = resolvedInterventions
+      .filter(i => i.id !== selectedIntervention.id)
+      .map(i => ({ technicien: i.technicien, date: i.date, heureDebut: i.heureDebut, heureFin: i.heureFin, ref: i.ref }));
+    const collision = checkCollision(
+      { technicien: editTech, date: editDate, heureDebut: editHeureDebut, heureFin: editHeureFin },
+      slots
+    );
+    if (collision) {
+      setCollisionInfo({
+        technicien: editTech,
+        creneauExistant: `${collision.ref || 'Intervention'} — ${collision.date} de ${collision.heureDebut} à ${collision.heureFin}`,
+      });
+      setCollisionOpen(true);
+      return;
+    }
     const selectedUser = dolibarrUsers.find(u => u.fullname === editTech);
     const dateTimestamp = editDate ? Math.floor(new Date(`${editDate}T12:00:00`).getTime() / 1000) : undefined;
     

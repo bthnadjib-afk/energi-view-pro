@@ -28,11 +28,11 @@ const MONTH_NAMES = [
 const DAY_NAMES = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
 const TYPE_LABELS: Record<InterventionType, string> = {
-  devis_sur_place: 'Devis sur place',
+  devis: 'Devis',
   panne: 'Panne',
+  panne_urgence: 'Panne urgence',
   sav: 'SAV',
   chantier: 'Chantier',
-  realisation: 'Réalisation',
 };
 
 const statusColor: Record<string, string> = {
