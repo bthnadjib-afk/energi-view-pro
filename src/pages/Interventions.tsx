@@ -117,10 +117,15 @@ export default function Interventions() {
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signatureTechData, setSignatureTechData] = useState<string | null>(null);
 
-  // Resolve technician names from user_author_id
+  // Resolve technician names — technicien field may contain an ID, so always try to resolve
   const resolvedInterventions = interventions.map(i => {
-    const techName = i.technicien || resolveTechnicianName(i.user_author_id, dolibarrUsers);
-    return { ...i, technicien: techName };
+    // Try resolving the stored technicien value as an ID first, then user_author_id
+    const techFromMeta = resolveTechnicianName(i.technicien, dolibarrUsers);
+    const techFromAuthor = resolveTechnicianName(i.user_author_id, dolibarrUsers);
+    // If technicien is already a real name (not an ID), keep it; otherwise use resolved values
+    const isNumericId = i.technicien && /^\d+$/.test(i.technicien);
+    const techName = isNumericId ? (techFromMeta || techFromAuthor) : (i.technicien || techFromAuthor);
+    return { ...i, technicien: techName || '' };
   });
 
   const technicienNames = dolibarrUsers.map(u => u.fullname).filter(Boolean);
