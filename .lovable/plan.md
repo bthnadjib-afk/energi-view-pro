@@ -1,32 +1,27 @@
 
 
-# Devis + Facture depuis toute intervention
+# Conformité stricte au Backend Dolibarr
 
-## Situation actuelle
-- **Devis** : bouton visible uniquement si `fk_statut ≤ 2` (brouillon, validée, en cours)
-- **Facture** : bouton visible uniquement si `fk_statut === 3` (terminée)
-- Résultat : on ne peut jamais avoir les deux options en même temps
+## Règle enregistrée
 
-## Correction
+Cette directive sera sauvegardée comme contrainte fondamentale du projet, appliquée à chaque modification future :
 
-### `src/pages/Interventions.tsx`
+1. **Aucun champ UI sans équivalent API** : tout champ de formulaire doit correspondre à un champ existant dans l'API REST Dolibarr, vérifié via `src/services/dolibarr.ts` et les réponses API réelles.
 
-**Dans le panneau de détail (lignes ~582-592)** :
-- Rendre les deux boutons visibles pour tout statut ≥ 1 (validée et au-delà)
-- Le bouton "Devis" reste aussi disponible en brouillon (statut 0)
-- Le bouton "Facture" devient disponible dès statut 1 (pas seulement 3)
+2. **Validation miroir** : si un champ est `required` côté API, il l'est dans l'UI. S'il est optionnel, il l'est dans l'UI. S'il n'existe pas, il n'apparaît pas.
 
-**Dans le tableau (lignes ~433-445)** :
-- Même logique : afficher les icônes devis et facture pour toute intervention validée
+3. **Aucune invention** : en cas de doute sur l'existence d'un champ ou module, demander confirmation avant d'implémenter.
 
-Règles proposées :
-| Statut | Devis | Facture |
-|--------|-------|---------|
-| 0 (Brouillon) | ✅ | ❌ |
-| 1 (Validée) | ✅ | ✅ |
-| 2 (En cours) | ✅ | ✅ |
-| 3 (Terminée) | ✅ | ✅ |
+4. **Audit préalable** : avant toute modification d'un formulaire (Client, Devis, Facture, Intervention, Utilisateur), consulter le service dolibarr.ts et les réponses réseau pour confirmer les champs disponibles.
 
-## Fichier impacté
-`src/pages/Interventions.tsx` — modifier les conditions d'affichage des boutons devis/facture dans le tableau et le panneau de détail.
+## Action
+
+Sauvegarder cette règle dans `mem://constraints/dolibarr-conformity` et l'ajouter au Core de `mem://index.md` pour qu'elle s'applique systématiquement.
+
+## Fichiers impactés
+
+| Fichier | Modification |
+|---------|-------------|
+| `mem://constraints/dolibarr-conformity` | Nouvelle mémoire avec la règle complète |
+| `mem://index.md` | Ajout de la règle au Core + référence dans Memories |
 
