@@ -74,7 +74,6 @@ export interface Client {
   ville: string;
   telephone: string;
   email: string;
-  projetsEnCours: number;
 }
 
 export interface Produit {
