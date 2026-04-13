@@ -498,6 +498,21 @@ export async function deleteFacture(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/invoices/${id}`, 'DELETE');
 }
 
+// Swagger-confirmed: POST /invoices/{id}/settodraft
+export async function setFactureToDraft(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/invoices/${id}/settodraft`, 'POST', { idwarehouse: -1 });
+}
+
+// Swagger-confirmed: POST /invoices/{id}/settounpaid
+export async function setFactureToUnpaid(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/invoices/${id}/settounpaid`, 'POST');
+}
+
+// Swagger-confirmed: POST /proposals/{id}/settodraft
+export async function setDevisToDraft(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/proposals/${id}/settodraft`, 'POST');
+}
+
 export async function convertDevisToFacture(devisId: string): Promise<string | null> {
   // Swagger-compliant: GET devis lines, POST /invoices, then mark devis as invoiced
   const devis = await dolibarrCall<any>(`/proposals/${devisId}`, 'GET');
