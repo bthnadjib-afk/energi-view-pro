@@ -17,7 +17,7 @@ interface AddressAutocompleteProps {
   className?: string;
 }
 
-export function AddressAutocomplete({ value, onSelect, placeholder = 'Rechercher une adresse...', className }: AddressAutocompleteProps) {
+export function AddressAutocomplete({ value, onSelect, placeholder = 'Adresse', className }: AddressAutocompleteProps) {
   const [query, setQuery] = useState(value || '');
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [open, setOpen] = useState(false);
