@@ -41,12 +41,22 @@ export default function Interventions() {
   const createInterventionMutation = useCreateIntervention();
   const createDevisMutation = useCreateDevis();
   const createFactureMutation = useCreateFacture();
+  const createClientMutation = useCreateClient();
   const validateMutation = useValidateIntervention();
   const deleteMutation = useDeleteIntervention();
   const closeMutation = useCloseIntervention();
   const saveSignaturesMutation = useSaveSignatures();
   const updateMutation = useUpdateIntervention();
   const { role } = useAuth();
+
+  // New client inline form state
+  const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [ncNom, setNcNom] = useState('');
+  const [ncAdresse, setNcAdresse] = useState('');
+  const [ncCodePostal, setNcCodePostal] = useState('');
+  const [ncVille, setNcVille] = useState('');
+  const [ncTelephone, setNcTelephone] = useState('');
+  const [ncEmail, setNcEmail] = useState('');
 
   // Cross-reference: find linked devis/factures per intervention
   const linkedDocsByIntervention = useMemo(() => {
