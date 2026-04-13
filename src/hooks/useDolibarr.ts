@@ -2,13 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, fetchDolibarrUsers,
   createClient, deleteClient, updateClient,
-  createIntervention, updateIntervention, deleteIntervention, validateIntervention, closeIntervention, setInterventionStatus,
+  createIntervention, updateIntervention, deleteIntervention, validateIntervention, closeIntervention, setInterventionStatus, reopenIntervention,
   createDevis, updateDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
   createFacture, validateFacture, deleteFacture, updateFactureLines,
   convertDevisToFacture, createAcompteFacture,
   createProduit, deleteProduit, updateProduit,
   bulkDeleteDevis, bulkDeleteFactures,
   createDolibarrUser, addPayment, updateDolibarrUser, saveInterventionSignatures,
+  fetchInterventionLines, addInterventionLine, updateInterventionLine, deleteInterventionLine,
   type CreateDevisLine,
 } from '@/services/dolibarr';
 import { toast } from 'sonner';
@@ -353,15 +354,66 @@ export function useUpdateDolibarrUser() {
   });
 }
 
-// --- Signature persistence ---
+// --- Signature persistence (Supabase) ---
 
 export function useSaveSignatures() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { id: string; signatureClient?: string; signatureTech?: string }) =>
-      saveInterventionSignatures(data.id, data.signatureClient, data.signatureTech),
-    onSuccess: () => { toast.success('Signatures sauvegardées'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    mutationFn: (data: { id: string; signatureClient?: string; signatureTech?: string; ref?: string }) =>
+      saveInterventionSignatures(data.id, data.signatureClient, data.signatureTech, data.ref),
+    onSuccess: () => { toast.success('Signatures sauvegardées'); },
     onError: (e: any) => toast.error(`Erreur signatures : ${e.message || e}`),
+  });
+}
+
+// --- Reopen intervention ---
+
+export function useReopenIntervention() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => reopenIntervention(id),
+    onSuccess: () => { toast.success('Intervention rouverte'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+// --- Intervention Lines ---
+
+export function useInterventionLines(interventionId: string | undefined) {
+  return useQuery({
+    queryKey: ['intervention-lines', interventionId],
+    queryFn: () => fetchInterventionLines(interventionId!),
+    enabled: !!interventionId,
+  });
+}
+
+export function useAddInterventionLine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { interventionId: string; description: string; date: string; duree: number }) =>
+      addInterventionLine(data.interventionId, data),
+    onSuccess: (_, vars) => { toast.success('Ligne ajoutée'); qc.invalidateQueries({ queryKey: ['intervention-lines', vars.interventionId] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useUpdateInterventionLine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { interventionId: string; lineId: string; description: string; date: string; duree: number }) =>
+      updateInterventionLine(data.interventionId, data.lineId, data),
+    onSuccess: (_, vars) => { toast.success('Ligne modifiée'); qc.invalidateQueries({ queryKey: ['intervention-lines', vars.interventionId] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useDeleteInterventionLine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { interventionId: string; lineId: string }) =>
+      deleteInterventionLine(data.interventionId, data.lineId),
+    onSuccess: (_, vars) => { toast.success('Ligne supprimée'); qc.invalidateQueries({ queryKey: ['intervention-lines', vars.interventionId] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
 
