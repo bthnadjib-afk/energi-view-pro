@@ -115,8 +115,7 @@ export function useSetInterventionStatus() {
   });
 }
 
-
-  const qc = useQueryClient();
+export function useUpdateIntervention() {
   return useMutation({
     mutationFn: (data: {
       id: string;
