@@ -262,9 +262,9 @@ export default function Interventions() {
     if (!selectedIntervention) return;
     setGeneratingPDF(true);
     try {
-      let url = await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
+      let url = await generatePDF('fichinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
       if (!url) {
-        url = await downloadPDFUrl('ficheinter', selectedIntervention.ref);
+        url = await downloadPDFUrl('fichinter', selectedIntervention.ref);
       }
       if (url) {
         setPdfPreviewUrl(url);
@@ -283,7 +283,7 @@ export default function Interventions() {
     if (!selectedIntervention || !emailDest || !emailObjet) return;
     setSendingEmail(true);
     try {
-      await generatePDF('ficheinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
+      await generatePDF('fichinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
       await sendInterventionByEmail(selectedIntervention.id, emailDest, emailObjet, emailMessage);
       toast.success('Bon d\'intervention envoyé par email via Dolibarr');
     } catch (e: any) {
