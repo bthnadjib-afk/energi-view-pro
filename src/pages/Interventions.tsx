@@ -152,8 +152,31 @@ export default function Interventions() {
     return true;
   });
 
+  const resetNewClientForm = () => {
+    setShowNewClientForm(false);
+    setNcNom(''); setNcAdresse(''); setNcCodePostal(''); setNcVille(''); setNcTelephone(''); setNcEmail('');
+  };
+
   const handleCreate = async () => {
-    if (!newClientId || !newDate) {
+    let clientId = newClientId;
+
+    // If creating a new client inline
+    if (showNewClientForm) {
+      if (!ncNom.trim() || !ncAdresse.trim() || !ncCodePostal.trim() || !ncVille.trim() || !ncTelephone.trim() || !ncEmail.trim()) {
+        toast.error('Tous les champs du client sont obligatoires');
+        return;
+      }
+      try {
+        const result = await createClientMutation.mutateAsync({
+          nom: ncNom, adresse: ncAdresse, codePostal: ncCodePostal, ville: ncVille, telephone: ncTelephone, email: ncEmail,
+        });
+        clientId = String(result);
+      } catch {
+        return; // error already shown by mutation
+      }
+    }
+
+    if (!clientId || !newDate) {
       toast.error('Veuillez remplir client et date');
       return;
     }
@@ -187,7 +210,7 @@ export default function Interventions() {
     const selectedUser = dolibarrUsers.find(u => u.fullname === newTech);
     
     await createInterventionMutation.mutateAsync({
-      socid: newClientId,
+      socid: clientId,
       description: newDescription || ' ',
       date: newDate,
       heureDebut: newHeureDebut,
@@ -198,6 +221,7 @@ export default function Interventions() {
     });
     setDialogOpen(false);
     setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee(''); setNewType('devis');
+    resetNewClientForm();
   };
 
   const openDetail = (inter: Intervention) => {
