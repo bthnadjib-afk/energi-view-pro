@@ -260,6 +260,7 @@ export function useSetDevisToDraft() {
     onSuccess: () => { toast.success('Devis repassé en brouillon'); qc.invalidateQueries({ queryKey: ['devis'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
+}
 
 // --- Convert & Acompte ---
 
