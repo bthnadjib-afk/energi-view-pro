@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures, useCreateClient } from '@/hooks/useDolibarr';
+import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useSetInterventionStatus, useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures, useCreateClient } from '@/hooks/useDolibarr';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, resolveTechnicianName, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -45,6 +45,7 @@ export default function Interventions() {
   const validateMutation = useValidateIntervention();
   const deleteMutation = useDeleteIntervention();
   const closeMutation = useCloseIntervention();
+  const statusMutation = useSetInterventionStatus();
   const saveSignaturesMutation = useSaveSignatures();
   const updateMutation = useUpdateIntervention();
   const { role } = useAuth();
@@ -665,15 +666,15 @@ export default function Interventions() {
                   )}
 
                   {selectedIntervention.fk_statut === 1 && (
-                    <Button onClick={async () => { await closeMutation.mutateAsync({ id: selectedIntervention.id, status: 2 }); setDetailOpen(false); }} disabled={closeMutation.isPending} className="gap-2 bg-orange-500 hover:bg-orange-600">
-                      <Play className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Démarrer (En cours)'}
-                    </Button>
+                     <Button onClick={async () => { await statusMutation.mutateAsync({ id: selectedIntervention.id, status: 2 }); setDetailOpen(false); }} disabled={statusMutation.isPending} className="gap-2 bg-orange-500 hover:bg-orange-600">
+                       <Play className="h-4 w-4" /> {statusMutation.isPending ? '...' : 'Démarrer (En cours)'}
+                     </Button>
                   )}
 
                   {selectedIntervention.fk_statut === 2 && (
-                    <Button onClick={async () => { await closeMutation.mutateAsync({ id: selectedIntervention.id, status: 3 }); setDetailOpen(false); }} disabled={closeMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-                      <CheckCircle2 className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Terminer'}
-                    </Button>
+                     <Button onClick={async () => { await statusMutation.mutateAsync({ id: selectedIntervention.id, status: 3 }); setDetailOpen(false); }} disabled={statusMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                       <CheckCircle2 className="h-4 w-4" /> {statusMutation.isPending ? '...' : 'Terminer'}
+                     </Button>
                   )}
 
                   {selectedIntervention.fk_statut >= 1 && (

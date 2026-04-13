@@ -97,7 +97,35 @@ export interface DolibarrUser {
   fullname: string;
 }
 
-// --- Proxy call ---
+// --- Extrafields probe for interventions (fichinter) ---
+
+let _extrafieldsProbeResult: Record<string, any> | null | undefined = undefined;
+
+export async function probeFichinterExtrafields(): Promise<Record<string, any> | null> {
+  if (_extrafieldsProbeResult !== undefined) return _extrafieldsProbeResult;
+  try {
+    const result = await dolibarrGet<any[]>('/setup/extrafields?elementtype=fichinter');
+    if (result && Array.isArray(result) && result.length > 0) {
+      const fields: Record<string, any> = {};
+      result.forEach((f: any) => { fields[f.name || f.attrname] = f; });
+      _extrafieldsProbeResult = fields;
+      console.info('Extrafields fichinter détectés:', Object.keys(fields));
+    } else {
+      _extrafieldsProbeResult = null;
+      console.info('Aucun extrafield fichinter — fallback note_private JSON');
+    }
+  } catch {
+    _extrafieldsProbeResult = null;
+    console.warn('Probe extrafields fichinter échouée — fallback note_private JSON');
+  }
+  return _extrafieldsProbeResult;
+}
+
+export function getExtrafieldsProbeResult(): Record<string, any> | null | undefined {
+  return _extrafieldsProbeResult;
+}
+
+
 
 async function dolibarrCall<T>(endpoint: string, method = 'GET', data?: unknown): Promise<T | null> {
   try {
@@ -233,6 +261,8 @@ export async function fetchDevis(): Promise<Devis[]> {
 }
 
 export async function fetchInterventions(): Promise<Intervention[]> {
+  // Probe extrafields on first call (lazy, cached)
+  await probeFichinterExtrafields();
   const result = await dolibarrGet<any[]>('/interventions?sortfield=t.rowid&sortorder=DESC&limit=500');
   if (!result) return [];
   const mapped = result.map(mapDolibarrIntervention);
@@ -350,26 +380,35 @@ export async function createIntervention(data: {
   const endTime = data.heureFin || '10:00';
   const dateTimestamp = Math.floor(new Date(`${baseDate}T12:00:00`).getTime() / 1000);
   
-  // Serialize metadata into note_private as JSON
-  const metadata = JSON.stringify({
-    type: data.type || 'devis',
-    technicien: data.fk_user_assign || '',
-    heureDebut: startTime,
-    heureFin: endTime,
-    dateIntervention: baseDate,
-    notePrivee: data.note_private || '',
-  });
-  
   const body: any = {
     socid: socidInt,
     fk_soc: socidInt,
     fk_project: 0,
     description: data.description || ' ',
     date: dateTimestamp,
-    note_private: metadata,
   };
   
   if (data.fk_user_assign) body.fk_user_assign = data.fk_user_assign;
+
+  // Use extrafields if available, otherwise fallback to note_private JSON
+  const extrafields = getExtrafieldsProbeResult();
+  if (extrafields && (extrafields['type_intervention'] || extrafields['heure_debut'] || extrafields['heure_fin'])) {
+    body.array_options = {};
+    if (extrafields['type_intervention']) body.array_options.options_type_intervention = data.type || 'devis';
+    if (extrafields['heure_debut']) body.array_options.options_heure_debut = startTime;
+    if (extrafields['heure_fin']) body.array_options.options_heure_fin = endTime;
+    body.note_private = data.note_private || '';
+  } else {
+    // Fallback: serialize metadata into note_private as JSON
+    body.note_private = JSON.stringify({
+      type: data.type || 'devis',
+      technicien: data.fk_user_assign || '',
+      heureDebut: startTime,
+      heureFin: endTime,
+      dateIntervention: baseDate,
+      notePrivee: data.note_private || '',
+    });
+  }
   
   const result = await dolibarrCall<string>('/interventions', 'POST', body);
   return result || '';
@@ -440,7 +479,7 @@ export async function deleteFacture(id: string): Promise<string | null> {
 }
 
 export async function convertDevisToFacture(devisId: string): Promise<string | null> {
-  // Standard approach: GET devis, then POST /invoices with same lines
+  // Swagger-compliant: GET devis lines, POST /invoices, then mark devis as invoiced
   const devis = await dolibarrCall<any>(`/proposals/${devisId}`, 'GET');
   if (!devis) throw new Error('Devis introuvable');
   const lines = (devis.lines || []).map((l: any) => ({
@@ -459,6 +498,8 @@ export async function convertDevisToFacture(devisId: string): Promise<string | n
     linked_objects: { propal: devisId },
     note_private: `Facture créée depuis devis ${devis.ref || devisId}`,
   });
+  // Mark devis as invoiced
+  try { await setDevisInvoiced(devisId); } catch (e) { console.warn('setinvoiced failed:', e); }
   return result;
 }
 
@@ -512,13 +553,38 @@ export async function validateIntervention(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/interventions/${id}/validate`, 'POST');
 }
 
-export async function closeIntervention(id: string, status: number): Promise<string | null> {
-  return dolibarrCall<string>(`/interventions/${id}/close`, 'POST', { status });
+export async function closeIntervention(id: string): Promise<string | null> {
+  // Swagger: POST /interventions/{id}/close — NO body parameters — sets status to closed (5)
+  return dolibarrCall<string>(`/interventions/${id}/close`, 'POST');
+}
+
+// For intermediate status transitions (1→2 En cours, 2→3 Terminée) — use PUT
+export async function setInterventionStatus(id: string, status: number): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${id}`, 'PUT', { fk_statut: status });
+}
+
+export async function reopenIntervention(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${id}/reopen`, 'POST');
+}
+
+// --- Mark devis as invoiced after conversion ---
+export async function setDevisInvoiced(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/proposals/${id}/setinvoiced`, 'POST');
 }
 
 // --- PDF generation via Dolibarr builddoc ---
+// Swagger: builddoc supports invoice, order, proposal, contract, supplier_invoice, shipment, mrp
+// fichinter is NOT supported by builddoc — use fallback download
 
 export type DolibarrModulepart = 'propal' | 'facture' | 'fichinter';
+
+function base64ToBlobUrl(base64: string): string {
+  const byteChars = atob(base64);
+  const byteArray = new Uint8Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+  const blob = new Blob([byteArray], { type: 'application/pdf' });
+  return URL.createObjectURL(blob);
+}
 
 export async function generatePDF(
   modulepart: DolibarrModulepart,
@@ -526,7 +592,11 @@ export async function generatePDF(
   ref: string,
   model?: string
 ): Promise<string | null> {
-  const defaultModel = modulepart === 'propal' ? 'azur' : modulepart === 'facture' ? 'crabe' : 'soleil';
+  // fichinter not supported by builddoc — try direct download fallback
+  if (modulepart === 'fichinter') {
+    return generateFichinterPDF(ref);
+  }
+  const defaultModel = modulepart === 'propal' ? 'azur' : 'crabe';
   const result = await dolibarrCall<any>('/documents/builddoc', 'PUT', {
     modulepart,
     original_file: `${ref}/${ref}.pdf`,
@@ -534,14 +604,34 @@ export async function generatePDF(
     langcode: 'fr_FR',
   });
   if (!result) return null;
-  if (result.content) {
-    const byteChars = atob(result.content);
-    const byteArray = new Uint8Array(byteChars.length);
-    for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
-    const blob = new Blob([byteArray], { type: 'application/pdf' });
-    return URL.createObjectURL(blob);
-  }
+  if (result.content) return base64ToBlobUrl(result.content);
   return result?.filename || null;
+}
+
+async function generateFichinterPDF(ref: string): Promise<string | null> {
+  // Step 1: Try builddoc anyway (some instances may have custom modules)
+  try {
+    const result = await dolibarrCall<any>('/documents/builddoc', 'PUT', {
+      modulepart: 'fichinter',
+      original_file: `${ref}/${ref}.pdf`,
+      doctemplate: 'soleil',
+      langcode: 'fr_FR',
+    });
+    if (result?.content) return base64ToBlobUrl(result.content);
+  } catch (e) {
+    console.warn('builddoc fichinter non supporté, tentative download direct...');
+  }
+  // Step 2: Fallback — try downloading existing PDF
+  try {
+    const dlResult = await dolibarrCall<any>(
+      `/documents/download?modulepart=fichinter&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`,
+      'GET'
+    );
+    if (dlResult?.content) return base64ToBlobUrl(dlResult.content);
+  } catch (e) {
+    console.warn('Download direct PDF fichinter échoué:', e);
+  }
+  throw new Error('PDF intervention non disponible. Le module fichinter ne supporte pas la génération automatique via l\'API REST. Générez le PDF manuellement depuis Dolibarr.');
 }
 
 export function openPDFInNewTab(blobUrl: string, filename: string) {
@@ -558,15 +648,15 @@ export async function downloadPDFUrl(
   modulepart: DolibarrModulepart,
   ref: string
 ): Promise<string | null> {
+  // For fichinter, use the fallback logic
+  if (modulepart === 'fichinter') {
+    return generateFichinterPDF(ref);
+  }
   const result = await dolibarrGet<any>(
     `/documents/download?modulepart=${modulepart}&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`
   );
   if (!result?.content) return null;
-  const byteChars = atob(result.content);
-  const byteArray = new Uint8Array(byteChars.length);
-  for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
-  const blob = new Blob([byteArray], { type: 'application/pdf' });
-  return URL.createObjectURL(blob);
+  return base64ToBlobUrl(result.content);
 }
 
 // --- Send by email via Edge Function + PDF attachment ---
@@ -714,12 +804,15 @@ export async function addPayment(invoiceId: string, data: {
   paymentid: number;
   closepaidinvoices: string;
   amount: number;
+  accountid?: number;
 }): Promise<string | null> {
+  // Swagger requires accountid (mandatory field)
   const result = await dolibarrCall<string>(`/invoices/${invoiceId}/payments`, 'POST', {
     datepaye: toUnixTimestamp(data.datepaye),
     payment_id: data.paymentid,
     closepaidinvoices: data.closepaidinvoices,
     amount: data.amount,
+    accountid: data.accountid || 1,
   });
   return result;
 }
@@ -861,22 +954,23 @@ function parseNotePrivateMetadata(notePrivate: string | null | undefined): {
 
 function mapDolibarrIntervention(d: any): Intervention {
   const fk_statut = Number(d.fk_statut ?? d.statut ?? d.status) || 0;
+  const opts = d.array_options || {};
   
-  // Parse metadata from note_private JSON
+  // Parse metadata from note_private JSON (fallback)
   const meta = parseNotePrivateMetadata(d.note_private);
   
-  const technicien = meta?.technicien
-    || d.array_options?.options_technicien
+  // Priority: extrafields > note_private JSON > defaults
+  const technicien = opts.options_technicien
+    || meta?.technicien
     || (d.user_author?.firstname ? `${d.user_author.firstname} ${d.user_author.lastname || ''}`.trim() : '')
     || (d.user_creation_id ? String(d.user_creation_id) : '');
   
-  const rawType = meta?.type || d.array_options?.options_type || 'devis';
-  // Migrate legacy types
+  const rawType = opts.options_type_intervention || meta?.type || opts.options_type || 'devis';
   const interventionType = rawType === 'devis_sur_place' ? 'devis' : rawType === 'realisation' ? 'chantier' : rawType;
-  const heureDebut = meta?.heureDebut || parseDolibarrTime(d.dateo) || '08:00';
-  const heureFin = meta?.heureFin || parseDolibarrTime(d.datee) || '10:00';
   
-  // Date: prioritize metadata dateIntervention, then Dolibarr fields, datec as last resort
+  const heureDebut = opts.options_heure_debut || meta?.heureDebut || parseDolibarrTime(d.dateo) || '08:00';
+  const heureFin = opts.options_heure_fin || meta?.heureFin || parseDolibarrTime(d.datee) || '10:00';
+  
   const rawDate = meta?.dateIntervention || d.datest || d.datei || d.dateo || d.date || d.date_creation || d.datec;
   
   return {
@@ -933,7 +1027,8 @@ export function getAcompteBadge(montantHT: number): { label: string; variant: 'g
   };
 }
 
-export const statutsIntervention: string[] = ['Brouillon', 'Validée', 'En cours', 'Terminée', 'Fermée'];
+// Index-aligned with Dolibarr native statuts: 0=Brouillon, 1=Validée, 2=En cours, 3=Terminée, (4 n'existe pas), 5=Fermée
+export const statutsIntervention: string[] = ['Brouillon', 'Validée', 'En cours', 'Terminée'];
 export const typesIntervention: { value: InterventionType; label: string }[] = [
   { value: 'devis', label: 'Devis' },
   { value: 'panne', label: 'Panne' },

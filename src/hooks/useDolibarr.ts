@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, fetchDolibarrUsers,
   createClient, deleteClient, updateClient,
-  createIntervention, updateIntervention, deleteIntervention, validateIntervention, closeIntervention,
+  createIntervention, updateIntervention, deleteIntervention, validateIntervention, closeIntervention, setInterventionStatus,
   createDevis, updateDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
   createFacture, validateFacture, deleteFacture, updateFactureLines,
   convertDevisToFacture, createAcompteFacture,
@@ -100,7 +100,16 @@ export function useValidateIntervention() {
 export function useCloseIntervention() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { id: string; status: number }) => closeIntervention(data.id, data.status),
+    mutationFn: (id: string) => closeIntervention(id),
+    onSuccess: () => { toast.success('Intervention fermée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useSetInterventionStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { id: string; status: number }) => setInterventionStatus(data.id, data.status),
     onSuccess: () => { toast.success('Statut intervention mis à jour'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
