@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures, useCreateClient } from '@/hooks/useDolibarr';
+import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useSetInterventionStatus, useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures, useCreateClient } from '@/hooks/useDolibarr';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, resolveTechnicianName, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -45,6 +45,7 @@ export default function Interventions() {
   const validateMutation = useValidateIntervention();
   const deleteMutation = useDeleteIntervention();
   const closeMutation = useCloseIntervention();
+  const statusMutation = useSetInterventionStatus();
   const saveSignaturesMutation = useSaveSignatures();
   const updateMutation = useUpdateIntervention();
   const { role } = useAuth();
