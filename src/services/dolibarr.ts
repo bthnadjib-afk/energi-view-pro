@@ -502,7 +502,7 @@ export async function closeIntervention(id: string, status: number): Promise<str
 
 // --- PDF generation via Dolibarr builddoc ---
 
-export type DolibarrModulepart = 'propal' | 'facture' | 'ficheinter';
+export type DolibarrModulepart = 'propal' | 'facture' | 'fichinter';
 
 export async function generatePDF(
   modulepart: DolibarrModulepart,
