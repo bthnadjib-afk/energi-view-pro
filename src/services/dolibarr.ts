@@ -412,14 +412,15 @@ export async function createIntervention(data: {
   
   const result = await dolibarrCall<string>('/interventions', 'POST', body);
   const newId = result || '';
-  // Auto-trigger PDF generation in background
   if (newId) {
     try {
       const inter = await dolibarrGet<any>(`/interventions/${newId}`);
       if (inter?.ref) {
-        triggerFichinterBuilddoc(inter.ref).catch(e => console.warn('Auto builddoc after create failed:', e));
+        await ensureFichinterPdfReady(inter.ref);
       }
-    } catch (e) { console.warn('Could not fetch ref for builddoc:', e); }
+    } catch (e) {
+      console.warn('Auto builddoc after create failed:', e);
+    }
   }
   return newId;
 }
@@ -561,13 +562,14 @@ export async function deleteIntervention(id: string): Promise<string | null> {
 
 export async function validateIntervention(id: string): Promise<string | null> {
   const result = await dolibarrCall<string>(`/interventions/${id}/validate`, 'POST');
-  // Auto-trigger PDF generation after validation
   try {
     const inter = await dolibarrGet<any>(`/interventions/${id}`);
     if (inter?.ref) {
-      triggerFichinterBuilddoc(inter.ref).catch(e => console.warn('Auto builddoc after validate failed:', e));
+      await ensureFichinterPdfReady(inter.ref);
     }
-  } catch (e) { console.warn('Could not fetch ref for builddoc:', e); }
+  } catch (e) {
+    console.warn('Auto builddoc after validate failed:', e);
+  }
   return result;
 }
 
