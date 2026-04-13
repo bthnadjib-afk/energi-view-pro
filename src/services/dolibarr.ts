@@ -411,7 +411,17 @@ export async function createIntervention(data: {
   }
   
   const result = await dolibarrCall<string>('/interventions', 'POST', body);
-  return result || '';
+  const newId = result || '';
+  // Auto-trigger PDF generation in background
+  if (newId) {
+    try {
+      const inter = await dolibarrGet<any>(`/interventions/${newId}`);
+      if (inter?.ref) {
+        triggerFichinterBuilddoc(inter.ref).catch(e => console.warn('Auto builddoc after create failed:', e));
+      }
+    } catch (e) { console.warn('Could not fetch ref for builddoc:', e); }
+  }
+  return newId;
 }
 
 // --- Devis ---
@@ -550,7 +560,15 @@ export async function deleteIntervention(id: string): Promise<string | null> {
 // --- Intervention status transitions ---
 
 export async function validateIntervention(id: string): Promise<string | null> {
-  return dolibarrCall<string>(`/interventions/${id}/validate`, 'POST');
+  const result = await dolibarrCall<string>(`/interventions/${id}/validate`, 'POST');
+  // Auto-trigger PDF generation after validation
+  try {
+    const inter = await dolibarrGet<any>(`/interventions/${id}`);
+    if (inter?.ref) {
+      triggerFichinterBuilddoc(inter.ref).catch(e => console.warn('Auto builddoc after validate failed:', e));
+    }
+  } catch (e) { console.warn('Could not fetch ref for builddoc:', e); }
+  return result;
 }
 
 export async function closeIntervention(id: string): Promise<string | null> {
@@ -572,9 +590,18 @@ export async function setDevisInvoiced(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/proposals/${id}/setinvoiced`, 'POST');
 }
 
+// --- Fichinter builddoc utility ---
+
+export async function triggerFichinterBuilddoc(ref: string): Promise<any> {
+  return dolibarrCall<any>('/documents/builddoc', 'PUT', {
+    modulepart: 'fichinter',
+    original_file: `${ref}/${ref}.pdf`,
+    doctemplate: 'soleil',
+    langcode: 'fr_FR',
+  });
+}
+
 // --- PDF generation via Dolibarr builddoc ---
-// Swagger: builddoc supports invoice, order, proposal, contract, supplier_invoice, shipment, mrp
-// fichinter is NOT supported by builddoc — use fallback download
 
 export type DolibarrModulepart = 'propal' | 'facture' | 'fichinter';
 
@@ -609,19 +636,14 @@ export async function generatePDF(
 }
 
 async function generateFichinterPDF(ref: string): Promise<string | null> {
-  // Step 1: Try builddoc anyway (some instances may have custom modules)
+  // Step 1: Try builddoc
   try {
-    const result = await dolibarrCall<any>('/documents/builddoc', 'PUT', {
-      modulepart: 'fichinter',
-      original_file: `${ref}/${ref}.pdf`,
-      doctemplate: 'soleil',
-      langcode: 'fr_FR',
-    });
+    const result = await triggerFichinterBuilddoc(ref);
     if (result?.content) return base64ToBlobUrl(result.content);
   } catch (e) {
-    console.warn('builddoc fichinter non supporté, tentative download direct...');
+    console.warn('builddoc fichinter failed, trying direct download...');
   }
-  // Step 2: Fallback — try downloading existing PDF
+  // Step 2: Try downloading existing PDF
   try {
     const dlResult = await dolibarrCall<any>(
       `/documents/download?modulepart=fichinter&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`,
@@ -629,9 +651,21 @@ async function generateFichinterPDF(ref: string): Promise<string | null> {
     );
     if (dlResult?.content) return base64ToBlobUrl(dlResult.content);
   } catch (e) {
-    console.warn('Download direct PDF fichinter échoué:', e);
+    console.warn('Direct download failed:', e);
   }
-  throw new Error('PDF intervention non disponible. Le module fichinter ne supporte pas la génération automatique via l\'API REST. Générez le PDF manuellement depuis Dolibarr.');
+  // Step 3: Retry — trigger builddoc then wait and download
+  try {
+    await triggerFichinterBuilddoc(ref);
+    await new Promise(r => setTimeout(r, 1500));
+    const dlResult = await dolibarrCall<any>(
+      `/documents/download?modulepart=fichinter&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`,
+      'GET'
+    );
+    if (dlResult?.content) return base64ToBlobUrl(dlResult.content);
+  } catch (e) {
+    console.warn('Retry builddoc+download failed:', e);
+  }
+  throw new Error('PDF intervention non disponible. Veuillez réessayer avec le bouton "Générer le PDF".');
 }
 
 export function openPDFInNewTab(blobUrl: string, filename: string) {

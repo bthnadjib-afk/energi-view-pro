@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useSetInterventionStatus, useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures, useCreateClient } from '@/hooks/useDolibarr';
+import { useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture, useValidateIntervention, useDeleteIntervention, useCloseIntervention, useSetInterventionStatus, useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures, useCreateClient, useGenerateInterventionPDF } from '@/hooks/useDolibarr';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab, downloadPDFUrl, sendInterventionByEmail, resolveTechnicianName, type InterventionType, type Intervention } from '@/services/dolibarr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
 import { SignaturePad } from '@/components/SignaturePad';
-import { Plus, FileText, Receipt, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send, Play, CheckCircle2, Search, Pencil } from 'lucide-react';
+import { Plus, FileText, Receipt, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send, Play, CheckCircle2, Search, Pencil, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -48,6 +48,7 @@ export default function Interventions() {
   const statusMutation = useSetInterventionStatus();
   const saveSignaturesMutation = useSaveSignatures();
   const updateMutation = useUpdateIntervention();
+  const generatePDFMutation = useGenerateInterventionPDF();
   const { role } = useAuth();
 
   // New client inline form state
@@ -660,7 +661,16 @@ export default function Interventions() {
                         </AlertDialogContent>
                       </AlertDialog>
                       <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
-                        <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
+                        <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération du document...' : 'Voir le PDF'}
+                      </Button>
+                      <Button
+                        onClick={() => selectedIntervention?.ref && generatePDFMutation.mutate({ ref: selectedIntervention.ref })}
+                        disabled={generatePDFMutation.isPending}
+                        variant="outline"
+                        className="gap-2"
+                      >
+                        <RefreshCw className={cn("h-4 w-4", generatePDFMutation.isPending && "animate-spin")} />
+                        {generatePDFMutation.isPending ? 'Génération...' : 'Générer le PDF'}
                       </Button>
                     </>
                   )}
@@ -686,7 +696,16 @@ export default function Interventions() {
                         <ArrowRightLeft className="h-4 w-4" /> {createDevisMutation.isPending ? 'Création...' : 'Transformer en Devis'}
                       </Button>
                       <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
-                        <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
+                        <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération du document...' : 'Voir le PDF'}
+                      </Button>
+                      <Button
+                        onClick={() => selectedIntervention?.ref && generatePDFMutation.mutate({ ref: selectedIntervention.ref })}
+                        disabled={generatePDFMutation.isPending}
+                        variant="outline"
+                        className="gap-2"
+                      >
+                        <RefreshCw className={cn("h-4 w-4", generatePDFMutation.isPending && "animate-spin")} />
+                        {generatePDFMutation.isPending ? 'Génération...' : 'Générer le PDF'}
                       </Button>
                       <Button onClick={() => {
                         const c = clients.find(cl => cl.id === selectedIntervention.socid);
