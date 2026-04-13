@@ -440,7 +440,7 @@ export async function deleteFacture(id: string): Promise<string | null> {
 }
 
 export async function convertDevisToFacture(devisId: string): Promise<string | null> {
-  // Standard approach: GET devis, then POST /invoices with same lines
+  // Swagger-compliant: GET devis lines, POST /invoices, then mark devis as invoiced
   const devis = await dolibarrCall<any>(`/proposals/${devisId}`, 'GET');
   if (!devis) throw new Error('Devis introuvable');
   const lines = (devis.lines || []).map((l: any) => ({
@@ -459,6 +459,8 @@ export async function convertDevisToFacture(devisId: string): Promise<string | n
     linked_objects: { propal: devisId },
     note_private: `Facture créée depuis devis ${devis.ref || devisId}`,
   });
+  // Mark devis as invoiced
+  try { await setDevisInvoiced(devisId); } catch (e) { console.warn('setinvoiced failed:', e); }
   return result;
 }
 
@@ -512,13 +514,33 @@ export async function validateIntervention(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/interventions/${id}/validate`, 'POST');
 }
 
-export async function closeIntervention(id: string, status: number): Promise<string | null> {
-  return dolibarrCall<string>(`/interventions/${id}/close`, 'POST', { status });
+export async function closeIntervention(id: string): Promise<string | null> {
+  // Swagger: POST /interventions/{id}/close — NO body parameters
+  return dolibarrCall<string>(`/interventions/${id}/close`, 'POST');
+}
+
+export async function reopenIntervention(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${id}/reopen`, 'POST');
+}
+
+// --- Mark devis as invoiced after conversion ---
+export async function setDevisInvoiced(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/proposals/${id}/setinvoiced`, 'POST');
 }
 
 // --- PDF generation via Dolibarr builddoc ---
+// Swagger: builddoc supports invoice, order, proposal, contract, supplier_invoice, shipment, mrp
+// fichinter is NOT supported by builddoc — use fallback download
 
 export type DolibarrModulepart = 'propal' | 'facture' | 'fichinter';
+
+function base64ToBlobUrl(base64: string): string {
+  const byteChars = atob(base64);
+  const byteArray = new Uint8Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+  const blob = new Blob([byteArray], { type: 'application/pdf' });
+  return URL.createObjectURL(blob);
+}
 
 export async function generatePDF(
   modulepart: DolibarrModulepart,
@@ -526,7 +548,11 @@ export async function generatePDF(
   ref: string,
   model?: string
 ): Promise<string | null> {
-  const defaultModel = modulepart === 'propal' ? 'azur' : modulepart === 'facture' ? 'crabe' : 'soleil';
+  // fichinter not supported by builddoc — try direct download fallback
+  if (modulepart === 'fichinter') {
+    return generateFichinterPDF(ref);
+  }
+  const defaultModel = modulepart === 'propal' ? 'azur' : 'crabe';
   const result = await dolibarrCall<any>('/documents/builddoc', 'PUT', {
     modulepart,
     original_file: `${ref}/${ref}.pdf`,
@@ -534,14 +560,34 @@ export async function generatePDF(
     langcode: 'fr_FR',
   });
   if (!result) return null;
-  if (result.content) {
-    const byteChars = atob(result.content);
-    const byteArray = new Uint8Array(byteChars.length);
-    for (let i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
-    const blob = new Blob([byteArray], { type: 'application/pdf' });
-    return URL.createObjectURL(blob);
-  }
+  if (result.content) return base64ToBlobUrl(result.content);
   return result?.filename || null;
+}
+
+async function generateFichinterPDF(ref: string): Promise<string | null> {
+  // Step 1: Try builddoc anyway (some instances may have custom modules)
+  try {
+    const result = await dolibarrCall<any>('/documents/builddoc', 'PUT', {
+      modulepart: 'fichinter',
+      original_file: `${ref}/${ref}.pdf`,
+      doctemplate: 'soleil',
+      langcode: 'fr_FR',
+    });
+    if (result?.content) return base64ToBlobUrl(result.content);
+  } catch (e) {
+    console.warn('builddoc fichinter non supporté, tentative download direct...');
+  }
+  // Step 2: Fallback — try downloading existing PDF
+  try {
+    const dlResult = await dolibarrCall<any>(
+      `/documents/download?modulepart=fichinter&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`,
+      'GET'
+    );
+    if (dlResult?.content) return base64ToBlobUrl(dlResult.content);
+  } catch (e) {
+    console.warn('Download direct PDF fichinter échoué:', e);
+  }
+  throw new Error('PDF intervention non disponible. Le module fichinter ne supporte pas la génération automatique via l\'API REST. Générez le PDF manuellement depuis Dolibarr.');
 }
 
 export function openPDFInNewTab(blobUrl: string, filename: string) {
@@ -714,12 +760,15 @@ export async function addPayment(invoiceId: string, data: {
   paymentid: number;
   closepaidinvoices: string;
   amount: number;
+  accountid?: number;
 }): Promise<string | null> {
+  // Swagger requires accountid (mandatory field)
   const result = await dolibarrCall<string>(`/invoices/${invoiceId}/payments`, 'POST', {
     datepaye: toUnixTimestamp(data.datepaye),
     payment_id: data.paymentid,
     closepaidinvoices: data.closepaidinvoices,
     amount: data.amount,
+    accountid: data.accountid || 1,
   });
   return result;
 }
@@ -933,7 +982,8 @@ export function getAcompteBadge(montantHT: number): { label: string; variant: 'g
   };
 }
 
-export const statutsIntervention: string[] = ['Brouillon', 'Validée', 'En cours', 'Terminée', 'Fermée'];
+// Index-aligned with Dolibarr native statuts: 0=Brouillon, 1=Validée, 2=En cours, 3=Terminée, (4 n'existe pas), 5=Fermée
+export const statutsIntervention: string[] = ['Brouillon', 'Validée', 'En cours', 'Terminée'];
 export const typesIntervention: { value: InterventionType; label: string }[] = [
   { value: 'devis', label: 'Devis' },
   { value: 'panne', label: 'Panne' },
