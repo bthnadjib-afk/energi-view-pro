@@ -596,6 +596,48 @@ export async function reopenIntervention(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/interventions/${id}/reopen`, 'POST');
 }
 
+// --- Intervention Lines CRUD ---
+
+export async function fetchInterventionLines(id: string): Promise<InterventionLine[]> {
+  const result = await dolibarrGet<any[]>(`/interventions/${id}/lines`);
+  if (!result || !Array.isArray(result)) return [];
+  return result.map((l: any) => ({
+    id: String(l.id || l.rowid),
+    description: l.description || l.desc || '',
+    date: parseDolibarrDate(l.date),
+    duree: parseInt(l.duree || l.duration || '0', 10),
+    rang: parseInt(l.rang || '0', 10),
+  }));
+}
+
+export async function addInterventionLine(interventionId: string, data: {
+  description: string;
+  date: string;
+  duree: number;
+}): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${interventionId}/lines`, 'POST', {
+    description: data.description,
+    date: toUnixTimestamp(data.date + 'T12:00:00'),
+    duree: data.duree,
+  });
+}
+
+export async function updateInterventionLine(interventionId: string, lineId: string, data: {
+  description: string;
+  date: string;
+  duree: number;
+}): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${interventionId}/lines/${lineId}`, 'PUT', {
+    description: data.description,
+    date: toUnixTimestamp(data.date + 'T12:00:00'),
+    duree: data.duree,
+  });
+}
+
+export async function deleteInterventionLine(interventionId: string, lineId: string): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${interventionId}/lines/${lineId}`, 'DELETE');
+}
+
 // --- Mark devis as invoiced after conversion ---
 export async function setDevisInvoiced(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/proposals/${id}/setinvoiced`, 'POST');
