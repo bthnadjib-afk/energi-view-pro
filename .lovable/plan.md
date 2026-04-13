@@ -1,27 +1,21 @@
 
 
-# Conformité stricte au Backend Dolibarr
+# Correction du modulepart pour les PDF d'interventions
 
-## Règle enregistrée
+## Problème identifié
 
-Cette directive sera sauvegardée comme contrainte fondamentale du projet, appliquée à chaque modification future :
-
-1. **Aucun champ UI sans équivalent API** : tout champ de formulaire doit correspondre à un champ existant dans l'API REST Dolibarr, vérifié via `src/services/dolibarr.ts` et les réponses API réelles.
-
-2. **Validation miroir** : si un champ est `required` côté API, il l'est dans l'UI. S'il est optionnel, il l'est dans l'UI. S'il n'existe pas, il n'apparaît pas.
-
-3. **Aucune invention** : en cas de doute sur l'existence d'un champ ou module, demander confirmation avant d'implémenter.
-
-4. **Audit préalable** : avant toute modification d'un formulaire (Client, Devis, Facture, Intervention, Utilisateur), consulter le service dolibarr.ts et les réponses réseau pour confirmer les champs disponibles.
-
-## Action
-
-Sauvegarder cette règle dans `mem://constraints/dolibarr-conformity` et l'ajouter au Core de `mem://index.md` pour qu'elle s'applique systématiquement.
+L'erreur `"Forbidden: Generation not available for this modulepart"` vient d'une faute de frappe dans le code : le modulepart envoyé à l'API Dolibarr est **`ficheinter`** alors que Dolibarr attend **`fichinter`** (sans le 'e').
 
 ## Fichiers impactés
 
 | Fichier | Modification |
 |---------|-------------|
-| `mem://constraints/dolibarr-conformity` | Nouvelle mémoire avec la règle complète |
-| `mem://index.md` | Ajout de la règle au Core + référence dans Memories |
+| `src/services/dolibarr.ts` | Corriger le type `DolibarrModulepart` : remplacer `'ficheinter'` par `'fichinter'` |
+| `src/pages/Interventions.tsx` | Mettre à jour les 3 appels `generatePDF` et `downloadPDFUrl` pour utiliser `'fichinter'` au lieu de `'ficheinter'` |
+
+## Detail technique
+
+- **Ligne 505** de `dolibarr.ts` : le type union `'ficheinter'` devient `'fichinter'`
+- **Lignes 265, 267, 286** de `Interventions.tsx` : remplacer `'ficheinter'` par `'fichinter'`
+- Le modèle PDF par défaut `'soleil'` reste inchangé (modèle standard Dolibarr pour fichinter)
 
