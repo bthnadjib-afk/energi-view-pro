@@ -256,7 +256,7 @@ export default function Clients() {
                     <div className="space-y-4 pt-3">
                       <Input placeholder="Nom *" value={nom} onChange={e => setNom(e.target.value)} />
                       {/* P2 — Autocomplétion en mode édition */}
-                      <AddressAutocomplete value={adresse} onSelect={({ rue, codePostal: cp, ville: v }) => { setAdresse(rue); setCodePostal(cp); setVille(v); }} placeholder="Adresse (autocomplétion)" />
+                      <AddressAutocomplete value={adresse} onSelect={({ rue, codePostal: cp, ville: v }) => { setAdresse(rue); setCodePostal(cp); setVille(v); }} placeholder="Adresse" />
                       <div className="grid grid-cols-2 gap-3">
                         <Input placeholder="Code postal" value={codePostal} onChange={e => setCodePostal(e.target.value)} />
                         <Input placeholder="Ville" value={ville} onChange={e => setVille(e.target.value)} />
