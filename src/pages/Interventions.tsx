@@ -258,7 +258,7 @@ export default function Interventions() {
     setEditDate(selectedIntervention.date || '');
     setEditHeureDebut(selectedIntervention.heureDebut || '08:00');
     setEditHeureFin(selectedIntervention.heureFin || '10:00');
-    setEditType(selectedIntervention.type || 'chantier');
+    setEditType(selectedIntervention.type || 'devis');
     setEditNotePrivee(selectedIntervention.compteRendu || '');
     setEditOpen(true);
   };
@@ -291,7 +291,7 @@ export default function Interventions() {
     
     // Serialize metadata into note_private as JSON
     const metadata = JSON.stringify({
-      type: editType || 'chantier',
+      type: editType || 'devis',
       technicien: selectedUser?.id || editTech || '',
       heureDebut: editHeureDebut || '08:00',
       heureFin: editHeureFin || '10:00',

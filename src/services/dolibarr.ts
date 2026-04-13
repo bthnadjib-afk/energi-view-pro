@@ -362,7 +362,7 @@ export async function createIntervention(data: {
   
   // Serialize metadata into note_private as JSON
   const metadata = JSON.stringify({
-    type: data.type || 'chantier',
+    type: data.type || 'devis',
     technicien: data.fk_user_assign || '',
     heureDebut: startTime,
     heureFin: endTime,

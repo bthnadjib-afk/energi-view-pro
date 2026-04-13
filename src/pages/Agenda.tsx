@@ -71,7 +71,7 @@ export default function Agenda() {
   const [createDate, setCreateDate] = useState('');
   const [newClientId, setNewClientId] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [newType, setNewType] = useState<InterventionType>('chantier');
+  const [newType, setNewType] = useState<InterventionType>('devis');
   const [newTech, setNewTech] = useState('');
   const [newHeureDebut, setNewHeureDebut] = useState('08:00');
   const [newHeureFin, setNewHeureFin] = useState('10:00');
@@ -128,7 +128,7 @@ export default function Agenda() {
       setCreateDate(dateStr);
       setNewClientId('');
       setNewDescription('');
-      setNewType('chantier');
+      setNewType('devis');
       setNewTech('');
       setNewHeureDebut('08:00');
       setNewHeureFin('10:00');
@@ -334,7 +334,7 @@ export default function Agenda() {
             setCreateDate(dayListDate);
             setNewClientId('');
             setNewDescription('');
-            setNewType('chantier');
+            setNewType('devis');
             setNewTech('');
             setNewHeureDebut('08:00');
             setNewHeureFin('10:00');
