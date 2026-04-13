@@ -48,6 +48,14 @@ export type InterventionType = 'devis' | 'panne' | 'panne_urgence' | 'sav' | 'ch
 
 export type InterventionStatut = string;
 
+export interface InterventionLine {
+  id: string;
+  description: string;
+  date: string;
+  duree: number; // duration in seconds
+  rang: number;
+}
+
 export interface Intervention {
   id: string;
   ref: string;
@@ -62,8 +70,9 @@ export interface Intervention {
   fk_statut: number;
   type: InterventionType;
   description: string;
-  descriptionClient?: string;  // note_public
-  compteRendu?: string;        // from note_private metadata notePrivee
+  descriptionClient?: string;
+  compteRendu?: string;
+  lines?: InterventionLine[];
 }
 
 export interface Client {
@@ -587,6 +596,48 @@ export async function reopenIntervention(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/interventions/${id}/reopen`, 'POST');
 }
 
+// --- Intervention Lines CRUD ---
+
+export async function fetchInterventionLines(id: string): Promise<InterventionLine[]> {
+  const result = await dolibarrGet<any[]>(`/interventions/${id}/lines`);
+  if (!result || !Array.isArray(result)) return [];
+  return result.map((l: any) => ({
+    id: String(l.id || l.rowid),
+    description: l.description || l.desc || '',
+    date: parseDolibarrDate(l.date),
+    duree: parseInt(l.duree || l.duration || '0', 10),
+    rang: parseInt(l.rang || '0', 10),
+  }));
+}
+
+export async function addInterventionLine(interventionId: string, data: {
+  description: string;
+  date: string;
+  duree: number;
+}): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${interventionId}/lines`, 'POST', {
+    description: data.description,
+    date: toUnixTimestamp(data.date + 'T12:00:00'),
+    duree: data.duree,
+  });
+}
+
+export async function updateInterventionLine(interventionId: string, lineId: string, data: {
+  description: string;
+  date: string;
+  duree: number;
+}): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${interventionId}/lines/${lineId}`, 'PUT', {
+    description: data.description,
+    date: toUnixTimestamp(data.date + 'T12:00:00'),
+    duree: data.duree,
+  });
+}
+
+export async function deleteInterventionLine(interventionId: string, lineId: string): Promise<string | null> {
+  return dolibarrCall<string>(`/interventions/${interventionId}/lines/${lineId}`, 'DELETE');
+}
+
 // --- Mark devis as invoiced after conversion ---
 export async function setDevisInvoiced(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/proposals/${id}/setinvoiced`, 'POST');
@@ -854,17 +905,29 @@ export async function updateDolibarrUser(dolibarrUserId: string, data: { firstna
   return dolibarrCall<string>(`/users/${dolibarrUserId}`, 'PUT', data);
 }
 
-// --- Signature persistence ---
+// --- Signature persistence (now via Supabase table) ---
 
-export async function saveInterventionSignatures(id: string, signatureClient?: string, signatureTech?: string): Promise<string | null> {
-  const body: any = {};
-  if (signatureClient || signatureTech) {
-    body.note_public = [
-      signatureClient ? `[SIGNATURE_CLIENT]${signatureClient}[/SIGNATURE_CLIENT]` : '',
-      signatureTech ? `[SIGNATURE_TECH]${signatureTech}[/SIGNATURE_TECH]` : '',
-    ].filter(Boolean).join('\n');
-  }
-  return dolibarrCall<string>(`/interventions/${id}`, 'PUT', body);
+export async function saveInterventionSignatures(id: string, signatureClient?: string, signatureTech?: string, ref?: string): Promise<void> {
+  const { error: upsertError } = await supabase
+    .from('intervention_signatures')
+    .upsert({
+      intervention_id: id,
+      intervention_ref: ref || null,
+      signature_client: signatureClient || null,
+      signature_tech: signatureTech || null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'intervention_id' });
+  if (upsertError) throw upsertError;
+}
+
+export async function getInterventionSignatures(interventionId: string): Promise<{ signature_client: string | null; signature_tech: string | null } | null> {
+  const { data, error } = await supabase
+    .from('intervention_signatures')
+    .select('signature_client, signature_tech')
+    .eq('intervention_id', interventionId)
+    .maybeSingle();
+  if (error) { console.warn('Error fetching signatures:', error); return null; }
+  return data;
 }
 
 // --- Email variable replacement ---
@@ -1059,7 +1122,7 @@ export function getAcompteBadge(montantHT: number): { label: string; variant: 'g
 }
 
 // Index-aligned with Dolibarr native statuts: 0=Brouillon, 1=Validée, 2=En cours, 3=Terminée, (4 n'existe pas), 5=Fermée
-export const statutsIntervention: string[] = ['Brouillon', 'Validée', 'En cours', 'Terminée'];
+export const statutsIntervention: string[] = ['Brouillon', 'Validée', 'En cours', 'Terminée', 'Fermée'];
 export const typesIntervention: { value: InterventionType; label: string }[] = [
   { value: 'devis', label: 'Devis' },
   { value: 'panne', label: 'Panne' },

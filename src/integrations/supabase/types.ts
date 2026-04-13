@@ -89,6 +89,36 @@ export type Database = {
         }
         Relationships: []
       }
+      intervention_signatures: {
+        Row: {
+          created_at: string
+          id: string
+          intervention_id: string
+          intervention_ref: string | null
+          signature_client: string | null
+          signature_tech: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          intervention_id: string
+          intervention_ref?: string | null
+          signature_client?: string | null
+          signature_tech?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          intervention_id?: string
+          intervention_ref?: string | null
+          signature_client?: string | null
+          signature_tech?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           actif: boolean
