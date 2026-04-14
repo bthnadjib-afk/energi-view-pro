@@ -6,7 +6,7 @@ import {
   useValidateIntervention, useDeleteIntervention, useCloseIntervention, useSetInterventionStatus,
   useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures,
   useCreateClient, useReopenIntervention, useProduits,
-  useInterventionLines, useAddInterventionLine, useUpdateInterventionLine, useDeleteInterventionLine,
+  useInterventionLines,
 } from '@/hooks/useDolibarr';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import {
@@ -68,9 +68,6 @@ export default function Interventions() {
   const updateMutation = useUpdateIntervention();
   
   const reopenMutation = useReopenIntervention();
-  const addLineMutation = useAddInterventionLine();
-  const updateLineMutation = useUpdateInterventionLine();
-  const deleteLineMutation = useDeleteInterventionLine();
   const { role } = useAuth();
 
   // New client inline form state
@@ -162,11 +159,7 @@ export default function Interventions() {
   const [heureDepart, setHeureDepart] = useState('');
 
   // P1: Lines state
-  const { data: interventionLines = [], refetch: refetchLines } = useInterventionLines(selectedIntervention?.id);
-  const [showAddLine, setShowAddLine] = useState(false);
-  const [lineDesc, setLineDesc] = useState('');
-  const [lineDate, setLineDate] = useState('');
-  const [lineDuree, setLineDuree] = useState(60); // minutes
+  const { data: interventionLines = [] } = useInterventionLines(selectedIntervention?.id);
 
   // P2: Facture conversion dialog
   const [factureDialogOpen, setFactureDialogOpen] = useState(false);
