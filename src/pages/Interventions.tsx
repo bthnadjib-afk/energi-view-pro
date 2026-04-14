@@ -354,17 +354,6 @@ export default function Interventions() {
     setDetailOpen(false);
   };
 
-  // P1: Add line handler
-  const handleAddLine = async () => {
-    if (!selectedIntervention || !lineDesc.trim()) { toast.error('Description requise'); return; }
-    await addLineMutation.mutateAsync({
-      interventionId: selectedIntervention.id,
-      description: lineDesc,
-      date: lineDate || selectedIntervention.date,
-      duree: lineDuree * 60, // convert minutes to seconds
-    });
-    setLineDesc(''); setLineDate(''); setLineDuree(60); setShowAddLine(false);
-  };
 
   return (
     <div className="space-y-6">
