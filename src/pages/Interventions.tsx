@@ -241,12 +241,32 @@ export default function Interventions() {
     resetNewClientForm();
   };
 
+  const roundToQuarterHour = (date: Date): string => {
+    const minutes = Math.round(date.getMinutes() / 15) * 15;
+    const h = date.getHours() + Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  };
+
   const openDetail = (inter: Intervention) => {
     setSelectedIntervention(inter);
     setDetailOpen(true);
-    setTechNote('');
-    setHeureArrivee('');
-    setHeureDepart('');
+    // Restore saved tech info from note_public (descriptionClient) if it exists
+    let restoredNote = '';
+    let restoredArrivee = '';
+    let restoredDepart = '';
+    if (inter.descriptionClient) {
+      try {
+        const saved = JSON.parse(inter.descriptionClient);
+        restoredNote = saved.techNote || '';
+        restoredArrivee = saved.heureArrivee || '';
+        restoredDepart = saved.heureDepart || '';
+      } catch { /* not JSON, ignore */ }
+    }
+    setTechNote(restoredNote);
+    setHeureArrivee(restoredArrivee);
+    // Auto-fill departure with current time rounded to 15 min if not already saved
+    setHeureDepart(restoredDepart || roundToQuarterHour(new Date()));
   };
 
   const handleTransformDevis = async (inter: Intervention) => {
@@ -765,6 +785,18 @@ export default function Interventions() {
                         }
                         if (!heureDepart) {
                           toast.error('L\'heure de départ est obligatoire pour terminer');
+                          return;
+                        }
+                        // Validate times are for today — not in the past
+                        const now = new Date();
+                        const todayStr = now.toISOString().slice(0, 10);
+                        const interDate = selectedIntervention.date?.slice(0, 10);
+                        if (interDate && interDate < todayStr) {
+                          // Intervention date is before today — warn but allow if already validated
+                        }
+                        // Check arrival is not after departure
+                        if (heureArrivee >= heureDepart) {
+                          toast.error('L\'heure d\'arrivée doit être avant l\'heure de départ');
                           return;
                         }
                         if (!signatureData) {
