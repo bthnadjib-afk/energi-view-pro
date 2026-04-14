@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useInterventions, useClients, useCreateIntervention, useDolibarrUsers } from '@/hooks/useDolibarr';
+import { useAuth } from '@/hooks/useAuth';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ChevronLeft, ChevronRight, X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
