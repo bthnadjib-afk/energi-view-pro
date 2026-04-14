@@ -7,6 +7,8 @@ interface PdfParams {
   intervention: Intervention;
   client?: Client;
   lines: InterventionLine[];
+  signatureClient?: string;
+  signatureTech?: string;
   entreprise?: {
     nom: string;
     adresse: string;
@@ -38,9 +40,10 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 /** Internal: builds the jsPDF doc object */
-function buildInterventionPdf({ intervention, client, lines, entreprise }: PdfParams): jsPDF {
+function buildInterventionPdf({ intervention, client, lines, entreprise, signatureClient, signatureTech }: PdfParams): jsPDF {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
   const margin = 15;
   let y = 15;
 
@@ -219,8 +222,51 @@ function buildInterventionPdf({ intervention, client, lines, entreprise }: PdfPa
     y = (doc as any).lastAutoTable?.finalY || y + 20;
   }
 
+  // ─── SIGNATURES ───
+  if (signatureClient || signatureTech) {
+    y += 8;
+    // Check if we need a new page
+    if (y > pageH - 80) {
+      doc.addPage();
+      y = 20;
+    }
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 64, 175);
+    doc.text('SIGNATURES', margin, y);
+    y += 2;
+    doc.setDrawColor(30, 64, 175);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, margin + 30, y);
+    y += 6;
+
+    const sigWidth = 60;
+    const sigHeight = 30;
+
+    if (signatureTech) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(80, 80, 80);
+      doc.text('Technicien :', margin, y);
+      y += 3;
+      try { doc.addImage(signatureTech, 'PNG', margin, y, sigWidth, sigHeight); } catch {}
+      y += sigHeight + 4;
+    }
+
+    if (signatureClient) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(80, 80, 80);
+      doc.text('Client :', margin, y);
+      y += 3;
+      try { doc.addImage(signatureClient, 'PNG', margin, y, sigWidth, sigHeight); } catch {}
+      y += sigHeight + 4;
+    }
+  }
+
   // ─── FOOTER ───
-  const pageH = doc.internal.pageSize.getHeight();
+  // pageH already declared at top
   doc.setDrawColor(200, 200, 200);
   doc.setLineWidth(0.3);
   doc.line(margin, pageH - 20, pageWidth - margin, pageH - 20);
