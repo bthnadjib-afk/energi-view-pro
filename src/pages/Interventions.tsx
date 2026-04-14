@@ -156,6 +156,11 @@ export default function Interventions() {
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
 
+  // Tech note & arrival/departure (internal, not on PDF)
+  const [techNote, setTechNote] = useState('');
+  const [heureArrivee, setHeureArrivee] = useState('');
+  const [heureDepart, setHeureDepart] = useState('');
+
   // P1: Lines state
   const { data: interventionLines = [], refetch: refetchLines } = useInterventionLines(selectedIntervention?.id);
   const [showAddLine, setShowAddLine] = useState(false);
