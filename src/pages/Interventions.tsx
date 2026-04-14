@@ -5,7 +5,7 @@ import {
   useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture,
   useValidateIntervention, useDeleteIntervention, useCloseIntervention, useSetInterventionStatus,
   useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures,
-  useCreateClient, useGenerateInterventionPDF, useReopenIntervention, useProduits,
+  useCreateClient, useReopenIntervention, useProduits,
   useInterventionLines, useAddInterventionLine, useUpdateInterventionLine, useDeleteInterventionLine,
 } from '@/hooks/useDolibarr';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
