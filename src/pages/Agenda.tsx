@@ -92,9 +92,16 @@ export default function Agenda() {
   }, [dolibarrUsers, interventions]);
 
   const filteredInterventions = useMemo(() => {
-    if (filterTech === 'all') return interventions;
-    return interventions.filter(i => i.technicien === filterTech);
-  }, [interventions, filterTech]);
+    let result = interventions;
+    // Techniciens ne voient pas les brouillons (fk_statut === 0)
+    if (role === 'technicien') {
+      result = result.filter(i => i.fk_statut >= 1);
+    }
+    if (filterTech !== 'all') {
+      result = result.filter(i => i.technicien === filterTech);
+    }
+    return result;
+  }, [interventions, filterTech, role]);
 
   const interventionsByDate = useMemo(() => {
     const map: Record<string, Intervention[]> = {};
