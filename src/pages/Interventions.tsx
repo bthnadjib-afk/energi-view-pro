@@ -66,7 +66,7 @@ export default function Interventions() {
   const statusMutation = useSetInterventionStatus();
   const saveSignaturesMutation = useSaveSignatures();
   const updateMutation = useUpdateIntervention();
-  const generatePDFMutation = useGenerateInterventionPDF();
+  
   const reopenMutation = useReopenIntervention();
   const addLineMutation = useAddInterventionLine();
   const updateLineMutation = useUpdateInterventionLine();
