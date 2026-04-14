@@ -290,14 +290,13 @@ export default function Interventions() {
     setGeneratingPDF(true);
     try {
       const client = clients.find(c => c.id === selectedIntervention.socid);
-      const url = generateInterventionPdfLocal({
+      generateInterventionPdfLocal({
         intervention: selectedIntervention,
         client,
         lines: interventionLines,
         entreprise: config.entreprise,
       });
-      if (url) { setPdfPreviewUrl(url); setPdfPreviewOpen(true); }
-      else toast.error('PDF non disponible');
+      toast.success('PDF téléchargé');
     } catch (e: any) { toast.error(`Erreur PDF : ${e.message || e}`); }
     finally { setGeneratingPDF(false); }
   };
@@ -802,13 +801,12 @@ export default function Interventions() {
                     onClick={() => {
                       if (!selectedIntervention) return;
                       const client = clients.find(c => c.id === selectedIntervention.socid);
-                      const url = generateInterventionPdfLocal({
+                      generateInterventionPdfLocal({
                         intervention: selectedIntervention,
                         client,
                         lines: interventionLines,
                         entreprise: config.entreprise,
                       });
-                      if (url) openPDFInNewTab(url, `${selectedIntervention.ref}.pdf`);
                     }}
                     disabled={generatingPDF}
                     variant="outline" className="gap-2"
