@@ -49,6 +49,7 @@ function formatDuration(seconds: number): string {
 }
 
 export default function Interventions() {
+  const { config } = useConfig();
   const { data: interventions = [] } = useInterventions();
   const { data: clients = [] } = useClients();
   const { data: dolibarrUsers = [] } = useDolibarrUsers();
@@ -288,8 +289,13 @@ export default function Interventions() {
     if (!selectedIntervention) return;
     setGeneratingPDF(true);
     try {
-      let url = await generatePDF('fichinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
-      if (!url) url = await downloadPDFUrl('fichinter', selectedIntervention.ref);
+      const client = clients.find(c => c.id === selectedIntervention.socid);
+      const url = generateInterventionPdfLocal({
+        intervention: selectedIntervention,
+        client,
+        lines: interventionLines,
+        entreprise: config.entreprise,
+      });
       if (url) { setPdfPreviewUrl(url); setPdfPreviewOpen(true); }
       else toast.error('PDF non disponible');
     } catch (e: any) { toast.error(`Erreur PDF : ${e.message || e}`); }
@@ -300,7 +306,6 @@ export default function Interventions() {
     if (!selectedIntervention || !emailDest || !emailObjet) return;
     setSendingEmail(true);
     try {
-      await generatePDF('fichinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
       await sendInterventionByEmail(selectedIntervention.id, emailDest, emailObjet, emailMessage);
       toast.success('Bon d\'intervention envoyé par email');
     } catch (e: any) { toast.error(`Erreur envoi : ${e.message || e}`); }
