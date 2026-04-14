@@ -422,14 +422,7 @@ export async function createIntervention(data: {
   const result = await dolibarrCall<string>('/interventions', 'POST', body);
   const newId = result || '';
   if (newId) {
-    try {
-      const inter = await dolibarrGet<any>(`/interventions/${newId}`);
-      if (inter?.ref) {
-        await ensureFichinterPdfReady(inter.ref);
-      }
-    } catch (e) {
-      console.warn('Auto builddoc after create failed:', e);
-    }
+    // PDF generation is now handled locally — no server builddoc call
   }
   return newId;
 }
@@ -586,14 +579,7 @@ export async function deleteIntervention(id: string): Promise<string | null> {
 
 export async function validateIntervention(id: string): Promise<string | null> {
   const result = await dolibarrCall<string>(`/interventions/${id}/validate`, 'POST');
-  try {
-    const inter = await dolibarrGet<any>(`/interventions/${id}`);
-    if (inter?.ref) {
-      await ensureFichinterPdfReady(inter.ref);
-    }
-  } catch (e) {
-    console.warn('Auto builddoc after validate failed:', e);
-  }
+  // PDF generation is now handled locally — no server builddoc call
   return result;
 }
 
@@ -711,9 +697,9 @@ export async function downloadPDFUrl(
   modulepart: DolibarrModulepart,
   ref: string
 ): Promise<string | null> {
-  // For fichinter, use the fallback logic
+  // Fichinter PDFs are generated locally
   if (modulepart === 'fichinter') {
-    return generateFichinterPDF(ref);
+    throw new Error('Fichinter PDF must be generated locally via generateInterventionPdfLocal');
   }
   const result = await dolibarrGet<any>(
     `/documents/download?modulepart=${modulepart}&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`

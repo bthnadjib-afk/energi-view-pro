@@ -451,12 +451,14 @@ export function useDeleteInterventionLine() {
 
 export function useGenerateInterventionPDF() {
   return useMutation({
-    mutationFn: async ({ ref }: { ref: string }) => {
-      const { ensureFichinterPdfReady } = await import('@/services/dolibarr');
-      return ensureFichinterPdfReady(ref);
+    mutationFn: async ({ intervention, client, lines, entreprise }: { 
+      intervention: any; client?: any; lines: any[]; entreprise?: any 
+    }) => {
+      const { generateInterventionPdfLocal } = await import('@/services/interventionPdf');
+      return generateInterventionPdfLocal({ intervention, client, lines, entreprise });
     },
     onSuccess: () => toast.success('PDF généré avec succès'),
-    onError: (e: any) => toast.error(e?.message || 'Le serveur Dolibarr tarde à générer le fichier. Réessayez dans quelques secondes.'),
+    onError: (e: any) => toast.error(e?.message || 'Erreur lors de la génération du PDF'),
   });
 }
 
