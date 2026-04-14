@@ -266,7 +266,7 @@ function buildInterventionPdf({ intervention, client, lines, entreprise, signatu
   }
 
   // ─── FOOTER ───
-  const pageH = doc.internal.pageSize.getHeight();
+  // pageH already declared at top
   doc.setDrawColor(200, 200, 200);
   doc.setLineWidth(0.3);
   doc.line(margin, pageH - 20, pageWidth - margin, pageH - 20);
