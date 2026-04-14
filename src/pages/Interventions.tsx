@@ -1,18 +1,20 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useConfig } from '@/hooks/useConfig';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
   useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture,
   useValidateIntervention, useDeleteIntervention, useCloseIntervention, useSetInterventionStatus,
   useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures,
-  useCreateClient, useGenerateInterventionPDF, useReopenIntervention, useProduits,
+  useCreateClient, useReopenIntervention, useProduits,
   useInterventionLines, useAddInterventionLine, useUpdateInterventionLine, useDeleteInterventionLine,
 } from '@/hooks/useDolibarr';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import {
-  statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab,
-  downloadPDFUrl, sendInterventionByEmail, resolveTechnicianName, getInterventionSignatures,
+  statutsIntervention, typesIntervention, formatDateFR, openPDFInNewTab,
+  sendInterventionByEmail, resolveTechnicianName, getInterventionSignatures,
   type InterventionType, type Intervention, type InterventionLine,
 } from '@/services/dolibarr';
+import { generateInterventionPdfLocal } from '@/services/interventionPdf';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +49,7 @@ function formatDuration(seconds: number): string {
 }
 
 export default function Interventions() {
+  const { config } = useConfig();
   const { data: interventions = [] } = useInterventions();
   const { data: clients = [] } = useClients();
   const { data: dolibarrUsers = [] } = useDolibarrUsers();
@@ -63,7 +66,7 @@ export default function Interventions() {
   const statusMutation = useSetInterventionStatus();
   const saveSignaturesMutation = useSaveSignatures();
   const updateMutation = useUpdateIntervention();
-  const generatePDFMutation = useGenerateInterventionPDF();
+  
   const reopenMutation = useReopenIntervention();
   const addLineMutation = useAddInterventionLine();
   const updateLineMutation = useUpdateInterventionLine();
@@ -286,8 +289,13 @@ export default function Interventions() {
     if (!selectedIntervention) return;
     setGeneratingPDF(true);
     try {
-      let url = await generatePDF('fichinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
-      if (!url) url = await downloadPDFUrl('fichinter', selectedIntervention.ref);
+      const client = clients.find(c => c.id === selectedIntervention.socid);
+      const url = generateInterventionPdfLocal({
+        intervention: selectedIntervention,
+        client,
+        lines: interventionLines,
+        entreprise: config.entreprise,
+      });
       if (url) { setPdfPreviewUrl(url); setPdfPreviewOpen(true); }
       else toast.error('PDF non disponible');
     } catch (e: any) { toast.error(`Erreur PDF : ${e.message || e}`); }
@@ -298,7 +306,6 @@ export default function Interventions() {
     if (!selectedIntervention || !emailDest || !emailObjet) return;
     setSendingEmail(true);
     try {
-      await generatePDF('fichinter', selectedIntervention.id, selectedIntervention.ref, 'soleil');
       await sendInterventionByEmail(selectedIntervention.id, emailDest, emailObjet, emailMessage);
       toast.success('Bon d\'intervention envoyé par email');
     } catch (e: any) { toast.error(`Erreur envoi : ${e.message || e}`); }
@@ -787,17 +794,27 @@ export default function Interventions() {
                     </>
                   )}
 
-                  {/* PDF & Email — always available */}
-                  <Button onClick={handleViewPDF} disabled={generatingPDF || generatePDFMutation.isPending} variant="outline" className="gap-2">
-                    <FileDown className="h-4 w-4" /> {(generatingPDF || generatePDFMutation.isPending) ? 'Génération...' : 'Voir le PDF'}
+                  {/* PDF — always available (local generation) */}
+                  <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
+                    <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
                   </Button>
                   <Button
-                    onClick={() => selectedIntervention?.ref && generatePDFMutation.mutate({ ref: selectedIntervention.ref })}
-                    disabled={generatePDFMutation.isPending || generatingPDF}
+                    onClick={() => {
+                      if (!selectedIntervention) return;
+                      const client = clients.find(c => c.id === selectedIntervention.socid);
+                      const url = generateInterventionPdfLocal({
+                        intervention: selectedIntervention,
+                        client,
+                        lines: interventionLines,
+                        entreprise: config.entreprise,
+                      });
+                      if (url) openPDFInNewTab(url, `${selectedIntervention.ref}.pdf`);
+                    }}
+                    disabled={generatingPDF}
                     variant="outline" className="gap-2"
                   >
-                    <RefreshCw className={cn("h-4 w-4", generatePDFMutation.isPending && "animate-spin")} />
-                    {generatePDFMutation.isPending ? 'Génération du PDF...' : 'Générer le PDF'}
+                    <RefreshCw className="h-4 w-4" />
+                    Télécharger le PDF
                   </Button>
                   {selectedIntervention.fk_statut >= 1 && (
                     <Button onClick={() => {
