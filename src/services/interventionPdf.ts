@@ -1,4 +1,4 @@
-// Local PDF generator for Bon d'Intervention — no Dolibarr builddoc needed
+// Local PDF generator for Bon d'Intervention — téléchargement direct, pas de popup
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Intervention, Client, InterventionLine } from '@/services/dolibarr';
@@ -37,16 +37,17 @@ const TYPE_LABELS: Record<string, string> = {
   devis: 'Devis', panne: 'Panne', panne_urgence: 'Panne urgence', sav: 'SAV', chantier: 'Chantier',
 };
 
-export function generateInterventionPdfLocal({ intervention, client, lines, entreprise }: PdfParams): string {
+/** Génère et télécharge directement le PDF — aucune popup bloquée */
+export function generateInterventionPdfLocal({ intervention, client, lines, entreprise }: PdfParams): void {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 15;
   let y = 15;
 
-  // === Header: Company info (left) + Intervention ref (right) ===
+  // ─── HEADER: Entreprise (gauche) ───
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 64, 175); // blue-800
+  doc.setTextColor(30, 64, 175);
   doc.text(entreprise?.nom || "Bon d'Intervention", margin, y);
 
   doc.setFontSize(10);
@@ -61,40 +62,48 @@ export function generateInterventionPdfLocal({ intervention, client, lines, entr
   if (entreprise?.email) { doc.text(entreprise.email, margin, y); y += 4.5; }
   if (entreprise?.siret) { doc.text(`SIRET : ${entreprise.siret}`, margin, y); y += 4.5; }
 
-  // Ref box (right side)
-  const refBoxX = pageWidth - margin - 70;
+  // ─── REF BOX (droite, style Soleil) ───
+  const refBoxX = pageWidth - margin - 72;
   const refBoxY = 12;
-  doc.setFillColor(239, 246, 255); // blue-50
-  doc.roundedRect(refBoxX, refBoxY, 70, 28, 3, 3, 'F');
-  doc.setFontSize(11);
+  // Bordure fine grise + fond bleu clair
+  doc.setDrawColor(180, 180, 180);
+  doc.setFillColor(239, 246, 255);
+  doc.roundedRect(refBoxX, refBoxY, 72, 30, 2, 2, 'FD');
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 64, 175);
-  doc.text(`BON D'INTERVENTION`, refBoxX + 35, refBoxY + 8, { align: 'center' });
-  doc.setFontSize(13);
-  doc.text(intervention.ref || '', refBoxX + 35, refBoxY + 16, { align: 'center' });
+  doc.text(`BON D'INTERVENTION`, refBoxX + 36, refBoxY + 8, { align: 'center' });
+  doc.setFontSize(14);
+  doc.text(intervention.ref || '', refBoxX + 36, refBoxY + 17, { align: 'center' });
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(80, 80, 80);
-  doc.text(`Date : ${formatDateFR(intervention.date)}`, refBoxX + 35, refBoxY + 23, { align: 'center' });
+  doc.text(`Date : ${formatDateFR(intervention.date)}`, refBoxX + 36, refBoxY + 25, { align: 'center' });
 
-  y = Math.max(y, refBoxY + 35);
+  y = Math.max(y, refBoxY + 37);
 
-  // Separator
+  // ─── Séparateur ───
   doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
   doc.line(margin, y, pageWidth - margin, y);
   y += 8;
 
-  // === Client block ===
-  doc.setFillColor(249, 250, 251); // gray-50
-  doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, client ? 30 : 14, 2, 2, 'F');
+  // ─── CLIENT (bloc avec bordure grise, style Soleil) ───
+  const clientBlockH = client ? 32 : 14;
+  doc.setDrawColor(200, 200, 200);
+  doc.setFillColor(249, 250, 251);
+  doc.roundedRect(margin, y - 3, pageWidth - 2 * margin, clientBlockH, 2, 2, 'FD');
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(50, 50, 50);
+  doc.setTextColor(30, 64, 175);
   doc.text('CLIENT', margin + 4, y + 3);
   doc.setFont('helvetica', 'normal');
+  doc.setTextColor(50, 50, 50);
   if (client) {
     doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
     doc.text(client.nom, margin + 30, y + 3);
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(80, 80, 80);
     let cy = y + 9;
@@ -102,18 +111,22 @@ export function generateInterventionPdfLocal({ intervention, client, lines, entr
     const cityLine = [client.codePostal, client.ville].filter(Boolean).join(' ');
     if (cityLine) { doc.text(cityLine, margin + 4, cy); cy += 4.5; }
     if (client.telephone) doc.text(`Tél : ${client.telephone}`, margin + 4, cy);
-    if (client.email) doc.text(client.email, margin + 60, cy);
+    if (client.email) doc.text(client.email, margin + 70, cy);
   } else {
     doc.text(intervention.client || 'N/A', margin + 30, y + 3);
   }
-  y += client ? 34 : 18;
+  y += clientBlockH + 5;
 
-  // === Intervention details ===
+  // ─── DÉTAILS INTERVENTION ───
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 64, 175);
   doc.text('DÉTAILS DE L\'INTERVENTION', margin, y);
-  y += 6;
+  y += 2;
+  doc.setDrawColor(30, 64, 175);
+  doc.setLineWidth(0.5);
+  doc.line(margin, y, margin + 55, y);
+  y += 5;
 
   const details: [string, string][] = [
     ['Type', TYPE_LABELS[intervention.type] || intervention.type || 'N/A'],
@@ -149,12 +162,16 @@ export function generateInterventionPdfLocal({ intervention, client, lines, entr
 
   y += 6;
 
-  // === Lines table ===
+  // ─── TABLEAU DES LIGNES (style Soleil: bordures grises, total en bas) ───
   if (lines && lines.length > 0) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 64, 175);
     doc.text('LIGNES D\'INTERVENTION', margin, y);
+    y += 2;
+    doc.setDrawColor(30, 64, 175);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, margin + 50, y);
     y += 4;
 
     const totalDuration = lines.reduce((sum, l) => sum + (l.duree || 0), 0);
@@ -169,33 +186,53 @@ export function generateInterventionPdfLocal({ intervention, client, lines, entr
         formatDateFR(line.date),
         formatDuration(line.duree || 0),
       ]),
-      foot: totalDuration > 0 ? [['', 'TOTAL', '', formatDuration(totalDuration)]] : undefined,
-      styles: { fontSize: 9, cellPadding: 3, textColor: [40, 40, 40] },
-      headStyles: { fillColor: [30, 64, 175], textColor: [255, 255, 255], fontStyle: 'bold' },
-      footStyles: { fillColor: [239, 246, 255], textColor: [30, 64, 175], fontStyle: 'bold' },
+      foot: totalDuration > 0 ? [['', 'TOTAL HEURES', '', formatDuration(totalDuration)]] : undefined,
+      theme: 'grid',
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+        textColor: [40, 40, 40],
+        lineColor: [200, 200, 200],
+        lineWidth: 0.3,
+      },
+      headStyles: {
+        fillColor: [30, 64, 175],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        lineColor: [30, 64, 175],
+      },
+      footStyles: {
+        fillColor: [239, 246, 255],
+        textColor: [30, 64, 175],
+        fontStyle: 'bold',
+        lineColor: [200, 200, 200],
+      },
       alternateRowStyles: { fillColor: [249, 250, 251] },
       columnStyles: {
         0: { cellWidth: 10, halign: 'center' },
         1: { cellWidth: 'auto' },
         2: { cellWidth: 28, halign: 'center' },
-        3: { cellWidth: 22, halign: 'center' },
+        3: { cellWidth: 24, halign: 'center' },
       },
     });
 
     y = (doc as any).lastAutoTable?.finalY || y + 20;
   }
 
-  // === Footer ===
-  const footerY = doc.internal.pageSize.getHeight() - 15;
+  // ─── FOOTER ───
+  const pageH = doc.internal.pageSize.getHeight();
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.line(margin, pageH - 20, pageWidth - margin, pageH - 20);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(150, 150, 150);
   doc.text(
     `${entreprise?.nom || 'Entreprise'} — Généré le ${new Date().toLocaleDateString('fr-FR')}`,
-    pageWidth / 2, footerY, { align: 'center' }
+    pageWidth / 2, pageH - 14, { align: 'center' }
   );
 
-  // Return blob URL
-  const blob = doc.output('blob');
-  return URL.createObjectURL(blob);
+  // ─── Téléchargement direct (pas de popup) ───
+  const fileName = `${intervention.ref || 'intervention'}.pdf`;
+  doc.save(fileName);
 }
