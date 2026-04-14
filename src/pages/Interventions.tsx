@@ -252,6 +252,10 @@ export default function Interventions() {
     setSelectedIntervention(inter);
     setDetailOpen(true);
     setShowAddLine(false);
+    // Reset tech fields
+    setTechNote('');
+    setHeureArrivee('');
+    setHeureDepart('');
   };
 
   const handleTransformDevis = async (inter: Intervention) => {
