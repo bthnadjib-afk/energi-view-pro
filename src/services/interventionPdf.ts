@@ -43,6 +43,7 @@ const TYPE_LABELS: Record<string, string> = {
 function buildInterventionPdf({ intervention, client, lines, entreprise, signatureClient, signatureTech }: PdfParams): jsPDF {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
   const margin = 15;
   let y = 15;
 
