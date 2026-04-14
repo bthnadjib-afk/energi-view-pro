@@ -37,8 +37,8 @@ const TYPE_LABELS: Record<string, string> = {
   devis: 'Devis', panne: 'Panne', panne_urgence: 'Panne urgence', sav: 'SAV', chantier: 'Chantier',
 };
 
-/** Génère et télécharge directement le PDF — aucune popup bloquée */
-export function generateInterventionPdfLocal({ intervention, client, lines, entreprise }: PdfParams): void {
+/** Internal: builds the jsPDF doc object */
+function buildInterventionPdf({ intervention, client, lines, entreprise }: PdfParams): jsPDF {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 15;
@@ -232,7 +232,28 @@ export function generateInterventionPdfLocal({ intervention, client, lines, entr
     pageWidth / 2, pageH - 14, { align: 'center' }
   );
 
-  // ─── Téléchargement direct (pas de popup) ───
-  const fileName = `${intervention.ref || 'intervention'}.pdf`;
+  return doc;
+}
+
+/** Génère et télécharge directement le PDF — aucune popup bloquée */
+export function generateInterventionPdfLocal(params: PdfParams): void {
+  const doc = buildInterventionPdf(params);
+  const fileName = `${params.intervention.ref || 'intervention'}.pdf`;
   doc.save(fileName);
+}
+
+/** Génère le PDF et retourne un blob URL pour ouverture dans un nouvel onglet */
+export function generateInterventionPdfBlobUrl(params: PdfParams): string {
+  const doc = buildInterventionPdf(params);
+  const blob = doc.output('blob');
+  return URL.createObjectURL(blob);
+}
+
+/** Génère le PDF et retourne le contenu en base64 (pour envoi email) */
+export function generateInterventionPdfBase64(params: PdfParams): string {
+  const doc = buildInterventionPdf(params);
+  // doc.output('datauristring') returns "data:application/pdf;base64,XXXX"
+  // We need just the base64 part
+  const dataUri = doc.output('datauristring');
+  return dataUri.split(',')[1];
 }
