@@ -707,6 +707,18 @@ export async function downloadPDFUrl(
 // sendByEmail endpoints don't exist in standard Dolibarr REST API.
 // New flow: generate PDF first, then send via edge function SMTP.
 
+async function invokeSmtpEmail(body: {
+  to: string;
+  subject: string;
+  message: string;
+  pdfBase64?: string;
+  pdfFilename?: string;
+}): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('send-email-smtp', { body });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+}
+
 export async function sendDocumentByEmail(
   modulepart: DolibarrModulepart,
   id: string,
@@ -716,7 +728,6 @@ export async function sendDocumentByEmail(
   message: string,
   model?: string
 ): Promise<void> {
-  // Step 1: Generate PDF via builddoc
   const defaultModel = modulepart === 'propal' ? 'azur' : modulepart === 'facture' ? 'crabe' : 'soleil';
   await dolibarrCall<any>('/documents/builddoc', 'PUT', {
     modulepart,
@@ -725,24 +736,19 @@ export async function sendDocumentByEmail(
     langcode: 'fr_FR',
   });
 
-  // Step 2: Download the generated PDF as base64
   const pdfResult = await dolibarrCall<any>(
     `/documents/download?modulepart=${modulepart}&original_file=${encodeURIComponent(ref + '/' + ref + '.pdf')}`,
     'GET'
   );
   if (!pdfResult?.content) throw new Error('Impossible de récupérer le PDF généré');
 
-  // Step 3: Send via edge function SMTP
-  const { error } = await supabase.functions.invoke('send-email-smtp', {
-    body: {
-      to,
-      subject,
-      message,
-      pdfBase64: pdfResult.content,
-      pdfFilename: `${ref}.pdf`,
-    },
+  await invokeSmtpEmail({
+    to,
+    subject,
+    message,
+    pdfBase64: pdfResult.content,
+    pdfFilename: `${ref}.pdf`,
   });
-  if (error) throw error;
 }
 
 // Legacy wrappers for backward compatibility
@@ -761,17 +767,14 @@ export async function sendFactureByEmail(id: string, to: string, subject: string
 export async function sendInterventionByEmail(id: string, to: string, subject: string, message: string): Promise<void> {
   const intervention = await dolibarrCall<any>(`/interventions/${id}`, 'GET');
   const ref = intervention?.ref || `FI-${id}`;
-  
-  // Generate PDF locally using jsPDF since Dolibarr 403s on fichinter builddoc
+
   const { generateInterventionPdfBase64 } = await import('@/services/interventionPdf');
-  
-  // Fetch client info for the PDF
-  const clientData = intervention?.socid 
-    ? await dolibarrGet<any>(`/thirdparties/${intervention.socid}`) 
+
+  const clientData = intervention?.socid
+    ? await dolibarrGet<any>(`/thirdparties/${intervention.socid}`)
     : null;
   const client = clientData ? mapDolibarrClient(clientData) : undefined;
-  
-  // Get lines from intervention object
+
   const lines: InterventionLine[] = (intervention?.lines || []).map((l: any) => ({
     id: String(l.id || l.rowid),
     description: l.description || l.desc || '',
@@ -779,21 +782,27 @@ export async function sendInterventionByEmail(id: string, to: string, subject: s
     duree: parseInt(l.duree || l.duration || '0', 10),
     rang: parseInt(l.rang || '0', 10),
   }));
-  
+
+  const signatures = await getInterventionSignatures(id);
+  const storedConfig = typeof window !== 'undefined' ? window.localStorage.getItem('electropro-config') : null;
+  const entreprise = storedConfig ? JSON.parse(storedConfig)?.entreprise : undefined;
   const mappedIntervention = mapDolibarrIntervention(intervention);
-  const pdfBase64 = generateInterventionPdfBase64({ intervention: mappedIntervention, client, lines });
-  
-  // Send via edge function SMTP with locally generated PDF
-  const { error } = await supabase.functions.invoke('send-email-smtp', {
-    body: {
-      to,
-      subject,
-      message,
-      pdfBase64,
-      pdfFilename: `${ref}.pdf`,
-    },
+  const pdfBase64 = generateInterventionPdfBase64({
+    intervention: mappedIntervention,
+    client,
+    lines,
+    entreprise,
+    signatureClient: signatures?.signature_client || undefined,
+    signatureTech: signatures?.signature_tech || undefined,
   });
-  if (error) throw error;
+
+  await invokeSmtpEmail({
+    to,
+    subject,
+    message,
+    pdfBase64,
+    pdfFilename: `${ref}.pdf`,
+  });
 }
 
 // --- Bulk operations ---

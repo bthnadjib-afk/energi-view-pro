@@ -305,14 +305,26 @@ export default function Interventions() {
   };
 
   const handleSendEmail = async () => {
-    if (!selectedIntervention || !emailDest || !emailObjet) return;
+    if (!selectedIntervention || !emailDest) return;
+
+    const defaultSubject = `Électricien du Genevois - Bon d'intervention ${selectedIntervention.ref}`;
+    const defaultMessage = `Bonjour,\n\nVous trouverez ci-joint votre bon d'intervention ${selectedIntervention.ref} terminé.\n\nCordialement,\nÉlectricien du Genevois`;
+
     setSendingEmail(true);
     try {
-      await sendInterventionByEmail(selectedIntervention.id, emailDest, emailObjet, emailMessage);
+      await sendInterventionByEmail(
+        selectedIntervention.id,
+        emailDest,
+        emailObjet.trim() || defaultSubject,
+        emailMessage.trim() || defaultMessage,
+      );
       toast.success('Bon d\'intervention envoyé par email');
-    } catch (e: any) { toast.error(`Erreur envoi : ${e.message || e}`); }
-    setSendingEmail(false);
-    setEmailOpen(false);
+      setEmailOpen(false);
+    } catch (e: any) {
+      toast.error(`Erreur envoi : ${e.message || e}`);
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const openEditDraft = () => {
@@ -834,9 +846,11 @@ export default function Interventions() {
                   {selectedIntervention.fk_statut >= 1 && role !== 'technicien' && (
                     <Button onClick={() => {
                       const c = clients.find(cl => cl.id === selectedIntervention.socid);
+                      const defaultSubject = `Électricien du Genevois - Bon d'intervention ${selectedIntervention.ref}`;
+                      const defaultMessage = `Bonjour,\n\nVous trouverez ci-joint votre bon d'intervention ${selectedIntervention.ref} terminé.\n\nCordialement,\nÉlectricien du Genevois`;
                       setEmailDest(c?.email || '');
-                      setEmailObjet(`Bon d'intervention ${selectedIntervention.ref}`);
-                      setEmailMessage('');
+                      setEmailObjet(defaultSubject);
+                      setEmailMessage(defaultMessage);
                       setEmailOpen(true);
                     }} variant="outline" className="gap-2">
                       <Send className="h-4 w-4" /> Envoyer par email
@@ -850,7 +864,7 @@ export default function Interventions() {
                     <DialogHeader><DialogTitle>Envoyer par email</DialogTitle></DialogHeader>
                     <div className="space-y-4 pt-2">
                       <div className="space-y-2">
-                        <label className="text-sm text-muted-foreground">Destinataire</label>
+                        <label className="text-sm text-muted-foreground">Destinataire <span className="text-destructive">*</span></label>
                         <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} />
                       </div>
                       <div className="space-y-2">
@@ -861,7 +875,10 @@ export default function Interventions() {
                         <label className="text-sm text-muted-foreground">Message</label>
                         <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[120px]" />
                       </div>
-                      <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest} className="w-full">
+                      <p className="text-xs text-muted-foreground">
+                        Le bon d'intervention PDF sera envoyé en pièce jointe.
+                      </p>
+                      <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest.trim()} className="w-full">
                         {sendingEmail ? 'Envoi...' : 'Envoyer'}
                       </Button>
                     </div>
