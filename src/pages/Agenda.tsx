@@ -94,16 +94,13 @@ export default function Agenda() {
   }, [dolibarrUsers, interventions]);
 
   const filteredInterventions = useMemo(() => {
-    let result = interventions;
-    // Techniciens ne voient pas les brouillons (fk_statut === 0)
-    if (role === 'technicien') {
-      result = result.filter(i => i.fk_statut >= 1);
-    }
+    // Ne jamais afficher les brouillons sur l'agenda
+    let result = interventions.filter(i => i.fk_statut >= 1);
     if (filterTech !== 'all') {
       result = result.filter(i => i.technicien === filterTech);
     }
     return result;
-  }, [interventions, filterTech, role]);
+  }, [interventions, filterTech]);
 
   const interventionsByDate = useMemo(() => {
     const map: Record<string, Intervention[]> = {};
@@ -268,18 +265,21 @@ export default function Agenda() {
                   {day}
                 </span>
                 <div className="flex-1 flex flex-col gap-0.5 mt-0.5 overflow-hidden">
-                  {dayInterventions.slice(0, 3).map((inter) => (
-                    <div
-                      key={inter.id}
-                      className="rounded px-1 py-0.5 text-[10px] leading-tight text-foreground truncate bg-muted/50"
-                      title={`${inter.ref} - ${inter.client} (${TYPE_LABELS[inter.type] || inter.type})`}
-                      onClick={(e) => { e.stopPropagation(); setSelected(inter); }}
-                    >
-                      <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${TYPE_COLORS[inter.type] || 'bg-muted-foreground'}`} />
-                      <span className="hidden sm:inline">{inter.client.split(' ').slice(0, 2).join(' ')}</span>
-                      <span className="sm:hidden">{inter.ref.split('-').pop()}</span>
-                    </div>
-                  ))}
+                  {dayInterventions.slice(0, 3).map((inter) => {
+                    const statusBg = inter.fk_statut >= 3 ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/20 border-amber-500/40 text-amber-700 dark:text-amber-400';
+                    return (
+                      <div
+                        key={inter.id}
+                        className={`rounded px-1 py-0.5 text-[10px] leading-tight truncate border ${statusBg}`}
+                        title={`${inter.ref} - ${inter.client} (${TYPE_LABELS[inter.type] || inter.type})`}
+                        onClick={(e) => { e.stopPropagation(); setSelected(inter); }}
+                      >
+                        <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${TYPE_COLORS[inter.type] || 'bg-muted-foreground'}`} />
+                        <span className="hidden sm:inline">{inter.client.split(' ').slice(0, 2).join(' ')}</span>
+                        <span className="sm:hidden">{inter.ref.split('-').pop()}</span>
+                      </div>
+                    );
+                  })}
                   {dayInterventions.length > 3 && (
                     <span className="text-[10px] text-muted-foreground px-1">+{dayInterventions.length - 3}</span>
                   )}
