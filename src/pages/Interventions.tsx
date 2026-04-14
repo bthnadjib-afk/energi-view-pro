@@ -156,6 +156,11 @@ export default function Interventions() {
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
 
+  // Tech note & arrival/departure (internal, not on PDF)
+  const [techNote, setTechNote] = useState('');
+  const [heureArrivee, setHeureArrivee] = useState('');
+  const [heureDepart, setHeureDepart] = useState('');
+
   // P1: Lines state
   const { data: interventionLines = [], refetch: refetchLines } = useInterventionLines(selectedIntervention?.id);
   const [showAddLine, setShowAddLine] = useState(false);
@@ -247,6 +252,10 @@ export default function Interventions() {
     setSelectedIntervention(inter);
     setDetailOpen(true);
     setShowAddLine(false);
+    // Reset tech fields
+    setTechNote('');
+    setHeureArrivee('');
+    setHeureDepart('');
   };
 
   const handleTransformDevis = async (inter: Intervention) => {
@@ -529,14 +538,16 @@ export default function Interventions() {
                             </>
                           );
                         })()}
-                        {i.fk_statut >= 1 && (
+                        {(i.fk_statut === 3 || i.fk_statut === 5) && role !== 'technicien' && (
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Générer facture" onClick={() => openFactureDialog(i)}>
                             <Receipt className="h-3.5 w-3.5 text-emerald-600" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => handleTransformDevis(i)}>
-                          <FileText className="h-3.5 w-3.5" />
-                        </Button>
+                        {(i.fk_statut === 3 || i.fk_statut === 5) && role !== 'technicien' && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => handleTransformDevis(i)}>
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -682,53 +693,86 @@ export default function Interventions() {
                   )}
                 </div>
 
+                {/* Tech note & arrival/departure — visible for validated interventions, internal only */}
+                {selectedIntervention.fk_statut >= 1 && (
+                  <div className="space-y-3 p-3 rounded-lg bg-muted/30 border border-border">
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <Clock className="h-4 w-4" /> Suivi technicien (interne)
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Heure d'arrivée</label>
+                        <Input type="time" value={heureArrivee} onChange={e => setHeureArrivee(e.target.value)} disabled={selectedIntervention.fk_statut >= 3} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Heure de départ</label>
+                        <Input type="time" value={heureDepart} onChange={e => setHeureDepart(e.target.value)} disabled={selectedIntervention.fk_statut >= 3} />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Note du technicien {selectedIntervention.fk_statut < 3 && <span className="text-destructive">*</span>}</label>
+                      <Textarea 
+                        placeholder="Décrivez le travail effectué, les observations..." 
+                        value={techNote} 
+                        onChange={e => setTechNote(e.target.value)} 
+                        className="min-h-[80px]"
+                        disabled={selectedIntervention.fk_statut >= 3}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Signatures - only when validated (fk_statut >= 1) */}
                 {selectedIntervention.fk_statut >= 1 && (
                   <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-foreground">✅ Signatures</h3>
+                    <h3 className="text-sm font-semibold text-foreground">
+                      ✅ Signatures {selectedIntervention.fk_statut < 3 && <span className="text-xs text-destructive font-normal ml-2">(obligatoires pour terminer)</span>}
+                    </h3>
                     {/* Show saved signatures */}
                     {(signatureData || signatureTechData) && (
                       <div className="grid grid-cols-2 gap-4">
                         {signatureData && (
                           <div>
-                            <p className="text-xs text-muted-foreground mb-1">Signature client (enregistrée)</p>
+                            <p className="text-xs text-muted-foreground mb-1">Signature client ✓</p>
                             <img src={signatureData} alt="Signature client" className="border border-border rounded max-h-20" />
                           </div>
                         )}
                         {signatureTechData && (
                           <div>
-                            <p className="text-xs text-muted-foreground mb-1">Signature technicien (enregistrée)</p>
+                            <p className="text-xs text-muted-foreground mb-1">Signature technicien ✓</p>
                             <img src={signatureTechData} alt="Signature technicien" className="border border-border rounded max-h-20" />
                           </div>
                         )}
                       </div>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-2">Signature du client</p>
-                        <SignaturePad onSave={async (data) => {
-                          setSignatureData(data);
-                          if (selectedIntervention) {
-                            await saveSignaturesMutation.mutateAsync({ id: selectedIntervention.id, signatureClient: data, signatureTech: signatureTechData || undefined, ref: selectedIntervention.ref });
-                          }
-                        }} />
+                    {selectedIntervention.fk_statut < 3 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-2">Signature du client</p>
+                          <SignaturePad onSave={async (data) => {
+                            setSignatureData(data);
+                            if (selectedIntervention) {
+                              await saveSignaturesMutation.mutateAsync({ id: selectedIntervention.id, signatureClient: data, signatureTech: signatureTechData || undefined, ref: selectedIntervention.ref });
+                            }
+                          }} />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-2">Signature du technicien</p>
+                          <SignaturePad onSave={async (data) => {
+                            setSignatureTechData(data);
+                            if (selectedIntervention) {
+                              await saveSignaturesMutation.mutateAsync({ id: selectedIntervention.id, signatureClient: signatureData || undefined, signatureTech: data, ref: selectedIntervention.ref });
+                            }
+                          }} />
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-2">Signature du technicien</p>
-                        <SignaturePad onSave={async (data) => {
-                          setSignatureTechData(data);
-                          if (selectedIntervention) {
-                            await saveSignaturesMutation.mutateAsync({ id: selectedIntervention.id, signatureClient: signatureData || undefined, signatureTech: data, ref: selectedIntervention.ref });
-                          }
-                        }} />
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-3 pt-2">
-                  {/* Brouillon (0) */}
+                  {/* Brouillon (0) — admin/secrétaire only (techniciens don't see brouillons) */}
                   {selectedIntervention.fk_statut === 0 && (
                     <>
                       <Button onClick={openEditDraft} variant="outline" className="gap-2">
@@ -755,36 +799,53 @@ export default function Interventions() {
                     </>
                   )}
 
-                  {/* Validée (1) → En cours */}
-                  {selectedIntervention.fk_statut === 1 && (
-                    <Button onClick={async () => { await statusMutation.mutateAsync({ id: selectedIntervention.id, status: 2 }); setDetailOpen(false); }} disabled={statusMutation.isPending} className="gap-2 bg-orange-500 hover:bg-orange-600">
-                      <Play className="h-4 w-4" /> {statusMutation.isPending ? '...' : 'Démarrer (En cours)'}
+                  {/* Validée (1) → Terminer — all roles can finish */}
+                  {(selectedIntervention.fk_statut === 1 || selectedIntervention.fk_statut === 2) && (
+                    <Button 
+                      onClick={async () => {
+                        // Validate mandatory fields
+                        if (!techNote.trim()) {
+                          toast.error('La note du technicien est obligatoire pour terminer l\'intervention');
+                          return;
+                        }
+                        if (!signatureData) {
+                          toast.error('La signature du client est obligatoire pour terminer');
+                          return;
+                        }
+                        if (!signatureTechData) {
+                          toast.error('La signature du technicien est obligatoire pour terminer');
+                          return;
+                        }
+                        // Save tech note + times in note_public
+                        const techInfo = JSON.stringify({
+                          techNote: techNote,
+                          heureArrivee: heureArrivee,
+                          heureDepart: heureDepart,
+                        });
+                        await updateMutation.mutateAsync({
+                          id: selectedIntervention.id,
+                          note_public: techInfo,
+                        });
+                        // Close the intervention (status 3 = Terminée)
+                        await closeMutation.mutateAsync(selectedIntervention.id);
+                        setDetailOpen(false);
+                      }} 
+                      disabled={closeMutation.isPending || updateMutation.isPending} 
+                      className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      <CheckCircle2 className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Terminer l\'intervention'}
                     </Button>
                   )}
 
-                  {/* En cours (2) → Terminée */}
-                  {selectedIntervention.fk_statut === 2 && (
-                    <Button onClick={async () => { await statusMutation.mutateAsync({ id: selectedIntervention.id, status: 3 }); setDetailOpen(false); }} disabled={statusMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-                      <CheckCircle2 className="h-4 w-4" /> {statusMutation.isPending ? '...' : 'Terminer'}
-                    </Button>
-                  )}
-
-                  {/* P3: Terminée (3) → Fermée (5) */}
-                  {selectedIntervention.fk_statut === 3 && (
-                    <Button onClick={async () => { await closeMutation.mutateAsync(selectedIntervention.id); setDetailOpen(false); }} disabled={closeMutation.isPending} variant="outline" className="gap-2">
-                      <XCircle className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Fermer l\'intervention'}
-                    </Button>
-                  )}
-
-                  {/* P4: Fermée (5) → Rouvrir */}
-                  {selectedIntervention.fk_statut === 5 && (
+                  {/* Terminée (3 ou 5) → Rouvrir */}
+                  {(selectedIntervention.fk_statut === 3 || selectedIntervention.fk_statut === 5) && (
                     <Button onClick={async () => { await reopenMutation.mutateAsync(selectedIntervention.id); setDetailOpen(false); }} disabled={reopenMutation.isPending} className="gap-2">
                       <RotateCcw className="h-4 w-4" /> {reopenMutation.isPending ? '...' : 'Rouvrir'}
                     </Button>
                   )}
 
-                  {/* Actions available for statut >= 1 */}
-                  {selectedIntervention.fk_statut >= 1 && (
+                  {/* Générer facture & Transformer en devis — ONLY when Terminée AND NOT technicien */}
+                  {(selectedIntervention.fk_statut === 3 || selectedIntervention.fk_statut === 5) && role !== 'technicien' && (
                     <>
                       <Button onClick={() => openFactureDialog(selectedIntervention)} disabled={createFactureMutation.isPending} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
                         <Receipt className="h-4 w-4" /> Générer une facture
@@ -816,7 +877,7 @@ export default function Interventions() {
                     <RefreshCw className="h-4 w-4" />
                     Télécharger le PDF
                   </Button>
-                  {selectedIntervention.fk_statut >= 1 && (
+                  {selectedIntervention.fk_statut >= 1 && role !== 'technicien' && (
                     <Button onClick={() => {
                       const c = clients.find(cl => cl.id === selectedIntervention.socid);
                       setEmailDest(c?.email || '');
