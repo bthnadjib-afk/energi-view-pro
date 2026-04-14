@@ -244,8 +244,6 @@ export default function Interventions() {
   const openDetail = (inter: Intervention) => {
     setSelectedIntervention(inter);
     setDetailOpen(true);
-    setShowAddLine(false);
-    // Reset tech fields
     setTechNote('');
     setHeureArrivee('');
     setHeureDepart('');
