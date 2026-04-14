@@ -7,6 +7,8 @@ interface PdfParams {
   intervention: Intervention;
   client?: Client;
   lines: InterventionLine[];
+  signatureClient?: string;
+  signatureTech?: string;
   entreprise?: {
     nom: string;
     adresse: string;
