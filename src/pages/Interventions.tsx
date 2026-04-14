@@ -794,17 +794,27 @@ export default function Interventions() {
                     </>
                   )}
 
-                  {/* PDF & Email — always available */}
-                  <Button onClick={handleViewPDF} disabled={generatingPDF || generatePDFMutation.isPending} variant="outline" className="gap-2">
-                    <FileDown className="h-4 w-4" /> {(generatingPDF || generatePDFMutation.isPending) ? 'Génération...' : 'Voir le PDF'}
+                  {/* PDF — always available (local generation) */}
+                  <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
+                    <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
                   </Button>
                   <Button
-                    onClick={() => selectedIntervention?.ref && generatePDFMutation.mutate({ ref: selectedIntervention.ref })}
-                    disabled={generatePDFMutation.isPending || generatingPDF}
+                    onClick={() => {
+                      if (!selectedIntervention) return;
+                      const client = clients.find(c => c.id === selectedIntervention.socid);
+                      const url = generateInterventionPdfLocal({
+                        intervention: selectedIntervention,
+                        client,
+                        lines: interventionLines,
+                        entreprise: config.entreprise,
+                      });
+                      if (url) openPDFInNewTab(url, `${selectedIntervention.ref}.pdf`);
+                    }}
+                    disabled={generatingPDF}
                     variant="outline" className="gap-2"
                   >
-                    <RefreshCw className={cn("h-4 w-4", generatePDFMutation.isPending && "animate-spin")} />
-                    {generatePDFMutation.isPending ? 'Génération du PDF...' : 'Générer le PDF'}
+                    <RefreshCw className="h-4 w-4" />
+                    Télécharger le PDF
                   </Button>
                   {selectedIntervention.fk_statut >= 1 && (
                     <Button onClick={() => {
