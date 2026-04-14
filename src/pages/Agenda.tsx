@@ -57,6 +57,7 @@ export default function Agenda() {
   const { data: clients = [] } = useClients();
   const { data: dolibarrUsers = [] } = useDolibarrUsers();
   const createMutation = useCreateIntervention();
+  const { role } = useAuth();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
