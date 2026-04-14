@@ -538,14 +538,16 @@ export default function Interventions() {
                             </>
                           );
                         })()}
-                        {i.fk_statut >= 1 && (
+                        {(i.fk_statut === 3 || i.fk_statut === 5) && role !== 'technicien' && (
                           <Button variant="ghost" size="icon" className="h-7 w-7" title="Générer facture" onClick={() => openFactureDialog(i)}>
                             <Receipt className="h-3.5 w-3.5 text-emerald-600" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => handleTransformDevis(i)}>
-                          <FileText className="h-3.5 w-3.5" />
-                        </Button>
+                        {(i.fk_statut === 3 || i.fk_statut === 5) && role !== 'technicien' && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Transformer en Devis" onClick={() => handleTransformDevis(i)}>
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
