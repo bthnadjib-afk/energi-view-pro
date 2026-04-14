@@ -40,7 +40,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 /** Internal: builds the jsPDF doc object */
-function buildInterventionPdf({ intervention, client, lines, entreprise }: PdfParams): jsPDF {
+function buildInterventionPdf({ intervention, client, lines, entreprise, signatureClient, signatureTech }: PdfParams): jsPDF {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 15;
