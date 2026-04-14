@@ -3,6 +3,69 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+function extractEmailAddress(value: string): string {
+  const match = value.match(/<([^>]+)>/)
+  return (match?.[1] || value).trim()
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function toBase64Utf8(value: string): string {
+  const bytes = new TextEncoder().encode(value)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary)
+}
+
+function chunkBase64(value: string): string {
+  return value.replace(/\s/g, '').match(/.{1,76}/g)?.join('\r\n') || ''
+}
+
+function getLastSmtpLine(response: string): string {
+  return response
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .pop() || ''
+}
+
+function assertSmtpCode(response: string, expectedCodes: string[]): void {
+  const lastLine = getLastSmtpLine(response)
+  if (!expectedCodes.some((code) => lastLine.startsWith(code))) {
+    throw new Error(`Réponse SMTP inattendue: ${lastLine || response}`)
+  }
+}
+
+async function readSmtpResponse(conn: Deno.Conn, decoder: TextDecoder): Promise<string> {
+  const chunks: string[] = []
+  const buf = new Uint8Array(4096)
+
+  while (true) {
+    const n = await conn.read(buf)
+    if (!n) break
+
+    const chunk = decoder.decode(buf.subarray(0, n))
+    chunks.push(chunk)
+    const response = chunks.join('')
+    const normalized = response.replace(/\r/g, '')
+    const lines = normalized.split('\n').filter(Boolean)
+    const lastLine = lines[lines.length - 1] || ''
+
+    if (/^\d{3} /.test(lastLine)) {
+      return response
+    }
+  }
+
+  return chunks.join('')
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -15,10 +78,10 @@ Deno.serve(async (req) => {
     const SMTP_PASS = Deno.env.get('SMTP_PASS')
     const SMTP_FROM = Deno.env.get('SMTP_FROM') || SMTP_USER
 
-    if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !SMTP_FROM) {
       return new Response(
-        JSON.stringify({ error: 'SMTP non configuré. Ajoutez SMTP_HOST, SMTP_USER et SMTP_PASS dans les secrets.' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'SMTP non configuré.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -31,39 +94,35 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Build MIME multipart email
+    const recipient = extractEmailAddress(String(to))
+    const mailFromAddress = extractEmailAddress(String(SMTP_FROM))
+    const safeHtmlMessage = `<div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #111827; white-space: pre-line;">${escapeHtml(String(message || ''))}</div>`
+    const htmlMessageBase64 = chunkBase64(toBase64Utf8(safeHtmlMessage))
+
     const boundary = `boundary_${crypto.randomUUID().replace(/-/g, '')}`
     const nl = '\r\n'
 
     let emailBody = `From: ${SMTP_FROM}${nl}`
-    emailBody += `To: ${to}${nl}`
+    emailBody += `To: ${recipient}${nl}`
     emailBody += `Subject: ${subject}${nl}`
     emailBody += `MIME-Version: 1.0${nl}`
     emailBody += `Content-Type: multipart/mixed; boundary="${boundary}"${nl}${nl}`
 
-    // Text part
     emailBody += `--${boundary}${nl}`
     emailBody += `Content-Type: text/html; charset=utf-8${nl}`
-    emailBody += `Content-Transfer-Encoding: quoted-printable${nl}${nl}`
-    emailBody += `${message || ''}${nl}${nl}`
+    emailBody += `Content-Transfer-Encoding: base64${nl}${nl}`
+    emailBody += `${htmlMessageBase64}${nl}${nl}`
 
-    // PDF attachment if provided
     if (pdfBase64 && pdfFilename) {
       emailBody += `--${boundary}${nl}`
       emailBody += `Content-Type: application/pdf; name="${pdfFilename}"${nl}`
       emailBody += `Content-Disposition: attachment; filename="${pdfFilename}"${nl}`
       emailBody += `Content-Transfer-Encoding: base64${nl}${nl}`
-      // Split base64 into 76-char lines per RFC
-      const b64 = pdfBase64.replace(/\s/g, '')
-      for (let i = 0; i < b64.length; i += 76) {
-        emailBody += b64.slice(i, i + 76) + nl
-      }
-      emailBody += nl
+      emailBody += `${chunkBase64(String(pdfBase64))}${nl}${nl}`
     }
 
     emailBody += `--${boundary}--${nl}`
 
-    // Connect to SMTP via Deno's built-in TLS
     const port = parseInt(SMTP_PORT, 10)
     let conn: Deno.Conn
 
@@ -76,48 +135,40 @@ Deno.serve(async (req) => {
     const encoder = new TextEncoder()
     const decoder = new TextDecoder()
 
-    async function readResponse(): Promise<string> {
-      const buf = new Uint8Array(4096)
-      const n = await conn.read(buf)
-      return n ? decoder.decode(buf.subarray(0, n)) : ''
-    }
-
-    async function sendCmd(cmd: string): Promise<string> {
+    async function sendCmd(cmd: string, expectedCodes: string[]): Promise<string> {
       await conn.write(encoder.encode(cmd + '\r\n'))
-      return await readResponse()
+      const response = await readSmtpResponse(conn, decoder)
+      assertSmtpCode(response, expectedCodes)
+      return response
     }
 
-    // SMTP handshake
-    await readResponse() // greeting
-    let ehloResp = await sendCmd(`EHLO localhost`)
+    const greeting = await readSmtpResponse(conn, decoder)
+    assertSmtpCode(greeting, ['220'])
 
-    // STARTTLS if not already TLS (port 587)
+    let ehloResp = await sendCmd('EHLO localhost', ['250'])
+
     if (port !== 465 && ehloResp.includes('STARTTLS')) {
-      await sendCmd('STARTTLS')
+      await sendCmd('STARTTLS', ['220'])
       conn = await Deno.startTls(conn as Deno.TcpConn, { hostname: SMTP_HOST })
-      ehloResp = await sendCmd('EHLO localhost')
+      ehloResp = await sendCmd('EHLO localhost', ['250'])
     }
 
-    // AUTH LOGIN
-    await sendCmd('AUTH LOGIN')
-    await sendCmd(btoa(SMTP_USER))
-    const authResp = await sendCmd(btoa(SMTP_PASS))
-    if (!authResp.startsWith('235')) {
-      conn.close()
-      throw new Error(`Authentification SMTP échouée: ${authResp}`)
+    if (ehloResp.includes('AUTH LOGIN')) {
+      await sendCmd('AUTH LOGIN', ['334'])
+      await sendCmd(btoa(SMTP_USER), ['334'])
+      await sendCmd(btoa(SMTP_PASS), ['235'])
+    } else {
+      throw new Error('Le serveur SMTP ne supporte pas AUTH LOGIN')
     }
 
-    await sendCmd(`MAIL FROM:<${SMTP_FROM}>`)
-    await sendCmd(`RCPT TO:<${to}>`)
-    await sendCmd('DATA')
+    await sendCmd(`MAIL FROM:<${mailFromAddress}>`, ['250'])
+    await sendCmd(`RCPT TO:<${recipient}>`, ['250', '251'])
+    await sendCmd('DATA', ['354'])
     await conn.write(encoder.encode(emailBody + '\r\n.\r\n'))
-    const dataResp = await readResponse()
-    await sendCmd('QUIT')
+    const dataResp = await readSmtpResponse(conn, decoder)
+    assertSmtpCode(dataResp, ['250'])
+    await sendCmd('QUIT', ['221'])
     conn.close()
-
-    if (!dataResp.startsWith('250')) {
-      throw new Error(`Envoi SMTP échoué: ${dataResp}`)
-    }
 
     return new Response(
       JSON.stringify({ success: true }),
@@ -126,8 +177,8 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('SMTP error:', error)
     return new Response(
-      JSON.stringify({ error: error.message || 'Erreur envoi email SMTP' }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Erreur envoi email SMTP' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
