@@ -658,44 +658,8 @@ export async function setDevisInvoiced(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/proposals/${id}/setinvoiced`, 'POST');
 }
 
-// --- Fichinter builddoc utility ---
-
-function wait(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function downloadFichinterPdfContent(ref: string): Promise<any | null> {
-  return dolibarrGet<any>(
-    `/documents/download?modulepart=fichinter&original_file=${encodeURIComponent(`${ref}/${ref}.pdf`)}`
-  );
-}
-
-export async function triggerFichinterBuilddoc(ref: string): Promise<any> {
-  return dolibarrCall<any>('/documents/builddoc', 'PUT', {
-    modulepart: 'fichinter',
-    original_file: `${ref}/${ref}.pdf`,
-    doctemplate: 'soleil',
-    langcode: 'fr_FR',
-  });
-}
-
-export async function ensureFichinterPdfReady(ref: string): Promise<string> {
-  // Tentative 1 : builddoc + pause 2s + download
-  await triggerFichinterBuilddoc(ref);
-  await wait(2000);
-
-  let pdfResult = await downloadFichinterPdfContent(ref);
-  if (pdfResult?.content) return base64ToBlobUrl(pdfResult.content);
-
-  // Tentative 2 : relancer builddoc + pause 2s + re-download
-  await triggerFichinterBuilddoc(ref);
-  await wait(2000);
-
-  pdfResult = await downloadFichinterPdfContent(ref);
-  if (pdfResult?.content) return base64ToBlobUrl(pdfResult.content);
-
-  throw new Error('Le serveur Dolibarr tarde à générer le fichier. Réessayez dans quelques secondes.');
-}
+// --- Fichinter PDF: now generated locally via jsPDF (see interventionPdf.ts) ---
+// Server-side builddoc removed due to Dolibarr 403 on fichinter module.
 
 // --- PDF generation via Dolibarr builddoc ---
 
@@ -716,7 +680,8 @@ export async function generatePDF(
   model?: string
 ): Promise<string | null> {
   if (modulepart === 'fichinter') {
-    return ensureFichinterPdfReady(ref);
+    // Fichinter PDFs are now generated locally — this path should not be called
+    throw new Error('Fichinter PDF must be generated locally via generateInterventionPdfLocal');
   }
   const defaultModel = modulepart === 'propal' ? 'azur' : 'crabe';
   const result = await dolibarrCall<any>('/documents/builddoc', 'PUT', {
@@ -730,9 +695,7 @@ export async function generatePDF(
   return result?.filename || null;
 }
 
-async function generateFichinterPDF(ref: string): Promise<string | null> {
-  return ensureFichinterPdfReady(ref);
-}
+// generateFichinterPDF removed — use generateInterventionPdfLocal from interventionPdf.ts
 
 export function openPDFInNewTab(blobUrl: string, filename: string) {
   const a = document.createElement('a');
