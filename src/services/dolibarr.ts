@@ -599,10 +599,11 @@ export async function reopenIntervention(id: string): Promise<string | null> {
 
 // --- Intervention Lines CRUD ---
 
+// Lines are embedded in the intervention object — no separate /lines endpoint
 export async function fetchInterventionLines(id: string): Promise<InterventionLine[]> {
-  const result = await dolibarrGet<any[]>(`/interventions/${id}/lines`);
-  if (!result || !Array.isArray(result)) return [];
-  return result.map((l: any) => ({
+  const intervention = await dolibarrGet<any>(`/interventions/${id}`);
+  if (!intervention || !Array.isArray(intervention.lines)) return [];
+  return intervention.lines.map((l: any) => ({
     id: String(l.id || l.rowid),
     description: l.description || l.desc || '',
     date: parseDolibarrDate(l.date),
@@ -616,10 +617,9 @@ export async function addInterventionLine(interventionId: string, data: {
   date: string;
   duree: number;
 }): Promise<string | null> {
+  // POST /interventions/{id}/lines — only description is required
   return dolibarrCall<string>(`/interventions/${interventionId}/lines`, 'POST', {
     description: data.description,
-    date: toUnixTimestamp(data.date + 'T12:00:00'),
-    duree: data.duree,
   });
 }
 
@@ -683,14 +683,9 @@ export async function generatePDF(
 
 // generateFichinterPDF removed — use generateInterventionPdfLocal from interventionPdf.ts
 
-export function openPDFInNewTab(blobUrl: string, filename: string) {
-  const a = document.createElement('a');
-  a.href = blobUrl;
-  a.download = filename;
-  a.target = '_blank';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+export function openPDFInNewTab(blobUrl: string, _filename: string) {
+  // Open in browser tab for direct viewing instead of forced download
+  window.open(blobUrl, '_blank');
 }
 
 export async function downloadPDFUrl(
@@ -766,7 +761,39 @@ export async function sendFactureByEmail(id: string, to: string, subject: string
 export async function sendInterventionByEmail(id: string, to: string, subject: string, message: string): Promise<void> {
   const intervention = await dolibarrCall<any>(`/interventions/${id}`, 'GET');
   const ref = intervention?.ref || `FI-${id}`;
-  return sendDocumentByEmail('fichinter', id, ref, to, subject, message);
+  
+  // Generate PDF locally using jsPDF since Dolibarr 403s on fichinter builddoc
+  const { generateInterventionPdfBase64 } = await import('@/services/interventionPdf');
+  
+  // Fetch client info for the PDF
+  const clientData = intervention?.socid 
+    ? await dolibarrGet<any>(`/thirdparties/${intervention.socid}`) 
+    : null;
+  const client = clientData ? mapDolibarrClient(clientData) : undefined;
+  
+  // Get lines from intervention object
+  const lines: InterventionLine[] = (intervention?.lines || []).map((l: any) => ({
+    id: String(l.id || l.rowid),
+    description: l.description || l.desc || '',
+    date: parseDolibarrDate(l.date),
+    duree: parseInt(l.duree || l.duration || '0', 10),
+    rang: parseInt(l.rang || '0', 10),
+  }));
+  
+  const mappedIntervention = mapDolibarrIntervention(intervention);
+  const pdfBase64 = generateInterventionPdfBase64({ intervention: mappedIntervention, client, lines });
+  
+  // Send via edge function SMTP with locally generated PDF
+  const { error } = await supabase.functions.invoke('send-email-smtp', {
+    body: {
+      to,
+      subject,
+      message,
+      pdfBase64,
+      pdfFilename: `${ref}.pdf`,
+    },
+  });
+  if (error) throw error;
 }
 
 // --- Bulk operations ---
