@@ -14,7 +14,7 @@ import {
   sendInterventionByEmail, resolveTechnicianName, getInterventionSignatures,
   type InterventionType, type Intervention, type InterventionLine,
 } from '@/services/dolibarr';
-import { generateInterventionPdfLocal } from '@/services/interventionPdf';
+import { generateInterventionPdfLocal, generateInterventionPdfBlobUrl } from '@/services/interventionPdf';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -290,13 +290,15 @@ export default function Interventions() {
     setGeneratingPDF(true);
     try {
       const client = clients.find(c => c.id === selectedIntervention.socid);
-      generateInterventionPdfLocal({
+      const blobUrl = generateInterventionPdfBlobUrl({
         intervention: selectedIntervention,
         client,
         lines: interventionLines,
         entreprise: config.entreprise,
       });
-      toast.success('PDF téléchargé');
+      // Open in new tab for direct viewing (not forced download)
+      window.open(blobUrl, '_blank');
+      toast.success('PDF ouvert dans un nouvel onglet');
     } catch (e: any) { toast.error(`Erreur PDF : ${e.message || e}`); }
     finally { setGeneratingPDF(false); }
   };
