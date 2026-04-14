@@ -134,7 +134,6 @@ function buildInterventionPdf({ intervention, client, lines, entreprise, signatu
   const details: [string, string][] = [
     ['Type', TYPE_LABELS[intervention.type] || intervention.type || 'N/A'],
     ['Date', formatDateFR(intervention.date)],
-    ['Horaires', `${intervention.heureDebut || '--:--'} → ${intervention.heureFin || '--:--'}`],
     ['Technicien', intervention.technicien || 'N/A'],
   ];
 
@@ -222,47 +221,42 @@ function buildInterventionPdf({ intervention, client, lines, entreprise, signatu
     y = (doc as any).lastAutoTable?.finalY || y + 20;
   }
 
-  // ─── SIGNATURES ───
+  // ─── SIGNATURES (côte à côte, en bas) ───
   if (signatureClient || signatureTech) {
-    y += 8;
-    // Check if we need a new page
-    if (y > pageH - 80) {
-      doc.addPage();
-      y = 20;
-    }
+    const sigWidth = 60;
+    const sigHeight = 30;
+    const sigY = pageH - 65; // Position fixe en bas de page
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 64, 175);
-    doc.text('SIGNATURES', margin, y);
-    y += 2;
+    doc.text('SIGNATURES', margin, sigY - 8);
     doc.setDrawColor(30, 64, 175);
     doc.setLineWidth(0.5);
-    doc.line(margin, y, margin + 30, y);
-    y += 6;
+    doc.line(margin, sigY - 6, margin + 30, sigY - 6);
 
-    const sigWidth = 60;
-    const sigHeight = 30;
+    const leftX = margin;
+    const rightX = pageWidth / 2 + 10;
 
+    // Technicien — gauche
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 80, 80);
+    doc.text('Technicien :', leftX, sigY);
     if (signatureTech) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(80, 80, 80);
-      doc.text('Technicien :', margin, y);
-      y += 3;
-      try { doc.addImage(signatureTech, 'PNG', margin, y, sigWidth, sigHeight); } catch {}
-      y += sigHeight + 4;
+      try { doc.addImage(signatureTech, 'PNG', leftX, sigY + 2, sigWidth, sigHeight); } catch {}
     }
+    // Ligne de signature
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.3);
+    doc.line(leftX, sigY + sigHeight + 4, leftX + sigWidth, sigY + sigHeight + 4);
 
+    // Client — droite
+    doc.text('Client :', rightX, sigY);
     if (signatureClient) {
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(80, 80, 80);
-      doc.text('Client :', margin, y);
-      y += 3;
-      try { doc.addImage(signatureClient, 'PNG', margin, y, sigWidth, sigHeight); } catch {}
-      y += sigHeight + 4;
+      try { doc.addImage(signatureClient, 'PNG', rightX, sigY + 2, sigWidth, sigHeight); } catch {}
     }
+    doc.line(rightX, sigY + sigHeight + 4, rightX + sigWidth, sigY + sigHeight + 4);
   }
 
   // ─── FOOTER ───

@@ -36,7 +36,7 @@ export function SignaturePad({ onSave, width = 400, height = 200 }: SignaturePad
     const ctx = canvas.getContext('2d')!;
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
-    ctx.strokeStyle = '#e2e8f0';
+    ctx.strokeStyle = '#000000';
   }, []);
 
   const startDraw = (e: React.TouchEvent | React.MouseEvent) => {
