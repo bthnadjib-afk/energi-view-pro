@@ -456,7 +456,7 @@ export function useGenerateInterventionPDF() {
       return ensureFichinterPdfReady(ref);
     },
     onSuccess: () => toast.success('PDF généré avec succès'),
-    onError: () => toast.error('Erreur lors de la génération du PDF, veuillez réessayer manuellement'),
+    onError: (e: any) => toast.error(e?.message || 'Le serveur Dolibarr tarde à générer le fichier. Réessayez dans quelques secondes.'),
   });
 }
 

@@ -680,18 +680,21 @@ export async function triggerFichinterBuilddoc(ref: string): Promise<any> {
 }
 
 export async function ensureFichinterPdfReady(ref: string): Promise<string> {
+  // Tentative 1 : builddoc + pause 2s + download
   await triggerFichinterBuilddoc(ref);
+  await wait(2000);
 
   let pdfResult = await downloadFichinterPdfContent(ref);
   if (pdfResult?.content) return base64ToBlobUrl(pdfResult.content);
 
+  // Tentative 2 : relancer builddoc + pause 2s + re-download
   await triggerFichinterBuilddoc(ref);
   await wait(2000);
 
   pdfResult = await downloadFichinterPdfContent(ref);
   if (pdfResult?.content) return base64ToBlobUrl(pdfResult.content);
 
-  throw new Error('Erreur lors de la génération du PDF, veuillez réessayer manuellement');
+  throw new Error('Le serveur Dolibarr tarde à générer le fichier. Réessayez dans quelques secondes.');
 }
 
 // --- PDF generation via Dolibarr builddoc ---
