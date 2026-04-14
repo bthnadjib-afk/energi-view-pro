@@ -797,7 +797,7 @@ export default function Interventions() {
                     variant="outline" className="gap-2"
                   >
                     <RefreshCw className={cn("h-4 w-4", generatePDFMutation.isPending && "animate-spin")} />
-                    {generatePDFMutation.isPending ? 'Génération confirmée...' : 'Générer le PDF'}
+                    {generatePDFMutation.isPending ? 'Génération du PDF...' : 'Générer le PDF'}
                   </Button>
                   {selectedIntervention.fk_statut >= 1 && (
                     <Button onClick={() => {
