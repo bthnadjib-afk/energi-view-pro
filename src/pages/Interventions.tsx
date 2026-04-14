@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useConfig } from '@/hooks/useConfig';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
   useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture,
@@ -9,10 +10,11 @@ import {
 } from '@/hooks/useDolibarr';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import {
-  statutsIntervention, typesIntervention, formatDateFR, generatePDF, openPDFInNewTab,
-  downloadPDFUrl, sendInterventionByEmail, resolveTechnicianName, getInterventionSignatures,
+  statutsIntervention, typesIntervention, formatDateFR, openPDFInNewTab,
+  sendInterventionByEmail, resolveTechnicianName, getInterventionSignatures,
   type InterventionType, type Intervention, type InterventionLine,
 } from '@/services/dolibarr';
+import { generateInterventionPdfLocal } from '@/services/interventionPdf';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
