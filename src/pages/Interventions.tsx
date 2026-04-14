@@ -304,8 +304,9 @@ export default function Interventions() {
         client,
         lines: interventionLines,
         entreprise: config.entreprise,
+        signatureClient: signatureData || undefined,
+        signatureTech: signatureTechData || undefined,
       });
-      // Open in new tab for direct viewing (not forced download)
       window.open(blobUrl, '_blank');
       toast.success('PDF ouvert dans un nouvel onglet');
     } catch (e: any) { toast.error(`Erreur PDF : ${e.message || e}`); }
@@ -808,6 +809,14 @@ export default function Interventions() {
                           toast.error('La note du technicien est obligatoire pour terminer l\'intervention');
                           return;
                         }
+                        if (!heureArrivee) {
+                          toast.error('L\'heure d\'arrivée est obligatoire pour terminer');
+                          return;
+                        }
+                        if (!heureDepart) {
+                          toast.error('L\'heure de départ est obligatoire pour terminer');
+                          return;
+                        }
                         if (!signatureData) {
                           toast.error('La signature du client est obligatoire pour terminer');
                           return;
@@ -838,10 +847,15 @@ export default function Interventions() {
                   )}
 
                   {/* Terminée (3 ou 5) → Rouvrir */}
-                  {(selectedIntervention.fk_statut === 3 || selectedIntervention.fk_statut === 5) && (
-                    <Button onClick={async () => { await reopenMutation.mutateAsync(selectedIntervention.id); setDetailOpen(false); }} disabled={reopenMutation.isPending} className="gap-2">
-                      <RotateCcw className="h-4 w-4" /> {reopenMutation.isPending ? '...' : 'Rouvrir'}
-                    </Button>
+                   {(selectedIntervention.fk_statut === 3 || selectedIntervention.fk_statut === 5) && (
+                     <Button onClick={async () => {
+                       await reopenMutation.mutateAsync(selectedIntervention.id);
+                       // Force status back to Validée (1) after reopen
+                       try { await statusMutation.mutateAsync({ id: selectedIntervention.id, status: 1 }); } catch {}
+                       setDetailOpen(false);
+                     }} disabled={reopenMutation.isPending} className="gap-2">
+                       <RotateCcw className="h-4 w-4" /> {reopenMutation.isPending ? '...' : 'Rouvrir (Validée)'}
+                     </Button>
                   )}
 
                   {/* Générer facture & Transformer en devis — ONLY when Terminée AND NOT technicien */}
@@ -860,7 +874,7 @@ export default function Interventions() {
                   <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
                     <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
                   </Button>
-                  <Button
+                   <Button
                     onClick={() => {
                       if (!selectedIntervention) return;
                       const client = clients.find(c => c.id === selectedIntervention.socid);
@@ -869,6 +883,8 @@ export default function Interventions() {
                         client,
                         lines: interventionLines,
                         entreprise: config.entreprise,
+                        signatureClient: signatureData || undefined,
+                        signatureTech: signatureTechData || undefined,
                       });
                     }}
                     disabled={generatingPDF}
