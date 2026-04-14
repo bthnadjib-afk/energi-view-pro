@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useInterventions, useClients, useCreateIntervention, useDolibarrUsers } from '@/hooks/useDolibarr';
+import { useAuth } from '@/hooks/useAuth';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ChevronLeft, ChevronRight, X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -56,6 +57,7 @@ export default function Agenda() {
   const { data: clients = [] } = useClients();
   const { data: dolibarrUsers = [] } = useDolibarrUsers();
   const createMutation = useCreateIntervention();
+  const { role } = useAuth();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -92,9 +94,16 @@ export default function Agenda() {
   }, [dolibarrUsers, interventions]);
 
   const filteredInterventions = useMemo(() => {
-    if (filterTech === 'all') return interventions;
-    return interventions.filter(i => i.technicien === filterTech);
-  }, [interventions, filterTech]);
+    let result = interventions;
+    // Techniciens ne voient pas les brouillons (fk_statut === 0)
+    if (role === 'technicien') {
+      result = result.filter(i => i.fk_statut >= 1);
+    }
+    if (filterTech !== 'all') {
+      result = result.filter(i => i.technicien === filterTech);
+    }
+    return result;
+  }, [interventions, filterTech, role]);
 
   const interventionsByDate = useMemo(() => {
     const map: Record<string, Intervention[]> = {};
