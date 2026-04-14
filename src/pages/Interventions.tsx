@@ -307,8 +307,8 @@ export default function Interventions() {
         signatureClient: signatureData || undefined,
         signatureTech: signatureTechData || undefined,
       });
-      window.open(blobUrl, '_blank');
-      toast.success('PDF ouvert dans un nouvel onglet');
+      setPdfPreviewUrl(blobUrl);
+      setPdfPreviewOpen(true);
     } catch (e: any) { toast.error(`Erreur PDF : ${e.message || e}`); }
     finally { setGeneratingPDF(false); }
   };
@@ -623,20 +623,12 @@ export default function Interventions() {
                   </div>
                 )}
 
-                {/* P1: Intervention Lines */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                {/* Lignes d'intervention (lecture seule) */}
+                {interventionLines.length > 0 && (
+                  <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                       <ListPlus className="h-4 w-4" /> Lignes d'intervention ({interventionLines.length})
                     </h3>
-                    {selectedIntervention.fk_statut <= 1 && (
-                      <Button variant="outline" size="sm" onClick={() => { setShowAddLine(true); setLineDate(selectedIntervention.date); }} className="gap-1 text-xs">
-                        <Plus className="h-3 w-3" /> Ajouter
-                      </Button>
-                    )}
-                  </div>
-
-                  {interventionLines.length > 0 && (
                     <div className="border border-border rounded-lg overflow-hidden">
                       <table className="w-full text-xs">
                         <thead>
@@ -644,7 +636,6 @@ export default function Interventions() {
                             <th className="text-left py-2 px-3 text-muted-foreground">Description</th>
                             <th className="text-left py-2 px-3 text-muted-foreground">Date</th>
                             <th className="text-left py-2 px-3 text-muted-foreground">Durée</th>
-                            {selectedIntervention.fk_statut <= 1 && <th className="py-2 px-3 w-16"></th>}
                           </tr>
                         </thead>
                         <tbody>
@@ -653,46 +644,13 @@ export default function Interventions() {
                               <td className="py-2 px-3 text-foreground">{line.description}</td>
                               <td className="py-2 px-3 text-muted-foreground">{formatDateFR(line.date)}</td>
                               <td className="py-2 px-3 text-muted-foreground">{formatDuration(line.duree)}</td>
-                              {selectedIntervention.fk_statut <= 1 && (
-                                <td className="py-2 px-3">
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteLineMutation.mutate({ interventionId: selectedIntervention.id, lineId: line.id })}>
-                                    <Trash2 className="h-3 w-3 text-destructive" />
-                                  </Button>
-                                </td>
-                              )}
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  )}
-
-                  {interventionLines.length === 0 && !showAddLine && (
-                    <p className="text-xs text-muted-foreground italic">Aucune ligne — ajoutez des détails pour enrichir le PDF.</p>
-                  )}
-
-                  {showAddLine && (
-                    <div className="space-y-3 border border-border rounded-lg p-3 bg-muted/20">
-                      <Input placeholder="Description de la ligne *" value={lineDesc} onChange={e => setLineDesc(e.target.value)} />
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground">Date</label>
-                          <Input type="date" value={lineDate} onChange={e => setLineDate(e.target.value)} />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground">Durée (minutes)</label>
-                          <Input type="number" min={1} value={lineDuree} onChange={e => setLineDuree(parseInt(e.target.value) || 60)} />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={handleAddLine} disabled={addLineMutation.isPending}>
-                          {addLineMutation.isPending ? 'Ajout...' : 'Ajouter la ligne'}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setShowAddLine(false)}>Annuler</Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Tech note & arrival/departure — visible for validated interventions, internal only */}
                 {selectedIntervention.fk_statut >= 1 && (
@@ -702,11 +660,11 @@ export default function Interventions() {
                     </h3>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-xs text-muted-foreground">Heure d'arrivée</label>
+                        <label className="text-xs text-muted-foreground">Heure d'arrivée {selectedIntervention.fk_statut < 3 && <span className="text-destructive">*</span>}</label>
                         <Input type="time" value={heureArrivee} onChange={e => setHeureArrivee(e.target.value)} disabled={selectedIntervention.fk_statut >= 3} />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs text-muted-foreground">Heure de départ</label>
+                        <label className="text-xs text-muted-foreground">Heure de départ {selectedIntervention.fk_statut < 3 && <span className="text-destructive">*</span>}</label>
                         <Input type="time" value={heureDepart} onChange={e => setHeureDepart(e.target.value)} disabled={selectedIntervention.fk_statut >= 3} />
                       </div>
                     </div>
@@ -727,7 +685,7 @@ export default function Interventions() {
                 {selectedIntervention.fk_statut >= 1 && (
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-foreground">
-                      ✅ Signatures {selectedIntervention.fk_statut < 3 && <span className="text-xs text-destructive font-normal ml-2">(obligatoires pour terminer)</span>}
+                      ✅ Signatures {selectedIntervention.fk_statut < 3 && <span className="text-xs text-destructive font-normal ml-2">* obligatoires pour terminer</span>}
                     </h3>
                     {/* Show saved signatures */}
                     {(signatureData || signatureTechData) && (
@@ -749,7 +707,7 @@ export default function Interventions() {
                     {selectedIntervention.fk_statut < 3 && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <p className="text-xs text-muted-foreground mb-2">Signature du client</p>
+                          <p className="text-xs text-muted-foreground mb-2">Signature du client <span className="text-destructive">*</span></p>
                           <SignaturePad onSave={async (data) => {
                             setSignatureData(data);
                             if (selectedIntervention) {
@@ -758,7 +716,7 @@ export default function Interventions() {
                           }} />
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground mb-2">Signature du technicien</p>
+                          <p className="text-xs text-muted-foreground mb-2">Signature du technicien <span className="text-destructive">*</span></p>
                           <SignaturePad onSave={async (data) => {
                             setSignatureTechData(data);
                             if (selectedIntervention) {
