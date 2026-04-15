@@ -15,7 +15,7 @@ async function loadSmtpFromAppConfig(): Promise<Record<string, string>> {
     const { data } = await admin
       .from('app_config')
       .select('key, value')
-      .in('key', ['smtp.host', 'smtp.port', 'smtp.user', 'smtp.pass', 'smtp.from'])
+      .in('key', ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp.host', 'smtp.port', 'smtp.user', 'smtp.pass', 'smtp.from'])
     if (!data) return {}
     const result: Record<string, string> = {}
     for (const row of data) result[row.key] = row.value
@@ -134,7 +134,16 @@ async function trySendSmtp(params: {
   console.log(`Connecting to SMTP ${SMTP_HOST}:${port}...`)
 
   if (port === 465) {
-    conn = await Deno.connectTls({ hostname: SMTP_HOST, port })
+    console.log(`[OVH SSL] Tentative connexion TLS directe sur ${SMTP_HOST}:${port}`)
+    try {
+      conn = await Deno.connectTls({ hostname: SMTP_HOST, port })
+      console.log(`[OVH SSL] Connexion TLS établie avec succès`)
+    } catch (tlsErr) {
+      const msg = tlsErr instanceof Error ? tlsErr.message : String(tlsErr)
+      console.error(`[OVH SSL] Échec connexion TLS à ${SMTP_HOST}:${port} — ${msg}`)
+      console.error(`[OVH SSL] Diagnostic: 1) Vérifiez smtp_user/smtp_pass dans app_config, 2) Le port 465 SSL doit être activé sur le compte OVH, 3) Accès réseau sortant depuis Supabase Edge Functions vers ssl0.ovh.net:465`)
+      throw new Error(`Connexion SSL OVH échouée (${SMTP_HOST}:${port}): ${msg}`)
+    }
   } else {
     conn = await Deno.connect({ hostname: SMTP_HOST, port })
   }
@@ -211,15 +220,16 @@ Deno.serve(async (req) => {
 
     if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
       const appCfg = await loadSmtpFromAppConfig()
-      SMTP_HOST = SMTP_HOST || appCfg['smtp.host'] || ''
-      SMTP_PORT = SMTP_PORT || appCfg['smtp.port'] || ''
-      SMTP_USER = SMTP_USER || appCfg['smtp.user'] || ''
-      SMTP_PASS = SMTP_PASS || appCfg['smtp.pass'] || ''
-      SMTP_FROM = SMTP_FROM || appCfg['smtp.from'] || ''
+      // Support both underscore keys (new) and dot keys (legacy fallback)
+      SMTP_HOST = SMTP_HOST || appCfg['smtp_host'] || appCfg['smtp.host'] || 'ssl0.ovh.net'
+      SMTP_PORT = SMTP_PORT || appCfg['smtp_port'] || appCfg['smtp.port'] || '465'
+      SMTP_USER = SMTP_USER || appCfg['smtp_user'] || appCfg['smtp.user'] || ''
+      SMTP_PASS = SMTP_PASS || appCfg['smtp_pass'] || appCfg['smtp.pass'] || ''
     }
 
-    SMTP_PORT = SMTP_PORT || '587'
-    SMTP_FROM = SMTP_FROM || SMTP_USER
+    SMTP_PORT = SMTP_PORT || '465'
+    // Expéditeur fixe OVH
+    SMTP_FROM = 'contact@electriciendugenevois.fr'
 
     if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
       return new Response(
