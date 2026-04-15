@@ -19,14 +19,40 @@ interface EmailTemplate {
 }
 
 export default function Configuration() {
-  const { config, saving, updateEntreprise, updateDefaults, updateNotifications, updateDolibarr, saveToSupabase } = useConfig();
+  const { config, saving, updateEntreprise, updateDefaults, updateNotifications, updateDolibarr, updateSmtp, saveToSupabase } = useConfig();
   const [testing, setTesting] = useState(false);
+  const [testingSmtp, setTestingSmtp] = useState(false);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNom, setEditNom] = useState('');
   const [editObjet, setEditObjet] = useState('');
   const [editCorps, setEditCorps] = useState('');
+
+  const handleTestSmtp = async () => {
+    if (!config.smtp.host || !config.smtp.user || !config.smtp.pass) {
+      toast.error('Renseignez au minimum le serveur, l\'identifiant et le mot de passe SMTP');
+      return;
+    }
+    setTestingSmtp(true);
+    try {
+      await saveToSupabase();
+      const { data, error } = await supabase.functions.invoke('send-email-smtp', {
+        body: {
+          to: config.smtp.user,
+          subject: 'Test SMTP — Électricien du Genevois',
+          message: 'Ce message confirme que la configuration SMTP fonctionne correctement.',
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (data && !data.ok) throw new Error(data.error || 'Échec SMTP');
+      toast.success('Email de test envoyé avec succès !');
+    } catch (e: any) {
+      toast.error(`Échec SMTP : ${e.message || e}`);
+    } finally {
+      setTestingSmtp(false);
+    }
+  };
 
   const handleTestConnection = async () => {
     setTesting(true);
@@ -106,6 +132,7 @@ export default function Configuration() {
           <TabsTrigger value="defaults" className="gap-1.5"><Settings2 className="h-3.5 w-3.5" /> Valeurs par défaut</TabsTrigger>
           <TabsTrigger value="notifications" className="gap-1.5"><Bell className="h-3.5 w-3.5" /> Notifications</TabsTrigger>
           <TabsTrigger value="emails" className="gap-1.5"><Mail className="h-3.5 w-3.5" /> Modèles emails</TabsTrigger>
+          <TabsTrigger value="smtp" className="gap-1.5"><Mail className="h-3.5 w-3.5" /> Serveur mail</TabsTrigger>
           <TabsTrigger value="dolibarr" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Dolibarr</TabsTrigger>
         </TabsList>
 
@@ -228,6 +255,66 @@ export default function Configuration() {
                 ))}
               </div>
             )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="smtp">
+          <div className="bg-card rounded-lg border border-border p-6 shadow-sm space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Serveur mail sortant (SMTP)</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                Ces paramètres permettent l'envoi des bons d'intervention et devis par email. Cliquez sur « Sauvegarder les paramètres » puis testez la connexion.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm text-muted-foreground">Serveur SMTP</label>
+                <Input
+                  value={config.smtp.host}
+                  onChange={(e) => updateSmtp({ host: e.target.value })}
+                  placeholder="ex : ssl0.ovh.net ou smtp.ionos.fr"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Port</label>
+                <Input
+                  value={config.smtp.port}
+                  onChange={(e) => updateSmtp({ port: e.target.value })}
+                  placeholder="587 (STARTTLS) ou 465 (SSL)"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Identifiant (email de connexion)</label>
+                <Input
+                  value={config.smtp.user}
+                  onChange={(e) => updateSmtp({ user: e.target.value })}
+                  placeholder="contact@electriciendugenevois.fr"
+                  type="email"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm text-muted-foreground">Mot de passe</label>
+                <Input
+                  value={config.smtp.pass}
+                  onChange={(e) => updateSmtp({ pass: e.target.value })}
+                  type="password"
+                  placeholder="••••••••••••••"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm text-muted-foreground">Expéditeur affiché (optionnel)</label>
+                <Input
+                  value={config.smtp.from}
+                  onChange={(e) => updateSmtp({ from: e.target.value })}
+                  placeholder='Électricien du Genevois <contact@electriciendugenevois.fr>'
+                />
+                <p className="text-xs text-muted-foreground">Si vide, l'identifiant SMTP sera utilisé comme expéditeur.</p>
+              </div>
+            </div>
+            <Button onClick={handleTestSmtp} disabled={testingSmtp} className="gap-2 h-12 px-6 text-base">
+              {testingSmtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Sauvegarder et tester l'envoi
+            </Button>
           </div>
         </TabsContent>
 

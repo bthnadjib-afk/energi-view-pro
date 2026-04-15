@@ -6,8 +6,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AuthProvider, useAuthContext } from "@/contexts/AuthContext";
+import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { RouteGuard } from "@/components/RouteGuard";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sun, Moon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import Index from "./pages/Index";
 import Factures from "./pages/Factures";
 import Devis from "./pages/Devis";
@@ -22,6 +24,21 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={toggleTheme}
+      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+      title={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
+    >
+      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </Button>
+  );
+}
 
 function AuthenticatedApp() {
   const { loading, session, profile } = useAuthContext();
@@ -73,8 +90,9 @@ function AuthenticatedApp() {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center border-b border-border bg-card px-4 shadow-sm">
+          <header className="h-14 flex items-center justify-between border-b border-border bg-card px-4 shadow-sm">
             <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
+            <ThemeToggle />
           </header>
           <main className="flex-1 p-4 md:p-6 overflow-auto bg-muted/30">
             <Routes>
@@ -98,17 +116,19 @@ function AuthenticatedApp() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <AuthenticatedApp />
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <AuthenticatedApp />
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;

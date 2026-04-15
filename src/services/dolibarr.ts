@@ -200,7 +200,7 @@ function resolveClientName(socid: string | undefined, clients: Client[], fallbac
 // --- Raw fetch (no client resolution) ---
 
 async function fetchClientsRaw(): Promise<Client[]> {
-  const result = await dolibarrGet<any[]>('/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=500');
+  const result = await dolibarrCall<any[]>('/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=500&sqlfilters=(t.client:>:0)', 'GET');
   if (!result) return [];
   return result.map(mapDolibarrClient);
 }
@@ -715,8 +715,20 @@ async function invokeSmtpEmail(body: {
   pdfFilename?: string;
 }): Promise<void> {
   const { data, error } = await supabase.functions.invoke('send-email-smtp', { body });
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error);
+  // error = FunctionsHttpError (non-2xx réseau/infra) — extraire le vrai message si possible
+  if (error) {
+    let msg = error.message;
+    try {
+      const ctx = (error as any).context;
+      if (ctx) {
+        const json = await ctx.json();
+        if (json?.error) msg = json.error;
+      }
+    } catch { /* ignore — on garde le message générique */ }
+    throw new Error(msg);
+  }
+  // data.ok === false = erreur métier retournée par l'edge function avec HTTP 200
+  if (data && !data.ok) throw new Error(data.error || 'Erreur SMTP inconnue');
 }
 
 export async function sendDocumentByEmail(

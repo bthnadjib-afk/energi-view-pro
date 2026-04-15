@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useConfig } from '@/hooks/useConfig';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
@@ -12,6 +13,7 @@ import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import {
   statutsIntervention, typesIntervention, formatDateFR, openPDFInNewTab,
   sendInterventionByEmail, resolveTechnicianName, getInterventionSignatures,
+  updateIntervention,
   type InterventionType, type Intervention, type InterventionLine,
 } from '@/services/dolibarr';
 import { generateInterventionPdfLocal, generateInterventionPdfBlobUrl } from '@/services/interventionPdf';
@@ -22,8 +24,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
-import { SignaturePad } from '@/components/SignaturePad';
-import { Plus, FileText, Receipt, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send, Play, CheckCircle2, Search, Pencil, RefreshCw, XCircle, RotateCcw, ListPlus } from 'lucide-react';
+import { SignaturePad, type SignaturePadRef } from '@/components/SignaturePad';
+import { Plus, FileText, Receipt, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send, Play, CheckCircle2, Search, Pencil, RefreshCw, XCircle, RotateCcw, ListPlus, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -51,11 +53,12 @@ function formatDuration(seconds: number): string {
 export default function Interventions() {
   const { config } = useConfig();
   const { data: interventions = [] } = useInterventions();
-  const { data: clients = [] } = useClients();
+  const { data: clients = [], isError: clientsError } = useClients();
   const { data: dolibarrUsers = [] } = useDolibarrUsers();
   const { data: allDevis = [] } = useDevis();
   const { data: allFactures = [] } = useFactures();
   const { data: produits = [] } = useProduits();
+  const queryClient = useQueryClient();
   const createInterventionMutation = useCreateIntervention();
   const createDevisMutation = useCreateDevis();
   const createFactureMutation = useCreateFacture();
@@ -132,13 +135,16 @@ export default function Interventions() {
   const [newDate, setNewDate] = useState('');
   const [newHeureDebut, setNewHeureDebut] = useState('08:00');
   const [newHeureFin, setNewHeureFin] = useState('10:00');
-  const [newType, setNewType] = useState<InterventionType>('devis');
+  const [newType, setNewType] = useState<InterventionType | ''>('');
   const [newDescription, setNewDescription] = useState('');
   const [newClientId, setNewClientId] = useState('');
+  const [newClientSearch, setNewClientSearch] = useState('');
+  const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [notePrivee, setNotePrivee] = useState('');
 
   const [collisionOpen, setCollisionOpen] = useState(false);
   const [collisionInfo, setCollisionInfo] = useState({ technicien: '', creneauExistant: '' });
+  const [confirmTerminerOpen, setConfirmTerminerOpen] = useState(false);
 
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailDest, setEmailDest] = useState('');
@@ -148,6 +154,8 @@ export default function Interventions() {
 
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signatureTechData, setSignatureTechData] = useState<string | null>(null);
+  const sigClientRef = useRef<SignaturePadRef>(null);
+  const sigTechRef = useRef<SignaturePadRef>(null);
 
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
@@ -157,6 +165,8 @@ export default function Interventions() {
   const [techNote, setTechNote] = useState('');
   const [heureArrivee, setHeureArrivee] = useState('');
   const [heureDepart, setHeureDepart] = useState('');
+  // App-side "En cours" state — stored in note_public, not sent to Dolibarr as fk_statut
+  const [appEnCours, setAppEnCours] = useState(false);
 
   // P1: Lines state
   const { data: interventionLines = [] } = useInterventionLines(selectedIntervention?.id);
@@ -217,7 +227,7 @@ export default function Interventions() {
       } catch { return; }
     }
 
-    if (!clientId || !newDate) { toast.error('Veuillez remplir client et date'); return; }
+    if (!clientId || !newDate) { toast.error((!clientId && newClientSearch) ? 'Sélectionnez un client dans la liste ou créez-en un nouveau' : 'Veuillez remplir client et date'); return; }
     if (!newDescription.trim()) { toast.error('La description est obligatoire'); return; }
 
     const slots: InterventionSlot[] = resolvedInterventions.map(i => ({
@@ -234,10 +244,10 @@ export default function Interventions() {
     await createInterventionMutation.mutateAsync({
       socid: clientId, description: newDescription || ' ', date: newDate,
       heureDebut: newHeureDebut, heureFin: newHeureFin,
-      fk_user_assign: selectedUser?.id, type: newType, note_private: notePrivee || undefined,
+      fk_user_assign: selectedUser?.id, type: (newType || 'devis') as InterventionType, note_private: notePrivee || undefined,
     });
     setDialogOpen(false);
-    setNewClientId(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee(''); setNewType('devis');
+    setNewClientId(''); setNewClientSearch(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee(''); setNewType('');
     resetNewClientForm();
   };
 
@@ -248,6 +258,46 @@ export default function Interventions() {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   };
 
+  const currentTime = (): string => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  };
+
+  const addTwoHours = (time: string): string => {
+    const [h, m] = time.split(':').map(Number);
+    const total = (h + 2) % 24;
+    return `${String(total).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
+  };
+
+  // Silent save of appStatus to note_public (en_cours or cleared)
+  const saveAppStatus = async (status: 'en_cours' | null) => {
+    if (!selectedIntervention) return;
+    try {
+      const existing = selectedIntervention.descriptionClient
+        ? (() => { try { return JSON.parse(selectedIntervention.descriptionClient!); } catch { return {}; } })()
+        : {};
+      if (status === null) { delete existing.appStatus; } else { existing.appStatus = status; }
+      const techInfo = JSON.stringify(existing);
+      await updateIntervention(selectedIntervention.id, { note_public: techInfo });
+      setSelectedIntervention(prev => prev ? { ...prev, descriptionClient: techInfo } : prev);
+      queryClient.invalidateQueries({ queryKey: ['interventions'] });
+    } catch {}
+  };
+
+  // Silent auto-save: persist arrival/departure times in note_public without showing a toast
+  const autoSaveTimes = async (arrivee: string, depart: string) => {
+    if (!selectedIntervention) return;
+    try {
+      const existing = selectedIntervention.descriptionClient
+        ? (() => { try { return JSON.parse(selectedIntervention.descriptionClient!); } catch { return {}; } })()
+        : {};
+      const techInfo = JSON.stringify({ ...existing, heureArrivee: arrivee, heureDepart: depart });
+      await updateIntervention(selectedIntervention.id, { note_public: techInfo });
+      // Update local state so closing/reopening the panel reads the saved values
+      setSelectedIntervention(prev => prev ? { ...prev, descriptionClient: techInfo } : prev);
+    } catch { /* silent — no toast on auto-save failure */ }
+  };
+
   const openDetail = (inter: Intervention) => {
     setSelectedIntervention(inter);
     setDetailOpen(true);
@@ -255,16 +305,20 @@ export default function Interventions() {
     let restoredNote = '';
     let restoredArrivee = '';
     let restoredDepart = '';
+    let restoredAppEnCours = false;
     if (inter.descriptionClient) {
       try {
         const saved = JSON.parse(inter.descriptionClient);
         restoredNote = saved.techNote || '';
         restoredArrivee = saved.heureArrivee || '';
         restoredDepart = saved.heureDepart || '';
+        restoredAppEnCours = saved.appStatus === 'en_cours';
       } catch { /* not JSON, ignore */ }
     }
     setTechNote(restoredNote);
-    setHeureArrivee(restoredArrivee);
+    setAppEnCours(restoredAppEnCours);
+    // Default arrival to the planned RDV start time if not already saved
+    setHeureArrivee(restoredArrivee || inter.heureDebut || '');
     // Auto-fill departure with current time rounded to 15 min if not already saved
     setHeureDepart(restoredDepart || roundToQuarterHour(new Date()));
   };
@@ -394,7 +448,7 @@ export default function Interventions() {
           <h1 className="text-2xl font-bold text-foreground">Interventions</h1>
           <p className="text-muted-foreground text-sm">Planning et suivi — statuts natifs Dolibarr</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setShowClientSuggestions(false); setNewClientSearch(''); setNewClientId(''); } }}>
           <DialogTrigger asChild>
             <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 h-12 px-6 text-base">
               <Plus className="h-4 w-4" /> Nouvelle intervention
@@ -404,13 +458,53 @@ export default function Interventions() {
             <DialogHeader><DialogTitle>Nouvelle intervention (Brouillon)</DialogTitle></DialogHeader>
             <div className="space-y-4 pt-2">
               {!showNewClientForm ? (
-                <Select value={newClientId} onValueChange={(v) => { if (v === '__new__') { setShowNewClientForm(true); setNewClientId(''); } else { setNewClientId(v); } }}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
-                  <SelectContent>
-                    {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>)}
-                    <SelectItem value="__new__" className="text-primary font-medium">＋ Nouveau client</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Input
+                    placeholder="Client"
+                    value={newClientSearch}
+                    onChange={e => { setNewClientSearch(e.target.value); setNewClientId(''); setShowClientSuggestions(true); }}
+                    onClick={() => setShowClientSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowClientSuggestions(false), 150)}
+                    autoComplete="off"
+                    className="pr-8"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onMouseDown={e => { e.preventDefault(); setShowClientSuggestions(v => !v); }}
+                  >
+                    <ChevronDown className={cn('h-4 w-4 transition-transform', showClientSuggestions && 'rotate-180')} />
+                  </button>
+                  {showClientSuggestions && (
+                    <div className="absolute z-50 w-full bg-popover border border-border rounded-md shadow-md mt-1 max-h-48 overflow-y-auto">
+                      {(() => {
+                        const filtered = clients.filter(c => !newClientSearch || c.nom.toLowerCase().includes(newClientSearch.toLowerCase())).slice(0, 8);
+                        return filtered.length > 0 ? filtered.map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted"
+                            onMouseDown={() => { setNewClientId(c.id); setNewClientSearch(c.nom); setShowClientSuggestions(false); }}
+                          >
+                            {c.nom}
+                          </button>
+                        )) : (
+                          <p className="px-3 py-2 text-sm text-muted-foreground italic">
+                            {clientsError ? 'Erreur Dolibarr — vérifiez la connexion' : clients.length === 0 ? 'Aucun client dans Dolibarr' : 'Aucun résultat'}
+                          </p>
+                        );
+                      })()}
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm text-primary font-medium hover:bg-muted border-t border-border"
+                        onMouseDown={() => { setShowNewClientForm(true); setNcNom(newClientSearch); setShowClientSuggestions(false); }}
+                      >
+                        ＋ Nouveau client
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/30">
                   <div className="flex items-center justify-between">
@@ -428,29 +522,51 @@ export default function Interventions() {
                 </div>
               )}
               <Select value={newType} onValueChange={(v) => setNewType(v as InterventionType)}>
-                <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Type d'intervention" /></SelectTrigger>
                 <SelectContent>
                   {typesIntervention.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={newTech} onValueChange={setNewTech}>
-                <SelectTrigger><SelectValue placeholder="Technicien (Dolibarr)" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Sélectionner un technicien" /></SelectTrigger>
                 <SelectContent>
                   {technicienNames.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   {technicienNames.length === 0 && <SelectItem value="none" disabled>Aucun utilisateur Dolibarr</SelectItem>}
                 </SelectContent>
               </Select>
-              <Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Début</label>
-                  <Input type="time" value={newHeureDebut} onChange={(e) => setNewHeureDebut(e.target.value)} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Fin</label>
-                  <Input type="time" value={newHeureFin} onChange={(e) => setNewHeureFin(e.target.value)} />
-                </div>
+              <div className="flex gap-1.5">
+                <Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="flex-1" />
+                <Button type="button" variant="outline" className="shrink-0 px-3 text-xs" onClick={() => { const d = new Date(); setNewDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`); }}>
+                  Aujourd'hui
+                </Button>
               </div>
+              {(() => {
+                const slots = newType === 'panne_urgence'
+                  ? Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 === 0 ? '00' : '30'}`)
+                  : Array.from({ length: 25 }, (_, i) => `${String(8 + Math.floor(i / 2)).padStart(2, '0')}:${i % 2 === 0 ? '00' : '30'}`);
+                return (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Début</label>
+                      <Select value={newHeureDebut} onValueChange={(v) => { setNewHeureDebut(v); setNewHeureFin(addTwoHours(v)); }}>
+                        <SelectTrigger><SelectValue placeholder="Heure de début" /></SelectTrigger>
+                        <SelectContent>
+                          {slots.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Fin</label>
+                      <Select value={newHeureFin} onValueChange={setNewHeureFin}>
+                        <SelectTrigger><SelectValue placeholder="Heure de fin" /></SelectTrigger>
+                        <SelectContent>
+                          {slots.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                );
+              })()}
               <Input placeholder="Description technique" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
               {role === 'admin' && (
                 <div className="space-y-2">
@@ -531,7 +647,12 @@ export default function Interventions() {
                       <Clock className="inline h-3 w-3 mr-1" />{i.heureDebut}–{i.heureFin}
                     </td>
                     <td className="py-3 px-2 text-muted-foreground">{formatDateFR(i.date)}</td>
-                    <td className="py-3 px-2"><StatusBadge statut={i.statut} /></td>
+                    <td className="py-3 px-2">{(() => {
+                      if (i.fk_statut === 1 && i.descriptionClient) {
+                        try { if (JSON.parse(i.descriptionClient).appStatus === 'en_cours') return <StatusBadge statut="En cours" />; } catch {}
+                      }
+                      return <StatusBadge statut={i.statut} />;
+                    })()}</td>
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         {(() => {
@@ -582,7 +703,7 @@ export default function Interventions() {
                   <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs ml-2', typeColors[selectedIntervention.type])}>
                     {typeLabels[selectedIntervention.type]}
                   </span>
-                  <StatusBadge statut={selectedIntervention.statut} />
+                  <StatusBadge statut={selectedIntervention.fk_statut === 1 && appEnCours ? 'En cours' : selectedIntervention.statut} />
                 </DialogTitle>
               </DialogHeader>
 
@@ -664,28 +785,74 @@ export default function Interventions() {
                   </div>
                 )}
 
-                {/* Tech note & arrival/departure — visible for validated interventions, internal only */}
-                {selectedIntervention.fk_statut >= 1 && (
+                {/* Heure d'arrivée — visible dès que l'intervention est validée */}
+                {selectedIntervention.fk_statut === 1 && (
+                  <div className="p-3 rounded-lg bg-muted/30 border border-border space-y-2">
+                    <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                      <Clock className="h-4 w-4" /> Heure d'arrivée
+                    </h3>
+                    <div className="flex gap-1.5">
+                      <Input
+                        type="time"
+                        value={heureArrivee}
+                        onChange={e => { setHeureArrivee(e.target.value); autoSaveTimes(e.target.value, heureDepart); }}
+                        disabled={appEnCours}
+                        className="flex-1"
+                      />
+                      {!appEnCours && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0 h-10 w-10"
+                          title="Heure actuelle"
+                          onClick={() => { const t = currentTime(); setHeureArrivee(t); autoSaveTimes(t, heureDepart); }}
+                        >
+                          <Clock className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {appEnCours && <p className="text-xs text-muted-foreground">Heure d'arrivée figée — intervention démarrée</p>}
+                  </div>
+                )}
+
+                {/* Tech note, heure de départ — visible seulement En cours ou terminée */}
+                {(appEnCours || selectedIntervention.fk_statut >= 3) && (
                   <div className="space-y-3 p-3 rounded-lg bg-muted/30 border border-border">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                       <Clock className="h-4 w-4" /> Suivi technicien (interne)
                     </h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-xs text-muted-foreground">Heure d'arrivée {selectedIntervention.fk_statut < 3 && <span className="text-destructive">*</span>}</label>
-                        <Input type="time" value={heureArrivee} onChange={e => setHeureArrivee(e.target.value)} disabled={selectedIntervention.fk_statut >= 3} />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-xs text-muted-foreground">Heure de départ {selectedIntervention.fk_statut < 3 && <span className="text-destructive">*</span>}</label>
-                        <Input type="time" value={heureDepart} onChange={e => setHeureDepart(e.target.value)} disabled={selectedIntervention.fk_statut >= 3} />
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Heure de départ {selectedIntervention.fk_statut < 3 && <span className="text-destructive">*</span>}</label>
+                      <div className="flex gap-1.5">
+                        <Input
+                          type="time"
+                          value={heureDepart}
+                          onChange={e => setHeureDepart(e.target.value)}
+                          onBlur={e => autoSaveTimes(heureArrivee, e.target.value)}
+                          disabled={selectedIntervention.fk_statut >= 3}
+                          className="flex-1"
+                        />
+                        {selectedIntervention.fk_statut < 3 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="shrink-0 h-10 w-10"
+                            title="Heure actuelle"
+                            onClick={() => { const t = currentTime(); setHeureDepart(t); autoSaveTimes(heureArrivee, t); }}
+                          >
+                            <Clock className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs text-muted-foreground">Note du technicien {selectedIntervention.fk_statut < 3 && <span className="text-destructive">*</span>}</label>
-                      <Textarea 
-                        placeholder="Décrivez le travail effectué, les observations..." 
-                        value={techNote} 
-                        onChange={e => setTechNote(e.target.value)} 
+                      <Textarea
+                        placeholder="Décrivez le travail effectué, les observations..."
+                        value={techNote}
+                        onChange={e => setTechNote(e.target.value)}
                         className="min-h-[80px]"
                         disabled={selectedIntervention.fk_statut >= 3}
                       />
@@ -693,13 +860,14 @@ export default function Interventions() {
                   </div>
                 )}
 
-                {/* Signatures - only when validated (fk_statut >= 1) */}
-                {selectedIntervention.fk_statut >= 1 && (
+                {/* Signatures - only when En cours (app) or already finished */}
+                {(appEnCours || selectedIntervention.fk_statut >= 3) && (
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-foreground">
-                      ✅ Signatures {selectedIntervention.fk_statut < 3 && <span className="text-xs text-destructive font-normal ml-2">* obligatoires pour terminer</span>}
+                      ✅ Signatures {selectedIntervention.fk_statut < 3 && !signatureData && !signatureTechData && <span className="text-xs text-destructive font-normal ml-2">* obligatoires pour terminer</span>}
                     </h3>
-                    {/* Show saved signatures */}
+
+                    {/* Saved signatures — always shown when available */}
                     {(signatureData || signatureTechData) && (
                       <div className="grid grid-cols-2 gap-4">
                         {signatureData && (
@@ -716,26 +884,63 @@ export default function Interventions() {
                         )}
                       </div>
                     )}
-                    {selectedIntervention.fk_statut < 3 && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-2">Signature du client <span className="text-destructive">*</span></p>
-                          <SignaturePad onSave={async (data) => {
-                            setSignatureData(data);
-                            if (selectedIntervention) {
-                              await saveSignaturesMutation.mutateAsync({ id: selectedIntervention.id, signatureClient: data, signatureTech: signatureTechData || undefined, ref: selectedIntervention.ref });
-                            }
-                          }} />
+
+                    {/* Signature pads — only shown when at least one is missing AND not finished */}
+                    {selectedIntervention.fk_statut < 3 && (!signatureData || !signatureTechData) && (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {!signatureData && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-2">Signature du client <span className="text-destructive">*</span></p>
+                              <SignaturePad ref={sigClientRef} onSave={(data) => setSignatureData(data)} />
+                            </div>
+                          )}
+                          {!signatureTechData && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-2">Signature du technicien <span className="text-destructive">*</span></p>
+                              <SignaturePad ref={sigTechRef} onSave={(data) => setSignatureTechData(data)} />
+                            </div>
+                          )}
                         </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-2">Signature du technicien <span className="text-destructive">*</span></p>
-                          <SignaturePad onSave={async (data) => {
-                            setSignatureTechData(data);
-                            if (selectedIntervention) {
-                              await saveSignaturesMutation.mutateAsync({ id: selectedIntervention.id, signatureClient: signatureData || undefined, signatureTech: data, ref: selectedIntervention.ref });
-                            }
-                          }} />
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => {
+                              sigClientRef.current?.clear();
+                              sigTechRef.current?.clear();
+                              setSignatureData(null);
+                              setSignatureTechData(null);
+                            }}
+                          >
+                            Effacer
+                          </Button>
+                          <Button
+                            type="button"
+                            className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700"
+                            disabled={!signatureData || !signatureTechData || saveSignaturesMutation.isPending}
+                            onClick={async () => {
+                              if (!signatureData || !signatureTechData) {
+                                toast.error(!signatureData ? 'Signature client manquante' : 'Signature technicien manquante');
+                                return;
+                              }
+                              await saveSignaturesMutation.mutateAsync({
+                                id: selectedIntervention.id,
+                                signatureClient: signatureData,
+                                signatureTech: signatureTechData,
+                                ref: selectedIntervention.ref,
+                              });
+                              toast.success('Signatures enregistrées');
+                            }}
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            {saveSignaturesMutation.isPending ? 'Enregistrement...' : 'Valider'}
+                          </Button>
                         </div>
+                        <p className="text-xs text-center text-amber-600">
+                          {!signatureData && !signatureTechData ? 'Signez les 2 cases ci-dessus' : !signatureData ? 'Signature client manquante' : 'Signature technicien manquante'}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -770,74 +975,115 @@ export default function Interventions() {
                     </>
                   )}
 
-                  {/* Validée (1) → Terminer — all roles can finish */}
-                  {(selectedIntervention.fk_statut === 1 || selectedIntervention.fk_statut === 2) && (
-                    <Button 
+                  {/* Validée (1) + pas encore démarrée → Démarrer (app-side only) */}
+                  {selectedIntervention.fk_statut === 1 && !appEnCours && (
+                    <Button
                       onClick={async () => {
-                        // Validate mandatory fields
-                        if (!techNote.trim()) {
-                          toast.error('La note du technicien est obligatoire pour terminer l\'intervention');
-                          return;
+                        if (role !== 'admin') {
+                          const now = currentTime();
+
+                          // Heure d'arrivée ne peut pas être dans le futur
+                          if (heureArrivee && heureArrivee > now) {
+                            toast.error(`L'heure d'arrivée (${heureArrivee}) est dans le futur — impossible de démarrer`);
+                            return;
+                          }
+
+                          // Heure d'arrivée ne peut pas être plus d'1h avant le RDV prévu
+                          if (heureArrivee && selectedIntervention.heureDebut) {
+                            const [ah, am] = heureArrivee.split(':').map(Number);
+                            const [sh, sm] = selectedIntervention.heureDebut.split(':').map(Number);
+                            if (ah * 60 + am < sh * 60 + sm - 60) {
+                              toast.error(`Arrivée trop tôt — le RDV est prévu à ${selectedIntervention.heureDebut}, vous ne pouvez pas arriver avant ${String(sh - 1).padStart(2, '0')}:${String(sm).padStart(2, '0')}`);
+                              return;
+                            }
+                          }
+
+                          // Même technicien ne peut pas avoir 2 interventions en cours simultanément (sauf même client)
+                          const techName = selectedIntervention.technicien;
+                          if (techName) {
+                            const autresEnCours = resolvedInterventions.filter(i => {
+                              if (i.id === selectedIntervention.id) return false;
+                              if (i.fk_statut !== 1) return false;
+                              if (i.technicien !== techName) return false;
+                              try { return JSON.parse(i.descriptionClient || '{}').appStatus === 'en_cours'; }
+                              catch { return false; }
+                            });
+                            const conflit = autresEnCours.filter(i => i.socid !== selectedIntervention.socid);
+                            if (conflit.length > 0) {
+                              toast.error(`${techName} est déjà en cours sur ${conflit.map(i => i.ref).join(', ')} — impossible de démarrer 2 interventions simultanées`);
+                              return;
+                            }
+                          }
                         }
-                        if (!heureArrivee) {
-                          toast.error('L\'heure d\'arrivée est obligatoire pour terminer');
-                          return;
-                        }
-                        if (!heureDepart) {
-                          toast.error('L\'heure de départ est obligatoire pour terminer');
-                          return;
-                        }
-                        // Validate times are for today — not in the past
-                        const now = new Date();
-                        const todayStr = now.toISOString().slice(0, 10);
-                        const interDate = selectedIntervention.date?.slice(0, 10);
-                        if (interDate && interDate < todayStr) {
-                          // Intervention date is before today — warn but allow if already validated
-                        }
-                        // Check arrival is not after departure
-                        if (heureArrivee >= heureDepart) {
-                          toast.error('L\'heure d\'arrivée doit être avant l\'heure de départ');
-                          return;
-                        }
-                        if (!signatureData) {
-                          toast.error('La signature du client est obligatoire pour terminer');
-                          return;
-                        }
-                        if (!signatureTechData) {
-                          toast.error('La signature du technicien est obligatoire pour terminer');
-                          return;
-                        }
-                        // Save tech note + times in note_public
-                        const techInfo = JSON.stringify({
-                          techNote: techNote,
-                          heureArrivee: heureArrivee,
-                          heureDepart: heureDepart,
-                        });
-                        await updateMutation.mutateAsync({
-                          id: selectedIntervention.id,
-                          note_public: techInfo,
-                        });
-                        // Close the intervention (status 3 = Terminée)
-                        await closeMutation.mutateAsync(selectedIntervention.id);
-                        setDetailOpen(false);
-                      }} 
-                      disabled={closeMutation.isPending || updateMutation.isPending} 
-                      className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+
+                        setAppEnCours(true);
+                        await saveAppStatus('en_cours');
+                      }}
+                      className="gap-2 bg-orange-500 hover:bg-orange-600"
                     >
-                      <CheckCircle2 className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Terminer l\'intervention'}
+                      <Play className="h-4 w-4" /> Démarrer l'intervention
                     </Button>
                   )}
 
-                  {/* Terminée (3 ou 5) → Rouvrir */}
-                   {(selectedIntervention.fk_statut === 3 || selectedIntervention.fk_statut === 5) && (
-                     <Button onClick={async () => {
-                       await reopenMutation.mutateAsync(selectedIntervention.id);
-                       // Force status back to Validée (1) after reopen
-                       try { await statusMutation.mutateAsync({ id: selectedIntervention.id, status: 1 }); } catch {}
-                       setDetailOpen(false);
-                     }} disabled={reopenMutation.isPending} className="gap-2">
-                       <RotateCcw className="h-4 w-4" /> {reopenMutation.isPending ? '...' : 'Rouvrir (Validée)'}
-                     </Button>
+                  {/* En cours (app) → Terminer dans Dolibarr */}
+                  {selectedIntervention.fk_statut === 1 && appEnCours && (
+                    <>
+                      <Button
+                        onClick={() => {
+                          if (!techNote.trim()) { toast.error('La note du technicien est obligatoire'); return; }
+                          if (!heureArrivee) { toast.error('L\'heure d\'arrivée est obligatoire'); return; }
+                          if (!heureDepart) { toast.error('L\'heure de départ est obligatoire'); return; }
+                          if (heureArrivee >= heureDepart) { toast.error('L\'heure d\'arrivée doit être avant l\'heure de départ'); return; }
+                          if (role !== 'admin' && heureDepart > currentTime()) { toast.error(`Bien essayé 😏 — il est ${currentTime()}, impossible de partir à ${heureDepart}`); return; }
+                          if (!signatureData) { toast.error('Signature client manquante'); return; }
+                          if (!signatureTechData) { toast.error('Signature technicien manquante'); return; }
+                          setConfirmTerminerOpen(true);
+                        }}
+                        disabled={closeMutation.isPending || updateMutation.isPending}
+                        className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                      >
+                        <CheckCircle2 className="h-4 w-4" /> {closeMutation.isPending ? '...' : 'Terminer l\'intervention'}
+                      </Button>
+                      <AlertDialog open={confirmTerminerOpen} onOpenChange={setConfirmTerminerOpen}>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Terminer l'intervention ?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Êtes-vous sûr de vouloir terminer cette intervention ? Une fois terminée, <strong>aucune modification ne sera possible</strong>.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-emerald-600 hover:bg-emerald-700"
+                              onClick={async () => {
+                                const techInfo = JSON.stringify({ techNote, heureArrivee, heureDepart });
+                                await updateMutation.mutateAsync({ id: selectedIntervention.id, note_public: techInfo });
+                                await closeMutation.mutateAsync(selectedIntervention.id);
+                                setConfirmTerminerOpen(false);
+                                setDetailOpen(false);
+                              }}
+                            >
+                              Oui, terminer
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  )}
+
+                  {/* Terminée (3 ou 5) → Rouvrir — admin uniquement */}
+                  {(selectedIntervention.fk_statut === 3 || selectedIntervention.fk_statut === 5) && role === 'admin' && (
+                    <Button onClick={async () => {
+                      await reopenMutation.mutateAsync(selectedIntervention.id);
+                      // reopen → statut=0, validate → statut=1, then set app En cours
+                      try { await validateMutation.mutateAsync(selectedIntervention.id); } catch {}
+                      await saveAppStatus('en_cours');
+                      setAppEnCours(true);
+                      setDetailOpen(false);
+                    }} disabled={reopenMutation.isPending} className="gap-2">
+                      <RotateCcw className="h-4 w-4" /> {reopenMutation.isPending ? '...' : 'Rouvrir'}
+                    </Button>
                   )}
 
                   {/* Générer facture & Transformer en devis — ONLY when Terminée AND NOT technicien */}
@@ -852,30 +1098,34 @@ export default function Interventions() {
                     </>
                   )}
 
-                  {/* PDF — always available (local generation) */}
-                  <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
-                    <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
-                  </Button>
-                   <Button
-                    onClick={() => {
-                      if (!selectedIntervention) return;
-                      const client = clients.find(c => c.id === selectedIntervention.socid);
-                      generateInterventionPdfLocal({
-                        intervention: selectedIntervention,
-                        client,
-                        lines: interventionLines,
-                        entreprise: config.entreprise,
-                        signatureClient: signatureData || undefined,
-                        signatureTech: signatureTechData || undefined,
-                      });
-                    }}
-                    disabled={generatingPDF}
-                    variant="outline" className="gap-2"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Télécharger le PDF
-                  </Button>
-                  {selectedIntervention.fk_statut >= 1 && role !== 'technicien' && (
+                  {/* PDF — only available when not brouillon */}
+                  {selectedIntervention.fk_statut > 0 && (
+                    <Button onClick={handleViewPDF} disabled={generatingPDF} variant="outline" className="gap-2">
+                      <FileDown className="h-4 w-4" /> {generatingPDF ? 'Génération...' : 'Voir le PDF'}
+                    </Button>
+                  )}
+                  {selectedIntervention.fk_statut > 0 && (
+                    <Button
+                      onClick={() => {
+                        if (!selectedIntervention) return;
+                        const client = clients.find(c => c.id === selectedIntervention.socid);
+                        generateInterventionPdfLocal({
+                          intervention: selectedIntervention,
+                          client,
+                          lines: interventionLines,
+                          entreprise: config.entreprise,
+                          signatureClient: signatureData || undefined,
+                          signatureTech: signatureTechData || undefined,
+                        });
+                      }}
+                      disabled={generatingPDF}
+                      variant="outline" className="gap-2"
+                    >
+                      <RefreshCw className="h-4 w-4" /> Télécharger le PDF
+                    </Button>
+                  )}
+                  {/* Email — only when terminée (bon d'intervention complet) */}
+                  {selectedIntervention.fk_statut >= 3 && role !== 'technicien' && (
                     <Button onClick={() => {
                       const c = clients.find(cl => cl.id === selectedIntervention.socid);
                       const defaultSubject = `Électricien du Genevois - Bon d'intervention ${selectedIntervention.ref}`;

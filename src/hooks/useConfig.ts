@@ -28,6 +28,13 @@ export interface AppConfig {
     apiKey: string;
     connected: boolean;
   };
+  smtp: {
+    host: string;
+    port: string;
+    user: string;
+    pass: string;
+    from: string;
+  };
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -55,6 +62,13 @@ const DEFAULT_CONFIG: AppConfig = {
     apiUrl: '',
     apiKey: '',
     connected: false,
+  },
+  smtp: {
+    host: '',
+    port: '587',
+    user: '',
+    pass: '',
+    from: '',
   },
 };
 
@@ -140,6 +154,10 @@ export function useConfig() {
     setConfigState(prev => ({ ...prev, dolibarr: { ...prev.dolibarr, ...updates } }));
   }, []);
 
+  const updateSmtp = useCallback((updates: Partial<AppConfig['smtp']>) => {
+    setConfigState(prev => ({ ...prev, smtp: { ...prev.smtp, ...updates } }));
+  }, []);
+
   const saveToSupabase = useCallback(async () => {
     setSaving(true);
     try {
@@ -163,5 +181,5 @@ export function useConfig() {
     setSaving(false);
   }, [config]);
 
-  return { config, loading, saving, updateConfig, updateEntreprise, updateDefaults, updateNotifications, updateDolibarr, saveToSupabase };
+  return { config, loading, saving, updateConfig, updateEntreprise, updateDefaults, updateNotifications, updateDolibarr, updateSmtp, saveToSupabase };
 }
