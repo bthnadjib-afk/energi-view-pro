@@ -1,6 +1,28 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Read SMTP config from app_config table (fallback when env secrets are not set)
+async function loadSmtpFromAppConfig(): Promise<Record<string, string>> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!supabaseUrl || !serviceKey) return {}
+  try {
+    const admin = createClient(supabaseUrl, serviceKey)
+    const { data } = await admin
+      .from('app_config')
+      .select('key, value')
+      .in('key', ['smtp.host', 'smtp.port', 'smtp.user', 'smtp.pass', 'smtp.from'])
+    if (!data) return {}
+    const result: Record<string, string> = {}
+    for (const row of data) result[row.key] = row.value
+    return result
+  } catch {
+    return {}
+  }
 }
 
 function extractEmailAddress(value: string): string {
@@ -179,16 +201,30 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const SMTP_HOST = Deno.env.get('SMTP_HOST')
-    const SMTP_PORT = Deno.env.get('SMTP_PORT') || '587'
-    const SMTP_USER = Deno.env.get('SMTP_USER')
-    const SMTP_PASS = Deno.env.get('SMTP_PASS')
-    const SMTP_FROM = Deno.env.get('SMTP_FROM') || SMTP_USER
+    // Priority 1: Supabase secrets (env vars)
+    // Priority 2: app_config table (configured from the app's Configuration page)
+    let SMTP_HOST = Deno.env.get('SMTP_HOST')
+    let SMTP_PORT = Deno.env.get('SMTP_PORT')
+    let SMTP_USER = Deno.env.get('SMTP_USER')
+    let SMTP_PASS = Deno.env.get('SMTP_PASS')
+    let SMTP_FROM = Deno.env.get('SMTP_FROM')
 
-    if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS || !SMTP_FROM) {
+    if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+      const appCfg = await loadSmtpFromAppConfig()
+      SMTP_HOST = SMTP_HOST || appCfg['smtp.host'] || ''
+      SMTP_PORT = SMTP_PORT || appCfg['smtp.port'] || ''
+      SMTP_USER = SMTP_USER || appCfg['smtp.user'] || ''
+      SMTP_PASS = SMTP_PASS || appCfg['smtp.pass'] || ''
+      SMTP_FROM = SMTP_FROM || appCfg['smtp.from'] || ''
+    }
+
+    SMTP_PORT = SMTP_PORT || '587'
+    SMTP_FROM = SMTP_FROM || SMTP_USER
+
+    if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
       return new Response(
-        JSON.stringify({ error: 'SMTP non configuré.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ ok: false, error: 'SMTP non configuré. Renseignez les paramètres dans Configuration → Serveur mail.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -196,8 +232,8 @@ Deno.serve(async (req) => {
 
     if (!to || !subject) {
       return new Response(
-        JSON.stringify({ error: 'Champs "to" et "subject" requis' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ ok: false, error: 'Champs "to" et "subject" requis' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -208,7 +244,7 @@ Deno.serve(async (req) => {
         console.log(`SMTP attempt ${attempt}/2`)
         await trySendSmtp({ SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, to, subject, message, pdfBase64, pdfFilename })
         return new Response(
-          JSON.stringify({ success: true }),
+          JSON.stringify({ ok: true }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       } catch (e) {
@@ -220,12 +256,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    throw lastError || new Error('Échec envoi SMTP')
-  } catch (error) {
-    console.error('SMTP error:', error)
+    const smtpErrMsg = lastError?.message || 'Échec envoi SMTP'
+    console.error('SMTP final error:', smtpErrMsg)
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Erreur envoi email SMTP' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ ok: false, error: smtpErrMsg }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erreur envoi email SMTP'
+    console.error('SMTP handler error:', msg)
+    return new Response(
+      JSON.stringify({ ok: false, error: msg }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
