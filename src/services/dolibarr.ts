@@ -264,7 +264,8 @@ export async function fetchFactures(): Promise<Facture[]> {
 }
 
 export async function fetchDevis(): Promise<Devis[]> {
-  const result = await dolibarrGet<any[]>('/proposals?sortfield=t.rowid&sortorder=DESC&limit=500');
+  // _ts cache-buster avoids HTTP 304 returning stale proposals after a status change
+  const result = await dolibarrGet<any[]>(`/proposals?sortfield=t.rowid&sortorder=DESC&limit=500&_ts=${Date.now()}`);
   if (!result) return [];
   const mapped = result.map(mapDolibarrDevis);
   try {
