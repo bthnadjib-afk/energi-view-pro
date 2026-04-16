@@ -89,8 +89,7 @@ export default function Fournisseurs() {
                 <label className="text-sm font-medium">Adresse</label>
                 <AddressAutocomplete
                   value={adresse}
-                  onChange={setAdresse}
-                  onAddressSelect={a => { setAdresse(a.adresse); setCodePostal(a.codePostal); setVille(a.ville); }}
+                  onSelect={a => { setAdresse(a.rue); setCodePostal(a.codePostal); setVille(a.ville); }}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">

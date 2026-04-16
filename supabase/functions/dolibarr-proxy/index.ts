@@ -67,8 +67,9 @@ Deno.serve(async (req) => {
       }
     )
   } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erreur proxy Dolibarr'
     return new Response(
-      JSON.stringify({ ok: false, status: 500, error: error.message || 'Erreur proxy Dolibarr' }),
+      JSON.stringify({ ok: false, status: 500, error: msg }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
