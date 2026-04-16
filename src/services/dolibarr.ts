@@ -1167,6 +1167,503 @@ function mapDolibarrProduit(d: any): Produit {
   };
 }
 
+// ============================================================
+// COMMANDES CLIENTS
+// ============================================================
+
+export interface Commande {
+  id: string;
+  ref: string;
+  client: string;
+  socid?: string;
+  date: string;
+  dateLivraison: string;
+  montantHT: number;
+  montantTTC: number;
+  statut: string;
+  fk_statut: number;
+  lignes: DevisLigne[];
+  note_private?: string;
+}
+
+export const COMMANDE_STATUTS: Record<number, string> = {
+  0: 'Brouillon',
+  1: 'Validée',
+  2: 'En cours',
+  3: 'Livrée',
+  5: 'Facturée',
+  6: 'Annulée',
+};
+
+export function getCommandeStatutLabel(fk_statut: number): string {
+  return COMMANDE_STATUTS[fk_statut] || `Statut ${fk_statut}`;
+}
+
+function mapDolibarrCommande(d: any): Commande {
+  const fk_statut = Number(d.fk_statut ?? d.statut_id ?? 0);
+  return {
+    id: String(d.id),
+    ref: d.ref || `CO-${d.id}`,
+    client: d.thirdparty?.name || d.nom || `Client #${d.socid}`,
+    socid: String(d.socid || ''),
+    date: parseDolibarrDate(d.date || d.date_commande || d.date_creation),
+    dateLivraison: parseDolibarrDate(d.date_livraison || d.delivery_date || ''),
+    montantHT: parseFloat(d.total_ht) || 0,
+    montantTTC: parseFloat(d.total_ttc) || 0,
+    statut: getCommandeStatutLabel(fk_statut),
+    fk_statut,
+    lignes: (d.lines || []).map((l: any) => ({
+      designation: l.desc || l.label || '',
+      ref: l.product_ref || l.ref || '',
+      quantite: parseFloat(l.qty) || 0,
+      unite: l.product_unit || l.unit || 'U',
+      prixUnitaire: parseFloat(l.subprice) || 0,
+      totalHT: parseFloat(l.total_ht) || 0,
+      tauxTVA: parseFloat(l.tva_tx) || 0,
+      productType: (parseInt(l.product_type, 10) === 1 ? 'main_oeuvre' : 'fourniture') as 'main_oeuvre' | 'fourniture',
+      prixAchat: parseFloat(l.pa_ht) || 0,
+    })),
+    note_private: d.note_private || undefined,
+  };
+}
+
+export async function fetchCommandes(): Promise<Commande[]> {
+  const result = await dolibarrGet<any[]>('/orders?sortfield=t.rowid&sortorder=DESC&limit=500');
+  if (!result) return [];
+  const mapped = result.map(mapDolibarrCommande);
+  try {
+    const clients = await getClientsCache();
+    return mapped.map(c => ({ ...c, client: resolveClientName(c.socid, clients, c.client) }));
+  } catch { return mapped; }
+}
+
+export async function createCommande(socid: string, lines: CreateDevisLine[], note_private?: string): Promise<string> {
+  const body: any = {
+    socid: parseInt(socid, 10) || socid,
+    date: toUnixTimestamp(new Date().toISOString()),
+    lines,
+  };
+  if (note_private) body.note_private = note_private;
+  const result = await dolibarrCall<string>('/orders', 'POST', body);
+  return result || '';
+}
+
+export async function validateCommande(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/orders/${id}/validate`, 'POST');
+}
+
+export async function setCommandeToDraft(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/orders/${id}/settodraft`, 'POST');
+}
+
+export async function deleteCommande(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/orders/${id}`, 'DELETE');
+}
+
+export async function convertCommandeToFacture(commandeId: string): Promise<string | null> {
+  return dolibarrCall<string>(`/orders/${commandeId}/createinvoice`, 'POST');
+}
+
+// ============================================================
+// FOURNISSEURS
+// ============================================================
+
+export interface Fournisseur {
+  id: string;
+  nom: string;
+  adresse?: string;
+  codePostal?: string;
+  ville: string;
+  telephone: string;
+  email: string;
+  siret?: string;
+  categorie?: string;
+}
+
+function mapDolibarrFournisseur(d: any): Fournisseur {
+  return {
+    id: String(d.id),
+    nom: d.name || '',
+    adresse: d.address || '',
+    codePostal: d.zip || '',
+    ville: d.town || '',
+    telephone: d.phone || '',
+    email: d.email || '',
+    siret: d.idprof2 || d.siren || '',
+    categorie: d.typent_code || '',
+  };
+}
+
+export async function fetchFournisseurs(): Promise<Fournisseur[]> {
+  const result = await dolibarrGet<any[]>('/thirdparties?sortfield=t.rowid&sortorder=DESC&limit=500&mode=2');
+  if (!result) return [];
+  return result.map(mapDolibarrFournisseur);
+}
+
+export async function createFournisseur(data: { nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }): Promise<string> {
+  const result = await dolibarrCall<string>('/thirdparties', 'POST', {
+    name: data.nom,
+    address: data.adresse || '',
+    zip: data.codePostal || '',
+    town: data.ville || '',
+    phone: data.telephone || '',
+    email: data.email || '',
+    fournisseur: 1,
+    supplier: 1,
+  });
+  return result || '';
+}
+
+export async function updateFournisseur(id: string, data: { nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }): Promise<string | null> {
+  return dolibarrCall<string>(`/thirdparties/${id}`, 'PUT', {
+    name: data.nom,
+    address: data.adresse || '',
+    zip: data.codePostal || '',
+    town: data.ville || '',
+    phone: data.telephone || '',
+    email: data.email || '',
+  });
+}
+
+export async function deleteFournisseur(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/thirdparties/${id}`, 'DELETE');
+}
+
+// ============================================================
+// CONTRATS
+// ============================================================
+
+export interface Contrat {
+  id: string;
+  ref: string;
+  client: string;
+  socid?: string;
+  titre: string;
+  dateDebut: string;
+  dateFin: string;
+  montantHT: number;
+  statut: string;
+  fk_statut: number;
+  note?: string;
+}
+
+export const CONTRAT_STATUTS: Record<number, string> = {
+  0: 'Brouillon',
+  1: 'Validé',
+  2: 'Actif',
+  3: 'Terminé',
+  5: 'Fermé',
+};
+
+export function getContratStatutLabel(fk_statut: number): string {
+  return CONTRAT_STATUTS[fk_statut] || `Statut ${fk_statut}`;
+}
+
+function mapDolibarrContrat(d: any): Contrat {
+  const fk_statut = Number(d.statut ?? d.fk_statut ?? 0);
+  return {
+    id: String(d.id),
+    ref: d.ref || `CT-${d.id}`,
+    client: d.thirdparty?.name || d.nom || `Client #${d.socid}`,
+    socid: String(d.socid || ''),
+    titre: d.titre || d.label || d.description || '',
+    dateDebut: parseDolibarrDate(d.date_start || d.date_contrat || d.date_creation),
+    dateFin: parseDolibarrDate(d.date_end || ''),
+    montantHT: parseFloat(d.total_ht || d.montant || '0') || 0,
+    statut: getContratStatutLabel(fk_statut),
+    fk_statut,
+    note: d.note_private || d.description || '',
+  };
+}
+
+export async function fetchContrats(): Promise<Contrat[]> {
+  const result = await dolibarrGet<any[]>('/contracts?sortfield=t.rowid&sortorder=DESC&limit=500');
+  if (!result) return [];
+  const mapped = result.map(mapDolibarrContrat);
+  try {
+    const clients = await getClientsCache();
+    return mapped.map(c => ({ ...c, client: resolveClientName(c.socid, clients, c.client) }));
+  } catch { return mapped; }
+}
+
+export async function createContrat(data: { socid: string; titre: string; dateDebut: string; dateFin?: string; note?: string }): Promise<string> {
+  const result = await dolibarrCall<string>('/contracts', 'POST', {
+    socid: parseInt(data.socid, 10) || data.socid,
+    titre: data.titre,
+    date_contrat: toUnixTimestamp(data.dateDebut),
+    date_start: toUnixTimestamp(data.dateDebut),
+    date_end: data.dateFin ? toUnixTimestamp(data.dateFin) : undefined,
+    note_private: data.note || '',
+  });
+  return result || '';
+}
+
+export async function validateContrat(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/contracts/${id}/validate`, 'POST');
+}
+
+export async function closeContrat(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/contracts/${id}/close`, 'POST');
+}
+
+export async function deleteContrat(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/contracts/${id}`, 'DELETE');
+}
+
+// ============================================================
+// PROJETS
+// ============================================================
+
+export interface Projet {
+  id: string;
+  ref: string;
+  titre: string;
+  client: string;
+  socid?: string;
+  dateDebut: string;
+  dateFin: string;
+  budget: number;
+  statut: string;
+  fk_statut: number;
+  description: string;
+}
+
+export const PROJET_STATUTS: Record<number, string> = {
+  0: 'Brouillon',
+  1: 'En cours',
+  2: 'Suspendu',
+  3: 'Terminé',
+};
+
+export function getProjetStatutLabel(fk_statut: number): string {
+  return PROJET_STATUTS[fk_statut] || `Statut ${fk_statut}`;
+}
+
+function mapDolibarrProjet(d: any): Projet {
+  const fk_statut = Number(d.fk_statut ?? d.statut ?? 0);
+  return {
+    id: String(d.id),
+    ref: d.ref || `PR-${d.id}`,
+    titre: d.title || d.titre || d.label || '',
+    client: d.thirdparty?.name || d.thirdparty_name || `Client #${d.socid}`,
+    socid: String(d.socid || ''),
+    dateDebut: parseDolibarrDate(d.date_start || d.date_creation),
+    dateFin: parseDolibarrDate(d.date_end || ''),
+    budget: parseFloat(d.budget_amount || d.budget || '0') || 0,
+    statut: getProjetStatutLabel(fk_statut),
+    fk_statut,
+    description: d.description || d.note_public || '',
+  };
+}
+
+export async function fetchProjets(): Promise<Projet[]> {
+  const result = await dolibarrGet<any[]>('/projects?sortfield=t.rowid&sortorder=DESC&limit=500');
+  if (!result) return [];
+  return result.map(mapDolibarrProjet);
+}
+
+export async function createProjet(data: { ref?: string; titre: string; socid?: string; dateDebut: string; dateFin?: string; budget?: number; description?: string }): Promise<string> {
+  const result = await dolibarrCall<string>('/projects', 'POST', {
+    ref: data.ref || 'auto',
+    title: data.titre,
+    socid: data.socid ? (parseInt(data.socid, 10) || data.socid) : 0,
+    date_start: toUnixTimestamp(data.dateDebut),
+    date_end: data.dateFin ? toUnixTimestamp(data.dateFin) : undefined,
+    budget_amount: data.budget || 0,
+    description: data.description || '',
+    fk_statut: 1,
+  });
+  return result || '';
+}
+
+export async function updateProjet(id: string, data: { titre?: string; dateFin?: string; budget?: number; description?: string; fk_statut?: number }): Promise<string | null> {
+  const body: any = {};
+  if (data.titre !== undefined) body.title = data.titre;
+  if (data.dateFin !== undefined) body.date_end = toUnixTimestamp(data.dateFin);
+  if (data.budget !== undefined) body.budget_amount = data.budget;
+  if (data.description !== undefined) body.description = data.description;
+  if (data.fk_statut !== undefined) body.fk_statut = data.fk_statut;
+  return dolibarrCall<string>(`/projects/${id}`, 'PUT', body);
+}
+
+export async function deleteProjet(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/projects/${id}`, 'DELETE');
+}
+
+// ============================================================
+// BANQUE / COMPTES BANCAIRES
+// ============================================================
+
+export interface CompteBancaire {
+  id: string;
+  ref: string;
+  label: string;
+  number: string;
+  iban: string;
+  bic: string;
+  solde: number;
+  currency: string;
+  type: string;
+}
+
+export interface LigneBancaire {
+  id: string;
+  date: string;
+  label: string;
+  montant: number;
+  sens: 'D' | 'C';
+  soldeApres: number;
+  num_chq?: string;
+}
+
+function mapDolibarrCompte(d: any): CompteBancaire {
+  return {
+    id: String(d.id),
+    ref: d.ref || d.code || `BA-${d.id}`,
+    label: d.label || d.bank || '',
+    number: d.number || d.account_number || '',
+    iban: d.iban || d.iban_prefix || '',
+    bic: d.bic || d.bic_swift || '',
+    solde: parseFloat(d.solde || d.balance || '0') || 0,
+    currency: d.currency_code || 'EUR',
+    type: d.courant === 1 ? 'Courant' : d.courant === 2 ? 'Épargne' : 'Autre',
+  };
+}
+
+function mapDolibarrLigne(d: any): LigneBancaire {
+  const montant = parseFloat(d.amount || d.montant || '0') || 0;
+  return {
+    id: String(d.id || d.rowid),
+    date: parseDolibarrDate(d.dateo || d.date || d.datev),
+    label: d.label || d.note || '',
+    montant: Math.abs(montant),
+    sens: montant >= 0 ? 'C' : 'D',
+    soldeApres: parseFloat(d.solde || '0') || 0,
+    num_chq: d.num_chq || d.num_releve || '',
+  };
+}
+
+export async function fetchComptesBancaires(): Promise<CompteBancaire[]> {
+  const result = await dolibarrGet<any[]>('/bankaccounts?sortfield=t.rowid&sortorder=ASC&limit=100');
+  if (!result) return [];
+  return result.map(mapDolibarrCompte);
+}
+
+export async function fetchLignesBancaires(accountId: string, limit = 50): Promise<LigneBancaire[]> {
+  const result = await dolibarrGet<any[]>(`/bankaccounts/${accountId}/lines?sortfield=t.rowid&sortorder=DESC&limit=${limit}`);
+  if (!result) return [];
+  return result.map(mapDolibarrLigne);
+}
+
+// ============================================================
+// STOCK / ENTREPÔTS
+// ============================================================
+
+export interface Entrepot {
+  id: string;
+  ref: string;
+  label: string;
+  description: string;
+  lieu: string;
+}
+
+export interface StockProduit {
+  id: string;
+  ref: string;
+  label: string;
+  stockReel: number;
+  stockMin: number;
+  entrepotId: string;
+  prixHT: number;
+  type: string;
+}
+
+function mapDolibarrEntrepot(d: any): Entrepot {
+  return {
+    id: String(d.id),
+    ref: d.ref || `WH-${d.id}`,
+    label: d.label || d.libelle || '',
+    description: d.description || '',
+    lieu: d.lieu || d.place || '',
+  };
+}
+
+export async function fetchEntrepots(): Promise<Entrepot[]> {
+  const result = await dolibarrGet<any[]>('/warehouses?sortfield=t.rowid&sortorder=ASC&limit=100');
+  if (!result) return [];
+  return result.map(mapDolibarrEntrepot);
+}
+
+export async function fetchStockProduits(entrepotId?: string): Promise<StockProduit[]> {
+  const endpoint = entrepotId
+    ? `/products?sortfield=t.rowid&sortorder=ASC&limit=500&warehouse_id=${entrepotId}`
+    : '/products?sortfield=t.rowid&sortorder=ASC&limit=500';
+  const result = await dolibarrGet<any[]>(endpoint);
+  if (!result) return [];
+  return result.map((d: any) => ({
+    id: String(d.id),
+    ref: d.ref || '',
+    label: d.label || '',
+    stockReel: parseFloat(d.stock_reel || d.stock || '0') || 0,
+    stockMin: parseFloat(d.seuil_stock_alerte || d.stock_alerte || '0') || 0,
+    entrepotId: entrepotId || '',
+    prixHT: parseFloat(d.price || d.prix) || 0,
+    type: d.type === '1' ? 'Service' : 'Produit',
+  }));
+}
+
+export async function addStockMovement(productId: string, entrepotId: string, qty: number, label: string): Promise<string | null> {
+  return dolibarrCall<string>(`/products/${productId}/stock/correct`, 'POST', {
+    warehouse_id: parseInt(entrepotId, 10),
+    qty: qty,
+    label: label,
+  });
+}
+
+// ============================================================
+// RAPPORTS / STATISTIQUES
+// ============================================================
+
+export interface StatCA {
+  mois: string;
+  ca_ht: number;
+  ca_ttc: number;
+  nb_factures: number;
+}
+
+export async function fetchStatsCA(year?: number): Promise<StatCA[]> {
+  const y = year || new Date().getFullYear();
+  // Récupère toutes les factures payées de l'année
+  const result = await dolibarrGet<any[]>(`/invoices?sortfield=t.datef&sortorder=ASC&limit=1000&status=1`);
+  if (!result) return [];
+
+  const byMonth: Record<string, { ca_ht: number; ca_ttc: number; nb: number }> = {};
+  result.forEach((d: any) => {
+    const dateStr = parseDolibarrDate(d.date || d.datef || d.date_creation);
+    if (!dateStr) return;
+    const date = new Date(dateStr);
+    if (date.getFullYear() !== y) return;
+    const moisKey = `${y}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    if (!byMonth[moisKey]) byMonth[moisKey] = { ca_ht: 0, ca_ttc: 0, nb: 0 };
+    byMonth[moisKey].ca_ht += parseFloat(d.total_ht) || 0;
+    byMonth[moisKey].ca_ttc += parseFloat(d.total_ttc) || 0;
+    byMonth[moisKey].nb += 1;
+  });
+
+  const moisLabels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+  return Array.from({ length: 12 }, (_, i) => {
+    const key = `${y}-${String(i + 1).padStart(2, '0')}`;
+    return {
+      mois: moisLabels[i],
+      ca_ht: byMonth[key]?.ca_ht || 0,
+      ca_ttc: byMonth[key]?.ca_ttc || 0,
+      nb_factures: byMonth[key]?.nb || 0,
+    };
+  });
+}
+
+// ============================================================
+
 // Helpers
 export function getAcompteBadge(montantHT: number): { label: string; variant: 'green' | 'orange'; taux: number } {
   const taux = montantHT > 5000 ? 30 : 50;

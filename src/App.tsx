@@ -19,6 +19,13 @@ import Catalogue from "./pages/Catalogue";
 import Agenda from "./pages/Agenda";
 import Configuration from "./pages/Configuration";
 import Utilisateurs from "./pages/Utilisateurs";
+import Commandes from "./pages/Commandes";
+import Fournisseurs from "./pages/Fournisseurs";
+import Contrats from "./pages/Contrats";
+import Projets from "./pages/Projets";
+import Banque from "./pages/Banque";
+import Stock from "./pages/Stock";
+import Rapports from "./pages/Rapports";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -97,12 +104,27 @@ function AuthenticatedApp() {
           <main className="flex-1 p-4 md:p-6 overflow-auto bg-muted/30">
             <Routes>
               <Route path="/" element={<Index />} />
+              {/* Facturation */}
               <Route path="/factures" element={<RouteGuard feature="factures"><Factures /></RouteGuard>} />
               <Route path="/devis" element={<RouteGuard feature="devis"><Devis /></RouteGuard>} />
+              <Route path="/commandes" element={<RouteGuard feature="devis"><Commandes /></RouteGuard>} />
+              <Route path="/contrats" element={<RouteGuard feature="devis"><Contrats /></RouteGuard>} />
+              {/* Interventions */}
               <Route path="/interventions" element={<RouteGuard feature="interventions"><Interventions /></RouteGuard>} />
+              {/* Tiers */}
               <Route path="/clients" element={<RouteGuard feature="clients"><Clients /></RouteGuard>} />
+              <Route path="/fournisseurs" element={<RouteGuard feature="clients"><Fournisseurs /></RouteGuard>} />
+              {/* Produits */}
               <Route path="/catalogue" element={<RouteGuard feature="factures"><Catalogue /></RouteGuard>} />
+              <Route path="/stock" element={<RouteGuard feature="factures"><Stock /></RouteGuard>} />
+              {/* Projets */}
+              <Route path="/projets" element={<RouteGuard feature="agenda"><Projets /></RouteGuard>} />
+              {/* Agenda */}
               <Route path="/agenda" element={<RouteGuard feature="agenda"><Agenda /></RouteGuard>} />
+              {/* Finance */}
+              <Route path="/banque" element={<RouteGuard feature="factures"><Banque /></RouteGuard>} />
+              <Route path="/rapports" element={<RouteGuard feature="factures"><Rapports /></RouteGuard>} />
+              {/* Admin */}
               <Route path="/configuration" element={<RouteGuard feature="configuration"><Configuration /></RouteGuard>} />
               <Route path="/utilisateurs" element={<RouteGuard feature="utilisateurs"><Utilisateurs /></RouteGuard>} />
               <Route path="/login" element={<Navigate to="/" replace />} />
