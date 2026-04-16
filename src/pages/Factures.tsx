@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil, Search, XCircle, Zap } from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -42,6 +42,17 @@ export default function Factures() {
   const [emailObjet, setEmailObjet] = useState('');
   const [emailMessage, setEmailMessage] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailTemplates, setEmailTemplates] = useState<{ id: string; nom: string; objet: string; corps: string }[]>([]);
+
+  useEffect(() => {
+    if (emailOpen) {
+      import('@/integrations/supabase/client').then(({ supabase }) => {
+        supabase.from('email_templates').select('*').then(({ data }) => {
+          if (data) setEmailTemplates(data as any);
+        });
+      });
+    }
+  }, [emailOpen]);
   const [socid, setSocid] = useState('');
   const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '' }]);
 
@@ -613,9 +624,38 @@ export default function Factures() {
             <DialogDescription className="sr-only">Formulaire d'envoi par email</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
+            {!config.smtp.user && (
+              <div className="rounded-lg bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-800">
+                ⚠️ SMTP non configuré — rendez-vous dans <strong>Configuration → Serveur mail</strong> pour activer l'envoi.
+              </div>
+            )}
+            {emailTemplates.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Modèle d'email</label>
+                <Select onValueChange={id => {
+                  const tmpl = emailTemplates.find(t => t.id === id);
+                  if (!tmpl || !selectedFacture) return;
+                  const client = clients.find((c: Client) => c.id === selectedFacture.socid);
+                  const vars: Record<string, string> = {
+                    NOM_CLIENT: client?.nom || selectedFacture.client,
+                    REF_FACTURE: selectedFacture.ref,
+                    MONTANT_TTC: `${selectedFacture.montantTTC.toLocaleString('fr-FR')} €`,
+                    NOM_ENTREPRISE: config.entreprise.nom || 'Notre entreprise',
+                  };
+                  const replace = (t: string) => t.replace(/\[([A-Z_]+)\]/g, (_, k) => vars[k] || `[${k}]`);
+                  setEmailObjet(replace(tmpl.objet));
+                  setEmailMessage(replace(tmpl.corps));
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Choisir un modèle (optionnel)" /></SelectTrigger>
+                  <SelectContent>
+                    {emailTemplates.map(t => <SelectItem key={t.id} value={t.id}>{t.nom}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
-              <label className="text-sm text-muted-foreground">Destinataire</label>
-              <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} />
+              <label className="text-sm text-muted-foreground">Destinataire *</label>
+              <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} placeholder="client@exemple.fr" type="email" />
             </div>
             <div className="space-y-2">
               <label className="text-sm text-muted-foreground">Objet</label>
@@ -623,11 +663,15 @@ export default function Factures() {
             </div>
             <div className="space-y-2">
               <label className="text-sm text-muted-foreground">Message</label>
-              <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[120px]" />
+              <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[120px]" placeholder="Corps du message..." />
             </div>
             <Button
               onClick={async () => {
                 if (!selectedFacture || !emailDest) return;
+                if (!config.smtp.user || !config.smtp.pass) {
+                  toast.error('SMTP non configuré. Allez dans Configuration → Serveur mail.');
+                  return;
+                }
                 setSendingEmail(true);
                 try {
                   const client = clients.find((c: Client) => c.id === selectedFacture.socid);
@@ -635,25 +679,30 @@ export default function Factures() {
                   const { supabase } = await import('@/integrations/supabase/client');
                   const { data, error } = await supabase.functions.invoke('send-email-smtp', {
                     body: {
-                      to: emailDest, subject: emailObjet, message: emailMessage,
-                      pdfBase64, pdfFilename: `${selectedFacture.ref}.pdf`,
-                      smtpHost: config.smtp.host, smtpPort: config.smtp.port || '465',
-                      smtpUser: config.smtp.user, smtpPass: config.smtp.pass,
+                      to: emailDest,
+                      subject: emailObjet || `Facture ${selectedFacture.ref}`,
+                      message: emailMessage,
+                      pdfBase64,
+                      pdfFilename: `${selectedFacture.ref}.pdf`,
+                      smtpHost: config.smtp.host,
+                      smtpPort: config.smtp.port || '465',
+                      smtpUser: config.smtp.user,
+                      smtpPass: config.smtp.pass,
                     },
                   });
                   if (error) throw new Error(error.message);
                   if (data && !data.ok) throw new Error(data.error || 'Erreur SMTP');
-                  toast.success('Facture envoyée par email');
+                  toast.success(`Facture ${selectedFacture.ref} envoyée à ${emailDest}`);
+                  setEmailOpen(false);
                 } catch (e: any) {
                   toast.error(`Erreur envoi : ${e.message || e}`);
                 }
                 setSendingEmail(false);
-                setEmailOpen(false);
               }}
               disabled={sendingEmail || !emailDest}
               className="w-full"
             >
-              {sendingEmail ? 'Envoi via Dolibarr...' : 'Envoyer'}
+              {sendingEmail ? 'Envoi en cours...' : 'Envoyer avec le PDF'}
             </Button>
           </div>
         </DialogContent>

@@ -210,17 +210,21 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Priority 0 (highest): credentials passed directly in the request body
     // Priority 1: Supabase secrets (env vars)
     // Priority 2: app_config table (configured from the app's Configuration page)
-    let SMTP_HOST = Deno.env.get('SMTP_HOST')
-    let SMTP_PORT = Deno.env.get('SMTP_PORT')
-    let SMTP_USER = Deno.env.get('SMTP_USER')
-    let SMTP_PASS = Deno.env.get('SMTP_PASS')
-    let SMTP_FROM = Deno.env.get('SMTP_FROM')
 
+    // Read body first so request credentials can override everything
+    const { to, subject, message, pdfBase64, pdfFilename, smtpHost, smtpPort, smtpUser, smtpPass } = await req.json()
+
+    let SMTP_HOST = smtpHost || Deno.env.get('SMTP_HOST') || ''
+    let SMTP_PORT = smtpPort || Deno.env.get('SMTP_PORT') || ''
+    let SMTP_USER = smtpUser || Deno.env.get('SMTP_USER') || ''
+    let SMTP_PASS = smtpPass || Deno.env.get('SMTP_PASS') || ''
+
+    // Fallback to app_config only if still missing
     if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
       const appCfg = await loadSmtpFromAppConfig()
-      // Support both underscore keys (new) and dot keys (legacy fallback)
       SMTP_HOST = SMTP_HOST || appCfg['smtp_host'] || appCfg['smtp.host'] || 'ssl0.ovh.net'
       SMTP_PORT = SMTP_PORT || appCfg['smtp_port'] || appCfg['smtp.port'] || '465'
       SMTP_USER = SMTP_USER || appCfg['smtp_user'] || appCfg['smtp.user'] || ''
@@ -229,7 +233,7 @@ Deno.serve(async (req) => {
 
     SMTP_PORT = SMTP_PORT || '465'
     // Expéditeur fixe OVH
-    SMTP_FROM = 'contact@electriciendugenevois.fr'
+    const SMTP_FROM = 'contact@electriciendugenevois.fr'
 
     if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
       return new Response(
@@ -237,14 +241,6 @@ Deno.serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    const { to, subject, message, pdfBase64, pdfFilename, smtpHost, smtpPort, smtpUser, smtpPass } = await req.json()
-
-    // Priority 0: credentials passed directly in the request body (most reliable)
-    if (smtpHost) SMTP_HOST = smtpHost
-    if (smtpPort) SMTP_PORT = smtpPort
-    if (smtpUser) SMTP_USER = smtpUser
-    if (smtpPass) SMTP_PASS = smtpPass
 
     if (!to || !subject) {
       return new Response(

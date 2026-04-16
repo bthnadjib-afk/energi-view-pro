@@ -1145,23 +1145,38 @@ export default function Interventions() {
                   <DialogContent className="max-w-lg">
                     <DialogHeader><DialogTitle>Envoyer par email</DialogTitle></DialogHeader>
                     <div className="space-y-4 pt-2">
+                      {!config.smtp.user && (
+                        <div className="rounded-lg bg-yellow-50 border border-yellow-200 px-4 py-3 text-sm text-yellow-800">
+                          ⚠️ SMTP non configuré — rendez-vous dans <strong>Configuration → Serveur mail</strong> pour activer l'envoi.
+                        </div>
+                      )}
                       <div className="space-y-2">
                         <label className="text-sm text-muted-foreground">Destinataire <span className="text-destructive">*</span></label>
-                        <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} />
+                        <Input value={emailDest} onChange={e => setEmailDest(e.target.value)} type="email" placeholder="client@exemple.fr" />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm text-muted-foreground">Objet</label>
-                        <Input value={emailObjet} onChange={e => setEmailObjet(e.target.value)} />
+                        <Input value={emailObjet} onChange={e => setEmailObjet(e.target.value)} placeholder="Bon d'intervention..." />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm text-muted-foreground">Message</label>
-                        <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[120px]" />
+                        <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[120px]" placeholder="Corps du message..." />
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Le bon d'intervention PDF sera envoyé en pièce jointe.
                       </p>
-                      <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest.trim()} className="w-full">
-                        {sendingEmail ? 'Envoi...' : 'Envoyer'}
+                      <Button
+                        onClick={() => {
+                          if (!config.smtp.user || !config.smtp.pass) {
+                            toast.error('SMTP non configuré. Allez dans Configuration → Serveur mail.');
+                            return;
+                          }
+                          handleSendEmail();
+                        }}
+                        disabled={sendingEmail || !emailDest.trim()}
+                        className="w-full"
+                      >
+                        {sendingEmail ? 'Envoi en cours...' : 'Envoyer avec le PDF'}
                       </Button>
                     </div>
                   </DialogContent>
