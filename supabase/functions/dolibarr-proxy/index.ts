@@ -54,12 +54,15 @@ Deno.serve(async (req) => {
 
     // Always return HTTP 200 so supabase.functions.invoke() doesn't throw.
     // The real Dolibarr status is in the JSON body.
+    // Note: 304 (Not Modified) is also considered a success — Dolibarr returns it
+    // when validate/close is called on a document already in target state.
+    const isOk = response.ok || response.status === 304
     return new Response(
       JSON.stringify({
-        ok: response.ok,
+        ok: isOk,
         status: response.status,
-        data: response.ok ? responseData : undefined,
-        error: response.ok ? undefined : responseData,
+        data: isOk ? (responseData ?? null) : undefined,
+        error: isOk ? undefined : responseData,
       }),
       {
         status: 200,
