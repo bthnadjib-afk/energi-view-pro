@@ -529,7 +529,36 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
             </DialogContent>
           </Dialog>
 
-          {/* Dialog changer le client */}
+          {/* Dialog aperçu PDF */}
+          <Dialog open={pdfPreviewOpen} onOpenChange={(open) => {
+            setPdfPreviewOpen(open);
+            if (!open && pdfPreviewUrl) {
+              URL.revokeObjectURL(pdfPreviewUrl);
+              setPdfPreviewUrl(null);
+            }
+          }}>
+            <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Aperçu du devis {devis.ref}</DialogTitle>
+              </DialogHeader>
+              {pdfPreviewUrl && (
+                <iframe src={pdfPreviewUrl} className="w-full flex-1 rounded border border-border" title={`Devis ${devis.ref}`} />
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => pdfPreviewUrl && window.open(pdfPreviewUrl, '_blank')}>
+                  Ouvrir dans un nouvel onglet
+                </Button>
+                <Button onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = pdfPreviewUrl || '';
+                  a.download = `${devis.ref}.pdf`;
+                  a.click();
+                }}>
+                  Télécharger
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={changeClientOpen} onOpenChange={setChangeClientOpen}>
             <DialogContent className="max-w-sm">
               <DialogHeader><DialogTitle>Changer le client — {devis.ref}</DialogTitle></DialogHeader>
