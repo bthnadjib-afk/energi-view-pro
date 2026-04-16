@@ -313,9 +313,11 @@ function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): jsPDF {
 
   doc.setDrawColor(...GRIS_LIGNE);
   doc.setLineWidth(0.3);
-  doc.setLineDash([2, 2]);
+  // @ts-ignore - jsPDF setLineDashPattern exists at runtime
+  (doc as any).setLineDashPattern?.([2, 2], 0);
   doc.roundedRect(sigX, y, sigW, sigH, 2, 2, 'S');
-  doc.setLineDash([]);
+  // @ts-ignore
+  (doc as any).setLineDashPattern?.([], 0);
 
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8);
