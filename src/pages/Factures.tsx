@@ -713,6 +713,38 @@ export default function Factures() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* PDF preview dialog */}
+      <Dialog open={pdfPreviewOpen} onOpenChange={(open) => {
+        setPdfPreviewOpen(open);
+        if (!open && pdfPreviewUrl) {
+          URL.revokeObjectURL(pdfPreviewUrl);
+          setPdfPreviewUrl(null);
+        }
+      }}>
+        <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Aperçu de la facture {pdfPreviewRef}</DialogTitle>
+            <DialogDescription className="sr-only">Prévisualisation PDF</DialogDescription>
+          </DialogHeader>
+          {pdfPreviewUrl && (
+            <iframe src={pdfPreviewUrl} className="w-full flex-1 rounded border border-border" title={`Facture ${pdfPreviewRef}`} />
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => pdfPreviewUrl && window.open(pdfPreviewUrl, '_blank')}>
+              Ouvrir dans un nouvel onglet
+            </Button>
+            <Button onClick={() => {
+              const a = document.createElement('a');
+              a.href = pdfPreviewUrl || '';
+              a.download = `${pdfPreviewRef}.pdf`;
+              a.click();
+            }}>
+              Télécharger
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
