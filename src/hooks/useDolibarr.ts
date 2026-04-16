@@ -169,7 +169,12 @@ export function useValidateDevis() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => validateDevis(id),
-    onSuccess: () => { toast.success('Devis validé'); qc.invalidateQueries({ queryKey: ['devis'] }); },
+    onSuccess: async () => {
+      toast.success('Devis validé');
+      // Small delay so Dolibarr commits before we refetch (avoids stale data on 304)
+      await new Promise(r => setTimeout(r, 400));
+      await qc.invalidateQueries({ queryKey: ['devis'], refetchType: 'all' });
+    },
     onError: (e: any) => toast.error(`Erreur validation : ${e.message || e}`),
   });
 }
@@ -178,9 +183,10 @@ export function useCloseDevis() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: { id: string; status: number }) => closeDevis(data.id, data.status),
-    onSuccess: (_, vars) => {
+    onSuccess: async (_, vars) => {
       toast.success(vars.status === 2 ? 'Devis signé' : 'Devis refusé');
-      qc.invalidateQueries({ queryKey: ['devis'] });
+      await new Promise(r => setTimeout(r, 400));
+      await qc.invalidateQueries({ queryKey: ['devis'], refetchType: 'all' });
     },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });

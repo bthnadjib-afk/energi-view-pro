@@ -106,16 +106,28 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const isRefused = devis.fk_statut === 3;
   const isInvoiced = devis.fk_statut === 4;
 
+  // Build the Dolibarr public online-signature URL from the configured API URL.
+  // Example: https://dolibarr.example.fr/api/index.php  ->  https://dolibarr.example.fr/public/onlinesign/newonlinesign.php?source=proposal&ref=PR2604-0001
+  const dolibarrSignUrl = (() => {
+    const apiUrl = config.dolibarr?.apiUrl?.trim();
+    if (!apiUrl || !devis.ref) return '';
+    const base = apiUrl.replace(/\/api\/index\.php\/?$/, '').replace(/\/$/, '');
+    return `${base}/public/onlinesign/newonlinesign.php?source=proposal&ref=${encodeURIComponent(devis.ref)}`;
+  })();
+
   useEffect(() => {
     if (emailOpen) {
       setEmailDest(client?.email || '');
       setEmailObjet(`Électricien du Genevois - Devis ${devis.ref}`);
-      setEmailMessage(`Bonjour,\n\nVous trouverez ci-joint votre devis ${devis.ref} d'un montant de ${devis.montantTTC.toLocaleString('fr-FR')} € TTC.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\nÉlectricien du Genevois`);
+      const signLine = dolibarrSignUrl
+        ? `\n\n👉 Pour accepter et signer ce devis en ligne, cliquez ici :\n${dolibarrSignUrl}\n`
+        : '';
+      setEmailMessage(`Bonjour,\n\nVous trouverez ci-joint votre devis ${devis.ref} d'un montant de ${devis.montantTTC.toLocaleString('fr-FR')} € TTC.${signLine}\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\nÉlectricien du Genevois`);
       supabase.from('email_templates').select('*').then(({ data }) => {
         if (data) setEmailTemplates(data as any);
       });
     }
-  }, [emailOpen, client, devis.ref, devis.montantTTC]);
+  }, [emailOpen, client, devis.ref, devis.montantTTC, dolibarrSignUrl]);
 
   const applyTemplate = (templateId: string) => {
     const tmpl = emailTemplates.find(t => t.id === templateId);
@@ -519,8 +531,31 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm text-muted-foreground">Message</label>
-                  <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[120px]" placeholder="Bonjour, veuillez trouver ci-joint votre devis..." />
+                  <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[160px]" placeholder="Bonjour, veuillez trouver ci-joint votre devis..." />
                 </div>
+                {dolibarrSignUrl && (
+                  <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-900 space-y-1.5">
+                    <div className="flex items-start gap-2">
+                      <Link2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium">Lien signature en ligne Dolibarr inclus dans le message</p>
+                        <p className="text-blue-700 truncate" title={dolibarrSignUrl}>{dolibarrSignUrl}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          navigator.clipboard.writeText(dolibarrSignUrl);
+                          toast.success('Lien Dolibarr copié');
+                        }}
+                      >
+                        <Copy className="h-3 w-3 mr-1" /> Copier
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest} className="w-full gap-2">
                   {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   {sendingEmail ? 'Envoi en cours...' : 'Envoyer avec le PDF'}
