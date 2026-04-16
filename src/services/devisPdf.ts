@@ -369,6 +369,13 @@ export function openDevisPdf(params: DevisPdfParams): void {
   window.open(url, '_blank');
 }
 
+/** Génère une URL blob pour afficher dans un iframe (pas bloqué par popup blocker) */
+export function devisPdfToBlobUrl(params: DevisPdfParams): string {
+  const doc = buildDevisPdf(params);
+  const blob = doc.output('blob');
+  return URL.createObjectURL(blob);
+}
+
 /** Télécharge directement le PDF */
 export function downloadDevisPdf(params: DevisPdfParams): void {
   const doc = buildDevisPdf(params);

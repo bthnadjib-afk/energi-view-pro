@@ -4,7 +4,7 @@ import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid } from '@/hooks/useDolibarr';
 import { formatDateFR, sendFactureByEmail, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
-import { openFacturePdf, facturePdfToBase64 } from '@/services/facturePdf';
+import { openFacturePdf, facturePdfToBase64, facturePdfToBlobUrl } from '@/services/facturePdf';
 import { useConfig } from '@/hooks/useConfig';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,9 @@ export default function Factures() {
   const [emailMessage, setEmailMessage] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailTemplates, setEmailTemplates] = useState<{ id: string; nom: string; objet: string; corps: string }[]>([]);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [pdfPreviewRef, setPdfPreviewRef] = useState('');
 
   useEffect(() => {
     if (emailOpen) {
@@ -503,7 +506,10 @@ export default function Factures() {
                     onClick={() => {
                       try {
                         const client = clients.find((c: Client) => c.id === selectedFacture.socid);
-                        openFacturePdf({ facture: selectedFacture, client, entreprise: config.entreprise });
+                        const url = facturePdfToBlobUrl({ facture: selectedFacture, client, entreprise: config.entreprise });
+                        setPdfPreviewUrl(url);
+                        setPdfPreviewRef(selectedFacture.ref);
+                        setPdfPreviewOpen(true);
                       } catch (e: any) { toast.error(`Erreur PDF : ${e.message || e}`); }
                     }}
                   >
@@ -516,8 +522,8 @@ export default function Factures() {
                       onClick={() => {
                         const c = clients.find(cl => cl.id === selectedFacture.socid);
                         setEmailDest(c?.email || '');
-                        setEmailObjet(`Facture ${selectedFacture.ref}`);
-                        setEmailMessage('');
+                        setEmailObjet(`Électricien du Genevois - Facture ${selectedFacture.ref}`);
+                        setEmailMessage(`Bonjour,\n\nVous trouverez ci-joint votre facture ${selectedFacture.ref} d'un montant de ${selectedFacture.montantTTC.toLocaleString('fr-FR')} € TTC.\n\nMerci de procéder au règlement dans les meilleurs délais.\n\nCordialement,\nÉlectricien du Genevois`);
                         setEmailOpen(true);
                       }}
                     >
@@ -703,6 +709,38 @@ export default function Factures() {
               className="w-full"
             >
               {sendingEmail ? 'Envoi en cours...' : 'Envoyer avec le PDF'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* PDF preview dialog */}
+      <Dialog open={pdfPreviewOpen} onOpenChange={(open) => {
+        setPdfPreviewOpen(open);
+        if (!open && pdfPreviewUrl) {
+          URL.revokeObjectURL(pdfPreviewUrl);
+          setPdfPreviewUrl(null);
+        }
+      }}>
+        <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Aperçu de la facture {pdfPreviewRef}</DialogTitle>
+            <DialogDescription className="sr-only">Prévisualisation PDF</DialogDescription>
+          </DialogHeader>
+          {pdfPreviewUrl && (
+            <iframe src={pdfPreviewUrl} className="w-full flex-1 rounded border border-border" title={`Facture ${pdfPreviewRef}`} />
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => pdfPreviewUrl && window.open(pdfPreviewUrl, '_blank')}>
+              Ouvrir dans un nouvel onglet
+            </Button>
+            <Button onClick={() => {
+              const a = document.createElement('a');
+              a.href = pdfPreviewUrl || '';
+              a.download = `${pdfPreviewRef}.pdf`;
+              a.click();
+            }}>
+              Télécharger
             </Button>
           </div>
         </DialogContent>

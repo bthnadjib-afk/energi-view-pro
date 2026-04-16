@@ -332,6 +332,13 @@ export function openFacturePdf(params: FacturePdfParams): void {
   window.open(url, '_blank');
 }
 
+/** Génère une URL blob pour afficher dans un iframe (pas bloqué par popup blocker) */
+export function facturePdfToBlobUrl(params: FacturePdfParams): string {
+  const doc = buildFacturePdf(params);
+  const blob = doc.output('blob');
+  return URL.createObjectURL(blob);
+}
+
 export function downloadFacturePdf(params: FacturePdfParams): void {
   const doc = buildFacturePdf(params);
   doc.save(`${params.facture.ref}.pdf`);

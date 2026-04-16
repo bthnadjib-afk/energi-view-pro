@@ -9,7 +9,7 @@ import {
   getAcompteBadge, formatDateFR, replaceEmailVariables, DEVIS_STATUTS,
   saveDevisSignatureToken, type Devis as DevisType, type Client,
 } from '@/services/dolibarr';
-import { openDevisPdf, devisPdfToBase64 } from '@/services/devisPdf';
+import { openDevisPdf, devisPdfToBase64, devisPdfToBlobUrl } from '@/services/devisPdf';
 import { useConfig } from '@/hooks/useConfig';
 import { cn } from '@/lib/utils';
 import {
@@ -83,6 +83,8 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const [changeClientOpen, setChangeClientOpen] = useState(false);
   const [newSocid, setNewSocid] = useState('');
   const [sigLinkCopied, setSigLinkCopied] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
 
   const client = clients.find(c => c.id === devis.socid);
 
@@ -107,12 +109,13 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   useEffect(() => {
     if (emailOpen) {
       setEmailDest(client?.email || '');
-      setEmailObjet(`Devis ${devis.ref}`);
+      setEmailObjet(`Électricien du Genevois - Devis ${devis.ref}`);
+      setEmailMessage(`Bonjour,\n\nVous trouverez ci-joint votre devis ${devis.ref} d'un montant de ${devis.montantTTC.toLocaleString('fr-FR')} € TTC.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\nÉlectricien du Genevois`);
       supabase.from('email_templates').select('*').then(({ data }) => {
         if (data) setEmailTemplates(data as any);
       });
     }
-  }, [emailOpen, client, devis.ref]);
+  }, [emailOpen, client, devis.ref, devis.montantTTC]);
 
   const applyTemplate = (templateId: string) => {
     const tmpl = emailTemplates.find(t => t.id === templateId);
@@ -239,7 +242,9 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const handleViewPDF = () => {
     setGeneratingPDF(true);
     try {
-      openDevisPdf({ devis, client: client as Client | undefined, entreprise: config.entreprise });
+      const url = devisPdfToBlobUrl({ devis, client: client as Client | undefined, entreprise: config.entreprise });
+      setPdfPreviewUrl(url);
+      setPdfPreviewOpen(true);
     } catch (e: any) {
       toast.error(`Erreur PDF : ${e.message || e}`);
     }
@@ -524,7 +529,36 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
             </DialogContent>
           </Dialog>
 
-          {/* Dialog changer le client */}
+          {/* Dialog aperçu PDF */}
+          <Dialog open={pdfPreviewOpen} onOpenChange={(open) => {
+            setPdfPreviewOpen(open);
+            if (!open && pdfPreviewUrl) {
+              URL.revokeObjectURL(pdfPreviewUrl);
+              setPdfPreviewUrl(null);
+            }
+          }}>
+            <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Aperçu du devis {devis.ref}</DialogTitle>
+              </DialogHeader>
+              {pdfPreviewUrl && (
+                <iframe src={pdfPreviewUrl} className="w-full flex-1 rounded border border-border" title={`Devis ${devis.ref}`} />
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => pdfPreviewUrl && window.open(pdfPreviewUrl, '_blank')}>
+                  Ouvrir dans un nouvel onglet
+                </Button>
+                <Button onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = pdfPreviewUrl || '';
+                  a.download = `${devis.ref}.pdf`;
+                  a.click();
+                }}>
+                  Télécharger
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={changeClientOpen} onOpenChange={setChangeClientOpen}>
             <DialogContent className="max-w-sm">
               <DialogHeader><DialogTitle>Changer le client — {devis.ref}</DialogTitle></DialogHeader>
