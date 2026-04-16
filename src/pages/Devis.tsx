@@ -106,16 +106,28 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const isRefused = devis.fk_statut === 3;
   const isInvoiced = devis.fk_statut === 4;
 
+  // Build the Dolibarr public online-signature URL from the configured API URL.
+  // Example: https://dolibarr.example.fr/api/index.php  ->  https://dolibarr.example.fr/public/onlinesign/newonlinesign.php?source=proposal&ref=PR2604-0001
+  const dolibarrSignUrl = (() => {
+    const apiUrl = config.dolibarr?.apiUrl?.trim();
+    if (!apiUrl || !devis.ref) return '';
+    const base = apiUrl.replace(/\/api\/index\.php\/?$/, '').replace(/\/$/, '');
+    return `${base}/public/onlinesign/newonlinesign.php?source=proposal&ref=${encodeURIComponent(devis.ref)}`;
+  })();
+
   useEffect(() => {
     if (emailOpen) {
       setEmailDest(client?.email || '');
       setEmailObjet(`Électricien du Genevois - Devis ${devis.ref}`);
-      setEmailMessage(`Bonjour,\n\nVous trouverez ci-joint votre devis ${devis.ref} d'un montant de ${devis.montantTTC.toLocaleString('fr-FR')} € TTC.\n\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\nÉlectricien du Genevois`);
+      const signLine = dolibarrSignUrl
+        ? `\n\n👉 Pour accepter et signer ce devis en ligne, cliquez ici :\n${dolibarrSignUrl}\n`
+        : '';
+      setEmailMessage(`Bonjour,\n\nVous trouverez ci-joint votre devis ${devis.ref} d'un montant de ${devis.montantTTC.toLocaleString('fr-FR')} € TTC.${signLine}\nN'hésitez pas à nous contacter pour toute question.\n\nCordialement,\nÉlectricien du Genevois`);
       supabase.from('email_templates').select('*').then(({ data }) => {
         if (data) setEmailTemplates(data as any);
       });
     }
-  }, [emailOpen, client, devis.ref, devis.montantTTC]);
+  }, [emailOpen, client, devis.ref, devis.montantTTC, dolibarrSignUrl]);
 
   const applyTemplate = (templateId: string) => {
     const tmpl = emailTemplates.find(t => t.id === templateId);
