@@ -238,7 +238,13 @@ Deno.serve(async (req) => {
       )
     }
 
-    const { to, subject, message, pdfBase64, pdfFilename } = await req.json()
+    const { to, subject, message, pdfBase64, pdfFilename, smtpHost, smtpPort, smtpUser, smtpPass } = await req.json()
+
+    // Priority 0: credentials passed directly in the request body (most reliable)
+    if (smtpHost) SMTP_HOST = smtpHost
+    if (smtpPort) SMTP_PORT = smtpPort
+    if (smtpUser) SMTP_USER = smtpUser
+    if (smtpPass) SMTP_PASS = smtpPass
 
     if (!to || !subject) {
       return new Response(

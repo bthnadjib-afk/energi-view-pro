@@ -3,7 +3,9 @@ import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid } from '@/hooks/useDolibarr';
-import { formatDateFR, generatePDF, openPDFInNewTab, sendFactureByEmail, type CreateDevisLine, type Facture } from '@/services/dolibarr';
+import { formatDateFR, sendFactureByEmail, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
+import { openFacturePdf, facturePdfToBase64 } from '@/services/facturePdf';
+import { useConfig } from '@/hooks/useConfig';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
@@ -22,6 +24,7 @@ interface LigneForm {
 }
 
 export default function Factures() {
+  const { config } = useConfig();
   const { data: factures = [] } = useFactures();
   const { data: clients = [] } = useClients();
   const { data: produits = [] } = useProduits();
@@ -486,11 +489,10 @@ export default function Factures() {
                   <Button
                     variant="outline"
                     className="gap-2"
-                    onClick={async () => {
+                    onClick={() => {
                       try {
-                        const url = await generatePDF('facture', selectedFacture.id, selectedFacture.ref, 'crabe');
-                        if (url) { openPDFInNewTab(url, `${selectedFacture.ref}.pdf`); toast.success('PDF téléchargé'); }
-                        else toast.error('PDF non disponible');
+                        const client = clients.find((c: Client) => c.id === selectedFacture.socid);
+                        openFacturePdf({ facture: selectedFacture, client, entreprise: config.entreprise });
                       } catch (e: any) { toast.error(`Erreur PDF : ${e.message || e}`); }
                     }}
                   >
@@ -628,9 +630,20 @@ export default function Factures() {
                 if (!selectedFacture || !emailDest) return;
                 setSendingEmail(true);
                 try {
-                  await generatePDF('facture', selectedFacture.id, selectedFacture.ref, 'crabe');
-                  await sendFactureByEmail(selectedFacture.id, emailDest, emailObjet, emailMessage);
-                  toast.success('Facture envoyée par email via Dolibarr');
+                  const client = clients.find((c: Client) => c.id === selectedFacture.socid);
+                  const pdfBase64 = facturePdfToBase64({ facture: selectedFacture, client, entreprise: config.entreprise });
+                  const { supabase } = await import('@/integrations/supabase/client');
+                  const { data, error } = await supabase.functions.invoke('send-email-smtp', {
+                    body: {
+                      to: emailDest, subject: emailObjet, message: emailMessage,
+                      pdfBase64, pdfFilename: `${selectedFacture.ref}.pdf`,
+                      smtpHost: config.smtp.host, smtpPort: config.smtp.port || '465',
+                      smtpUser: config.smtp.user, smtpPass: config.smtp.pass,
+                    },
+                  });
+                  if (error) throw new Error(error.message);
+                  if (data && !data.ok) throw new Error(data.error || 'Erreur SMTP');
+                  toast.success('Facture envoyée par email');
                 } catch (e: any) {
                   toast.error(`Erreur envoi : ${e.message || e}`);
                 }

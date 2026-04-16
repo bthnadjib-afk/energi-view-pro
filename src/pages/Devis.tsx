@@ -1,7 +1,9 @@
 import { useState, Fragment, useEffect, useMemo } from 'react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture, useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis, useUpdateDevisLines, useSetDevisToDraft } from '@/hooks/useDolibarr';
-import { getAcompteBadge, formatDateFR, replaceEmailVariables, generatePDF, openPDFInNewTab, downloadPDFUrl, sendDevisByEmail, DEVIS_STATUTS, type Devis as DevisType } from '@/services/dolibarr';
+import { getAcompteBadge, formatDateFR, replaceEmailVariables, sendDevisByEmail, DEVIS_STATUTS, type Devis as DevisType, type Client } from '@/services/dolibarr';
+import { openDevisPdf, devisPdfToBase64 } from '@/services/devisPdf';
+import { useConfig } from '@/hooks/useConfig';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2, XCircle, Send, FileCheck, FileDown, Pencil, Search, Filter, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -41,7 +43,7 @@ function AcompteBadge({ montantHT }: { montantHT: number }) {
 
 function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPending, acomptePending, onCollapse }: {
   devis: DevisType;
-  clients: { id: string; nom: string; email: string }[];
+  clients: Client[];
   produits: { id: string; ref: string; label: string; prixHT: number; tauxTVA: number; type: string; prixAchat?: number }[];
   onConvert: () => void;
   onAcompte: () => void;
@@ -55,6 +57,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const updateLinesMutation = useUpdateDevisLines();
   const setToDraftMutation = useSetDevisToDraft();
   const { user } = useAuth();
+  const { config } = useConfig();
 
   const [showSignature, setShowSignature] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -111,9 +114,20 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
     if (!emailDest || !emailObjet) return;
     setSendingEmail(true);
     try {
-      await generatePDF('propal', devis.id, devis.ref, 'azur');
-      await sendDevisByEmail(devis.id, emailDest, emailObjet, emailMessage);
-      toast.success('Devis envoyé par email via Dolibarr');
+      const pdfBase64 = devisPdfToBase64({ devis, client: client as Client | undefined, entreprise: config.entreprise });
+      const smtpCreds = {
+        smtpHost: config.smtp.host,
+        smtpPort: config.smtp.port || '465',
+        smtpUser: config.smtp.user,
+        smtpPass: config.smtp.pass,
+      };
+      const { supabase: sb } = await import('@/integrations/supabase/client');
+      const { data, error } = await sb.functions.invoke('send-email-smtp', {
+        body: { to: emailDest, subject: emailObjet, message: emailMessage, pdfBase64, pdfFilename: `${devis.ref}.pdf`, ...smtpCreds },
+      });
+      if (error) throw new Error(error.message);
+      if (data && !data.ok) throw new Error(data.error || 'Erreur SMTP');
+      toast.success('Devis envoyé par email');
     } catch (e: any) {
       toast.error(`Erreur envoi email : ${e.message || e}`);
     }
@@ -153,18 +167,10 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
     } catch {}
   };
 
-  const handleViewPDF = async () => {
+  const handleViewPDF = () => {
     setGeneratingPDF(true);
     try {
-      const url = await generatePDF('propal', devis.id, devis.ref, 'azur');
-      if (url) {
-        openPDFInNewTab(url, `${devis.ref}.pdf`);
-        toast.success(`PDF ${devis.ref} téléchargé`);
-      } else {
-        const dlUrl = await downloadPDFUrl('propal', devis.ref);
-        if (dlUrl) openPDFInNewTab(dlUrl, `${devis.ref}.pdf`);
-        else toast.error('PDF non disponible');
-      }
+      openDevisPdf({ devis, client: client as Client | undefined, entreprise: config.entreprise });
     } catch (e: any) {
       toast.error(`Erreur PDF : ${e.message || e}`);
     }

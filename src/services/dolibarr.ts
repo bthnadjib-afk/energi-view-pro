@@ -23,9 +23,13 @@ export interface Facture {
 
 export interface DevisLigne {
   designation: string;
+  ref: string;
   quantite: number;
+  unite: string;
   prixUnitaire: number;
   totalHT: number;
+  tauxTVA: number;
+  productType: 'main_oeuvre' | 'fourniture';
   prixAchat?: number;
 }
 
@@ -707,6 +711,22 @@ export async function downloadPDFUrl(
 // sendByEmail endpoints don't exist in standard Dolibarr REST API.
 // New flow: generate PDF first, then send via edge function SMTP.
 
+function getSmtpConfigFromStorage(): { smtpHost?: string; smtpPort?: string; smtpUser?: string; smtpPass?: string } {
+  try {
+    const raw = localStorage.getItem('electropro-config');
+    if (!raw) return {};
+    const cfg = JSON.parse(raw);
+    return {
+      smtpHost: cfg?.smtp?.host || undefined,
+      smtpPort: cfg?.smtp?.port || undefined,
+      smtpUser: cfg?.smtp?.user || undefined,
+      smtpPass: cfg?.smtp?.pass || undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 async function invokeSmtpEmail(body: {
   to: string;
   subject: string;
@@ -714,7 +734,8 @@ async function invokeSmtpEmail(body: {
   pdfBase64?: string;
   pdfFilename?: string;
 }): Promise<void> {
-  const { data, error } = await supabase.functions.invoke('send-email-smtp', { body });
+  const smtpCreds = getSmtpConfigFromStorage();
+  const { data, error } = await supabase.functions.invoke('send-email-smtp', { body: { ...body, ...smtpCreds } });
   // error = FunctionsHttpError (non-2xx réseau/infra) — extraire le vrai message si possible
   if (error) {
     let msg = error.message;
@@ -1001,13 +1022,23 @@ function mapDolibarrFacture(d: any): Facture {
     paye,
     resteAPayer,
     totalPaye,
-    lignes: (d.lines || []).map((l: any) => ({
-      designation: l.desc || l.label || '',
-      quantite: parseFloat(l.qty) || 0,
-      prixUnitaire: parseFloat(l.subprice) || 0,
-      totalHT: parseFloat(l.total_ht) || 0,
-      prixAchat: parseFloat(l.pa_ht) || 0,
-    })),
+    lignes: (d.lines || []).map((l: any) => {
+      const rawDesc: string = l.desc || l.label || '';
+      const refMatch = rawDesc.match(/^\[([^\]]+)\]\s*/);
+      const ref = refMatch ? refMatch[1] : (l.product_ref || l.ref || '');
+      const designation = refMatch ? rawDesc.slice(refMatch[0].length) : rawDesc;
+      return {
+        designation,
+        ref,
+        quantite: parseFloat(l.qty) || 0,
+        unite: l.product_unit || l.unit || 'U',
+        prixUnitaire: parseFloat(l.subprice) || 0,
+        totalHT: parseFloat(l.total_ht) || 0,
+        tauxTVA: parseFloat(l.tva_tx) || 0,
+        productType: (parseInt(l.product_type, 10) === 1 ? 'main_oeuvre' : 'fourniture') as 'main_oeuvre' | 'fourniture',
+        prixAchat: parseFloat(l.pa_ht) || 0,
+      };
+    }),
     note_private: d.note_private || undefined,
   };
 }
@@ -1024,13 +1055,23 @@ function mapDolibarrDevis(d: any): Devis {
     montantTTC: parseFloat(d.total_ttc) || 0,
     statut: getDevisStatutLabel(fk_statut),
     fk_statut,
-    lignes: (d.lines || []).map((l: any) => ({
-      designation: l.desc || l.label || '',
-      quantite: parseFloat(l.qty) || 0,
-      prixUnitaire: parseFloat(l.subprice) || 0,
-      totalHT: parseFloat(l.total_ht) || 0,
-      prixAchat: parseFloat(l.pa_ht) || 0,
-    })),
+    lignes: (d.lines || []).map((l: any) => {
+      const rawDesc: string = l.desc || l.label || '';
+      const refMatch = rawDesc.match(/^\[([^\]]+)\]\s*/);
+      const ref = refMatch ? refMatch[1] : (l.product_ref || l.ref || '');
+      const designation = refMatch ? rawDesc.slice(refMatch[0].length) : rawDesc;
+      return {
+        designation,
+        ref,
+        quantite: parseFloat(l.qty) || 0,
+        unite: l.product_unit || l.unit || 'U',
+        prixUnitaire: parseFloat(l.subprice) || 0,
+        totalHT: parseFloat(l.total_ht) || 0,
+        tauxTVA: parseFloat(l.tva_tx) || 0,
+        productType: (parseInt(l.product_type, 10) === 1 ? 'main_oeuvre' : 'fourniture') as 'main_oeuvre' | 'fourniture',
+        prixAchat: parseFloat(l.pa_ht) || 0,
+      };
+    }),
     finValidite: parseDolibarrDate(d.fin_validite || d.duree_validite || ''),
     note_private: d.note_private || undefined,
   };

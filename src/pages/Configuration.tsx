@@ -42,6 +42,10 @@ export default function Configuration() {
           to: config.smtp.user,
           subject: 'Test SMTP — Électricien du Genevois',
           message: 'Ce message confirme que la configuration SMTP fonctionne correctement.',
+          smtpHost: config.smtp.host,
+          smtpPort: config.smtp.port || '465',
+          smtpUser: config.smtp.user,
+          smtpPass: config.smtp.pass,
         },
       });
       if (error) throw new Error(error.message);
