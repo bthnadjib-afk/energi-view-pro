@@ -531,8 +531,31 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm text-muted-foreground">Message</label>
-                  <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[120px]" placeholder="Bonjour, veuillez trouver ci-joint votre devis..." />
+                  <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[160px]" placeholder="Bonjour, veuillez trouver ci-joint votre devis..." />
                 </div>
+                {dolibarrSignUrl && (
+                  <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-900 space-y-1.5">
+                    <div className="flex items-start gap-2">
+                      <Link2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium">Lien signature en ligne Dolibarr inclus dans le message</p>
+                        <p className="text-blue-700 truncate" title={dolibarrSignUrl}>{dolibarrSignUrl}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          navigator.clipboard.writeText(dolibarrSignUrl);
+                          toast.success('Lien Dolibarr copié');
+                        }}
+                      >
+                        <Copy className="h-3 w-3 mr-1" /> Copier
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 <Button onClick={handleSendEmail} disabled={sendingEmail || !emailDest} className="w-full gap-2">
                   {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   {sendingEmail ? 'Envoi en cours...' : 'Envoyer avec le PDF'}
