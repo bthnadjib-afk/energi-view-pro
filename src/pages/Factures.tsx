@@ -286,7 +286,7 @@ export default function Factures() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard title="Total CA TTC" value={`${totalCA.toLocaleString('fr-FR')} €`} icon={Euro} />
         <StatCard title="Factures payées" value={String(payees.length)} subtitle={`${payees.reduce((s, f) => s + f.montantTTC, 0).toLocaleString('fr-FR')} €`} icon={CheckCircle} />
-        <StatCard title="Factures impayées" value={String(nonPayees.length)} subtitle={`${nonPayees.reduce((s, f) => s + f.montantTTC, 0).toLocaleString('fr-FR')} €`} icon={AlertCircle} />
+        <StatCard title="Factures non payées" value={String(nonPayees.length)} subtitle={`${nonPayees.reduce((s, f) => s + f.montantTTC, 0).toLocaleString('fr-FR')} €`} icon={AlertCircle} />
       </div>
 
       {/* Filters */}
@@ -300,7 +300,7 @@ export default function Factures() {
           <SelectContent>
             <SelectItem value="all">Tous les statuts</SelectItem>
             <SelectItem value="brouillon">Brouillon</SelectItem>
-            <SelectItem value="impayee">Impayée</SelectItem>
+            <SelectItem value="impayee">Non payée</SelectItem>
             <SelectItem value="partielle">Partiellement payée</SelectItem>
             <SelectItem value="payee">Payée</SelectItem>
             <SelectItem value="abandonnee">Abandonnée</SelectItem>

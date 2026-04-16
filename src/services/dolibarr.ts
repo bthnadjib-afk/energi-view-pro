@@ -213,7 +213,7 @@ async function fetchClientsRaw(): Promise<Client[]> {
 
 export const DEVIS_STATUTS: Record<number, string> = {
   0: 'Brouillon',
-  1: 'Validé',
+  1: 'Ouvert',
   2: 'Signé',
   3: 'Refusé',
   4: 'Facturé',
@@ -221,7 +221,7 @@ export const DEVIS_STATUTS: Record<number, string> = {
 
 export const FACTURE_STATUTS: Record<number, string> = {
   0: 'Brouillon',
-  1: 'Impayée',
+  1: 'Non payée',
   2: 'Payée',
   3: 'Abandonnée',
 };
@@ -243,7 +243,7 @@ export function getFactureStatutLabel(fk_statut: number, paye: boolean, totalPay
   if (fk_statut === 3) return 'Abandonnée';
   if (fk_statut === 0) return 'Brouillon';
   if (fk_statut >= 1 && !paye && (totalPaye || 0) > 0) return 'Partiellement payée';
-  if (fk_statut >= 1) return 'Impayée';
+  if (fk_statut >= 1) return 'Non payée';
   return `Statut ${fk_statut}`;
 }
 
@@ -461,12 +461,46 @@ export async function updateDevis(id: string, socid: string, lines: CreateDevisL
   return result || '';
 }
 
+export async function updateDevisSocid(id: string, socid: string): Promise<string | null> {
+  return dolibarrCall<string>(`/proposals/${id}`, 'PUT', {
+    socid: parseInt(socid, 10) || socid,
+  });
+}
+
+export async function cloneDevis(id: string, newSocid?: string): Promise<string> {
+  const devis = await dolibarrCall<any>(`/proposals/${id}`, 'GET');
+  if (!devis) throw new Error('Devis introuvable');
+  const lines = (devis.lines || []).map((l: any) => ({
+    desc: l.desc || l.label || '',
+    qty: parseFloat(l.qty) || 1,
+    subprice: parseFloat(l.subprice) || 0,
+    tva_tx: parseFloat(l.tva_tx) || 0,
+    product_type: parseInt(l.product_type || '0', 10),
+    pa_ht: parseFloat(l.pa_ht) || 0,
+  }));
+  const result = await dolibarrCall<string>('/proposals', 'POST', {
+    socid: parseInt(newSocid || devis.socid, 10) || devis.socid,
+    date: toUnixTimestamp(new Date().toISOString()),
+    lines,
+    note_private: `Copie du devis ${devis.ref}`,
+  });
+  return result || '';
+}
+
+export async function saveDevisSignatureToken(devisId: string, devisRef: string, token: string): Promise<void> {
+  const supabase = (await import('@/integrations/supabase/client')).supabase;
+  await supabase.from('app_config').upsert(
+    { key: `devis_token_${token}`, value: JSON.stringify({ devisId, devisRef, createdAt: new Date().toISOString() }), updated_at: new Date().toISOString() },
+    { onConflict: 'key' }
+  );
+}
+
 export async function validateDevis(id: string): Promise<string | null> {
-  return dolibarrCall<string>(`/proposals/${id}/validate`, 'POST');
+  return dolibarrCall<string>(`/proposals/${id}/validate`, 'POST', { notrigger: 0 });
 }
 
 export async function closeDevis(id: string, status: number): Promise<string | null> {
-  return dolibarrCall<string>(`/proposals/${id}/close`, 'POST', { status });
+  return dolibarrCall<string>(`/proposals/${id}/close`, 'POST', { status, notrigger: 0 });
 }
 
 export async function deleteDevis(id: string): Promise<string | null> {
@@ -488,7 +522,7 @@ export async function createFacture(socid: string, lines: CreateDevisLine[], not
 }
 
 export async function validateFacture(id: string): Promise<string | null> {
-  return dolibarrCall<string>(`/invoices/${id}/validate`, 'POST');
+  return dolibarrCall<string>(`/invoices/${id}/validate`, 'POST', { notrigger: 0 });
 }
 
 export async function deleteFacture(id: string): Promise<string | null> {
@@ -582,7 +616,7 @@ export async function deleteIntervention(id: string): Promise<string | null> {
 // --- Intervention status transitions ---
 
 export async function validateIntervention(id: string): Promise<string | null> {
-  const result = await dolibarrCall<string>(`/interventions/${id}/validate`, 'POST');
+  const result = await dolibarrCall<string>(`/interventions/${id}/validate`, 'POST', { notrigger: 0 });
   // PDF generation is now handled locally — no server builddoc call
   return result;
 }
@@ -1249,7 +1283,7 @@ export async function createCommande(socid: string, lines: CreateDevisLine[], no
 }
 
 export async function validateCommande(id: string): Promise<string | null> {
-  return dolibarrCall<string>(`/orders/${id}/validate`, 'POST');
+  return dolibarrCall<string>(`/orders/${id}/validate`, 'POST', { notrigger: 0 });
 }
 
 export async function setCommandeToDraft(id: string): Promise<string | null> {
@@ -1399,7 +1433,7 @@ export async function createContrat(data: { socid: string; titre: string; dateDe
 }
 
 export async function validateContrat(id: string): Promise<string | null> {
-  return dolibarrCall<string>(`/contracts/${id}/validate`, 'POST');
+  return dolibarrCall<string>(`/contracts/${id}/validate`, 'POST', { notrigger: 0 });
 }
 
 export async function closeContrat(id: string): Promise<string | null> {

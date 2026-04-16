@@ -3,7 +3,7 @@ import {
   fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, fetchDolibarrUsers,
   createClient, deleteClient, updateClient,
   createIntervention, updateIntervention, deleteIntervention, validateIntervention, closeIntervention, setInterventionStatus, reopenIntervention,
-  createDevis, updateDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
+  createDevis, updateDevis, updateDevisSocid, cloneDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
   createFacture, validateFacture, deleteFacture, updateFactureLines,
   setFactureToDraft, setFactureToUnpaid, setDevisToDraft,
   convertDevisToFacture, createAcompteFacture,
@@ -258,6 +258,24 @@ export function useSetDevisToDraft() {
   return useMutation({
     mutationFn: (id: string) => setDevisToDraft(id),
     onSuccess: () => { toast.success('Devis repassé en brouillon'); qc.invalidateQueries({ queryKey: ['devis'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useCloneDevis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, newSocid }: { id: string; newSocid?: string }) => cloneDevis(id, newSocid),
+    onSuccess: () => { toast.success('Devis cloné'); qc.invalidateQueries({ queryKey: ['devis'] }); },
+    onError: (e: any) => toast.error(`Erreur clone : ${e.message || e}`),
+  });
+}
+
+export function useUpdateDevisSocid() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, socid }: { id: string; socid: string }) => updateDevisSocid(id, socid),
+    onSuccess: () => { toast.success('Client modifié'); qc.invalidateQueries({ queryKey: ['devis'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
