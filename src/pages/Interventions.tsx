@@ -936,6 +936,9 @@ export default function Interventions() {
                           <SelectValue placeholder="Sélectionner l'heure d'arrivée" />
                         </SelectTrigger>
                         <SelectContent className="max-h-72">
+                          {(heureArrivee && !timeSlots.includes(heureArrivee)) && (
+                            <SelectItem value={heureArrivee}>{heureArrivee}</SelectItem>
+                          )}
                           {timeSlots.map((t) => (
                             <SelectItem key={t} value={t}>{t}</SelectItem>
                           ))}
@@ -947,17 +950,11 @@ export default function Interventions() {
                         size="icon"
                         title={`Maintenant (${liveTime})`}
                         disabled={appEnCours}
-                        onClick={() => { const t = roundToQuarterHour(new Date()); setHeureArrivee(t); autoSaveTimes(t, heureDepart); }}
+                        onClick={() => { const t = currentTime(); setHeureArrivee(t); autoSaveTimes(t, heureDepart); }}
                       >
                         <Clock className="h-4 w-4" />
                       </Button>
                     </div>
-                    {heureArrivee && (
-                      <div className="flex items-center gap-2 text-xs text-emerald-600">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        <span>Arrivée enregistrée à {heureArrivee}</span>
-                      </div>
-                    )}
                   </div>
                 )}
 
