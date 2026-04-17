@@ -5,7 +5,8 @@ import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid } from '@/hooks/useDolibarr';
 import { useFactureRelances, useRecordFactureEnvoi, useSetFactureEnvoiDate, getRelanceStatus } from '@/hooks/useFactureRelances';
-import { formatDateFR, sendFactureByEmail, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
+import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
+import { useQuery } from '@tanstack/react-query';
 import { openFacturePdf, facturePdfToBase64, facturePdfToBlobUrl } from '@/services/facturePdf';
 import { useConfig } from '@/hooks/useConfig';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -83,6 +84,15 @@ export default function Factures() {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMode, setPaymentMode] = useState(4);
+  const [paymentAccountId, setPaymentAccountId] = useState<string>('');
+  const { data: comptesBancaires = [] } = useQuery({ queryKey: ['comptes-bancaires'], queryFn: fetchComptesBancaires });
+
+  // Auto-select first bank account when accounts load
+  useEffect(() => {
+    if (!paymentAccountId && comptesBancaires.length > 0) {
+      setPaymentAccountId(comptesBancaires[0].id);
+    }
+  }, [comptesBancaires, paymentAccountId]);
 
   // Edit draft state
   const [editOpen, setEditOpen] = useState(false);
@@ -173,6 +183,10 @@ export default function Factures() {
 
   const handlePayment = async () => {
     if (!selectedFacture || paymentAmount <= 0) return;
+    if (!paymentAccountId) {
+      toast.error('Veuillez sélectionner un compte bancaire');
+      return;
+    }
     const reste = selectedFacture.resteAPayer;
     try {
       await addPaymentMutation.mutateAsync({
@@ -181,6 +195,7 @@ export default function Factures() {
         paymentid: paymentMode,
         closepaidinvoices: (reste - paymentAmount) <= 0.01 ? 'yes' : 'no',
         amount: paymentAmount,
+        accountid: Number(paymentAccountId),
       });
       setPaymentOpen(false);
       setSelectedFacture(null);
