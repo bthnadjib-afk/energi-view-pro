@@ -308,7 +308,79 @@ export async function fetchClients(): Promise<Client[]> {
 export async function fetchProduits(): Promise<Produit[]> {
   const result = await dolibarrGet<any[]>('/products?sortfield=t.rowid&sortorder=DESC&limit=500');
   if (!result) return [];
-  return result.map(mapDolibarrProduit);
+  // Exclude LOT- prefixed products (those are product group templates, not regular catalogue items)
+  return result.filter(p => !String(p.ref || '').startsWith('LOT-')).map(mapDolibarrProduit);
+}
+
+// ============================================================
+// LOTS / GABARITS DE DEVIS (stockés comme produits Dolibarr
+// avec préfixe ref "LOT-" et lignes JSON dans note_private)
+// ============================================================
+
+export interface GroupLine {
+  desc: string;
+  qty: number;
+  subprice: number;
+  tva_tx: number;
+  product_type: number;
+  prixAchat: number;
+  variable_qty: boolean;
+}
+
+export interface ProductGroup {
+  id: string;
+  nom: string;
+  description: string;
+  lines: GroupLine[];
+}
+
+export type ProductGroupInput = Pick<ProductGroup, 'nom' | 'description' | 'lines'>;
+
+function mapDolibarrLot(p: any): ProductGroup | null {
+  try {
+    const meta = p.note_private ? JSON.parse(p.note_private) : {};
+    return {
+      id: String(p.id),
+      nom: p.label || p.ref || '',
+      description: meta.description || '',
+      lines: Array.isArray(meta.lines) ? meta.lines : [],
+    };
+  } catch { return null; }
+}
+
+export async function fetchProductGroups(): Promise<ProductGroup[]> {
+  const result = await dolibarrGet<any[]>('/products?sortfield=t.label&sortorder=ASC&limit=500');
+  if (!result) return [];
+  return result
+    .filter(p => String(p.ref || '').startsWith('LOT-'))
+    .map(mapDolibarrLot)
+    .filter((g): g is ProductGroup => g !== null);
+}
+
+export async function createProductGroup(input: ProductGroupInput): Promise<ProductGroup> {
+  const ref = `LOT-${Date.now().toString(36).toUpperCase()}`;
+  const id = await dolibarrCall<any>('/products', 'POST', {
+    ref,
+    label: input.nom,
+    note_private: JSON.stringify({ description: input.description, lines: input.lines }),
+    type: 1,
+    status: 0,
+    status_buy: 0,
+    price: 0,
+  });
+  return { id: String(id), nom: input.nom, description: input.description, lines: input.lines };
+}
+
+export async function updateProductGroup(id: string, input: ProductGroupInput): Promise<ProductGroup> {
+  await dolibarrCall(`/products/${id}`, 'PUT', {
+    label: input.nom,
+    note_private: JSON.stringify({ description: input.description, lines: input.lines }),
+  });
+  return { id, ...input };
+}
+
+export async function deleteProductGroup(id: string): Promise<void> {
+  await dolibarrCall(`/products/${id}`, 'DELETE');
 }
 
 export async function fetchDolibarrUsers(): Promise<DolibarrUser[]> {
