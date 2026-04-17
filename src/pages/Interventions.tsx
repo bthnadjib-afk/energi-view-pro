@@ -262,6 +262,41 @@ export default function Interventions() {
     }
   }, [selectedIntervention?.id, detailOpen]);
 
+  // Auto-pré-remplissage des défauts chantier quand on choisit le type "chantier"
+  useEffect(() => {
+    if (newType === 'chantier') {
+      setNewHeureDebut(config.defaults.chantierHeureDebut || '08:00');
+      setNewHeureFin(config.defaults.chantierHeureFin || '18:00');
+      const defaultJours = (config.defaults.chantierJours || '1,2,3,4,5').split(',').filter(Boolean);
+      if (chantierJoursActifs.length === 0) setChantierJoursActifs(defaultJours);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newType]);
+
+  // Calcule la liste finale des dates pour un chantier multi-jours
+  const chantierDates = useMemo(() => {
+    if (newType !== 'chantier' || !newDate) return [] as string[];
+    const start = new Date(`${newDate}T12:00:00`);
+    const end = chantierDateFin ? new Date(`${chantierDateFin}T12:00:00`) : start;
+    if (end.getTime() < start.getTime()) return [];
+    const result: string[] = [];
+    const cur = new Date(start);
+    while (cur.getTime() <= end.getTime()) {
+      // getDay : 0=Dim, 1=Lun..6=Sam → on convertit en notre format 1..7 (1=Lun..7=Dim)
+      const jsDay = cur.getDay();
+      const ourDay = jsDay === 0 ? '7' : String(jsDay);
+      if (chantierJoursActifs.includes(ourDay)) {
+        const iso = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+        result.push(iso);
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    // Ajout des dates extra et exclusion des dates retirées
+    const merged = [...new Set([...result, ...chantierDatesExtra])].filter(d => !chantierDatesExclues.includes(d));
+    return merged.sort();
+  }, [newType, newDate, chantierDateFin, chantierJoursActifs, chantierDatesExtra, chantierDatesExclues]);
+
+
   const resolvedInterventions = interventions.map(i => {
     const techFromMeta = resolveTechnicianName(i.technicien, dolibarrUsers);
     const techFromAuthor = resolveTechnicianName(i.user_author_id, dolibarrUsers);
