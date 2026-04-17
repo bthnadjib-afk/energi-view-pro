@@ -197,7 +197,7 @@ export default function Clients() {
               {filtered.map((c) => {
                 const nbProjets = projetsParClient[c.id] || 0;
                 return (
-                  <tr key={c.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => openDetail(c)}>
+                  <tr key={c.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate(`/clients/${c.id}`)}>
                     <td className="py-3 px-2 font-medium text-foreground">{c.nom}</td>
                     <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{c.ville}</td>
                     <td className="py-3 px-2 text-muted-foreground hidden md:table-cell font-mono text-xs">{c.telephone}</td>
