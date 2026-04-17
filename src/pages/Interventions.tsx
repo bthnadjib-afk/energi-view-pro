@@ -947,7 +947,7 @@ export default function Interventions() {
                         size="icon"
                         title={`Maintenant (${liveTime})`}
                         disabled={appEnCours}
-                        onClick={() => { const t = currentTime(); setHeureArrivee(t); autoSaveTimes(t, heureDepart); }}
+                        onClick={() => { const t = roundToQuarterHour(new Date()); setHeureArrivee(t); autoSaveTimes(t, heureDepart); }}
                       >
                         <Clock className="h-4 w-4" />
                       </Button>
