@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import logo from '@/assets/logo.png';
+import logoDark from '@/assets/logo-dark.png';
+import { useTheme } from '@/contexts/ThemeContext';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Login() {
@@ -43,7 +45,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <div className="bg-card rounded-xl p-8 w-full max-w-md space-y-6 border border-border shadow-lg">
         <div className="flex flex-col items-center gap-3">
-          <img src={logo} alt="Electricien Du Genevois" className="h-16 w-16 object-contain" />
+          <img src={theme === 'dark' ? logoDark : logo} alt="Electricien Du Genevois" className="h-16 w-16 object-contain" />
           <h1 className="text-2xl font-bold text-foreground text-center">Electricien Du Genevois</h1>
           <p className="text-sm text-muted-foreground">
             {forgotMode ? 'Réinitialisation du mot de passe' : 'Connectez-vous à votre compte'}
