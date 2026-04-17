@@ -1,4 +1,4 @@
-import { useState, Fragment, useEffect, useMemo } from 'react';
+import { useState, Fragment, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
@@ -9,11 +9,11 @@ import {
 } from '@/hooks/useDolibarr';
 import {
   getAcompteBadge, formatDateFR, replaceEmailVariables, DEVIS_STATUTS,
-  saveDevisSignatureToken, markDevisSent, type Devis as DevisType, type Client,
+  saveDevisSignatureToken, markDevisSent, closeDevis, type Devis as DevisType, type Client,
 } from '@/services/dolibarr';
 import { openDevisPdf, devisPdfToBase64, devisPdfToBlobUrl } from '@/services/devisPdf';
 import { useConfig } from '@/hooks/useConfig';
-import { useRecordDevisEnvoi } from '@/hooks/useDevisRelances';
+import { useRecordDevisEnvoi, useDevisRelances, useMarkDevisRelance, getDevisRelanceStatus } from '@/hooks/useDevisRelances';
 import { cn } from '@/lib/utils';
 import {
   ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2,
@@ -60,7 +60,7 @@ function AcompteBadge({ montantHT }: { montantHT: number }) {
   );
 }
 
-function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPending, acomptePending, onCollapse }: {
+function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPending, acomptePending, onCollapse, relanceVariant, onMarkRelance }: {
   devis: DevisType;
   clients: Client[];
   produits: { id: string; ref: string; label: string; prixHT: number; tauxTVA: number; type: string; prixAchat?: number }[];
@@ -69,6 +69,8 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   convertPending: boolean;
   acomptePending: boolean;
   onCollapse: () => void;
+  relanceVariant?: 'a_relancer' | 'relance' | 'expire' | 'envoye' | 'signe' | 'none';
+  onMarkRelance?: () => void;
 }) {
   const validateMutation = useValidateDevis();
   const closeMutation = useCloseDevis();
@@ -525,6 +527,15 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" /> Accepter / Refuser
                 </Button>
+                {relanceVariant === 'a_relancer' && onMarkRelance && (
+                  <Button
+                    onClick={onMarkRelance}
+                    size="sm"
+                    className="gap-1.5 bg-orange-500 hover:bg-orange-600"
+                  >
+                    <Send className="h-3.5 w-3.5" /> Marquer relancé
+                  </Button>
+                )}
                 <Button
                   onClick={async () => {
                     // Edit a validated devis: temporarily set to draft, open editor.
@@ -1092,6 +1103,37 @@ export default function Devis() {
   const { data: clients = [] } = useClients();
   const { data: produits = [] } = useProduits();
   const { data: productGroups = [] } = useProductGroups();
+  const { data: devisRelances = [] } = useDevisRelances();
+  const markRelanceMutation = useMarkDevisRelance();
+  const devisRelanceMap = useMemo(() => {
+    const m = new Map<string, typeof devisRelances[0]>();
+    devisRelances.forEach(r => m.set(r.devis_id, r));
+    return m;
+  }, [devisRelances]);
+
+  // Auto-expiry : ferme automatiquement les devis validés dont la date de fin de validité est dépassée
+  const autoClosedRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (devis.length === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const toClose = devis.filter(d =>
+      d.fk_statut === 1 &&
+      d.finValidite &&
+      d.finValidite < today &&
+      !autoClosedRef.current.has(d.id)
+    );
+    if (toClose.length === 0) return;
+    toClose.forEach(d => autoClosedRef.current.add(d.id));
+    Promise.all(toClose.map(d => closeDevis(d.id, 3)))
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['devis'] });
+        toast.info(
+          `${toClose.length} devis expiré${toClose.length > 1 ? 's' : ''} automatiquement annulé${toClose.length > 1 ? 's' : ''}`,
+          { description: toClose.map(d => d.ref).join(', ') }
+        );
+      })
+      .catch(e => console.error('Auto-expiry error:', e));
+  }, [devis]);
   const createDevisMutation = useCreateDevis();
   const convertMutation = useConvertDevisToFacture();
   const acompteMutation = useCreateAcompte();
@@ -1493,7 +1535,31 @@ export default function Devis() {
                         );
                       })()}
                     </td>
-                    <td className="py-3 px-2"><StatusBadge statut={d.statut} /></td>
+                    <td className="py-3 px-2">
+                      <div className="flex flex-col gap-1">
+                        <StatusBadge statut={d.statut} />
+                        {(() => {
+                          // Utilise dateValidation OU date du devis comme fallback (toujours remplie)
+                          const rs = getDevisRelanceStatus(devisRelanceMap.get(d.id), d.fk_statut, d.dateValidation || d.date);
+                          if (rs.variant === 'a_relancer') return (
+                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium bg-orange-100 text-orange-700 border-orange-300">
+                              ⏰ À relancer
+                            </span>
+                          );
+                          if (rs.variant === 'expire') return (
+                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium bg-red-100 text-red-700 border-red-300">
+                              ⚠ Expiré
+                            </span>
+                          );
+                          if (rs.variant === 'relance') return (
+                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium bg-blue-100 text-blue-700 border-blue-300">
+                              ✓ Relancé
+                            </span>
+                          );
+                          return null;
+                        })()}
+                      </div>
+                    </td>
                     <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
                       {d.fk_statut === 0 && (
                         <AlertDialog>
@@ -1524,6 +1590,8 @@ export default function Devis() {
                       convertPending={convertMutation.isPending}
                       acomptePending={acompteMutation.isPending}
                       onCollapse={() => setExpandedId(null)}
+                      relanceVariant={getDevisRelanceStatus(devisRelanceMap.get(d.id), d.fk_statut, d.dateValidation || d.date).variant}
+                      onMarkRelance={() => markRelanceMutation.mutate(d.id)}
                     />
                   )}
                 </Fragment>
