@@ -149,6 +149,13 @@ export default function Factures() {
       socid,
       lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type, pa_ht: l.prixAchat })),
     });
+    try {
+      const created = await persistLinesToCatalog(lignes, produits as any);
+      if (created > 0) {
+        toast.success(`${created} article(s) ajouté(s) au catalogue`);
+        queryClient.invalidateQueries({ queryKey: ['produits'] });
+      }
+    } catch {}
     setDialogOpen(false);
     setSocid('');
     setLignes([emptyLigne()]);
@@ -204,6 +211,13 @@ export default function Factures() {
         socid: selectedFacture.socid || '',
         lines: editLines.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type, pa_ht: l.prixAchat })),
       });
+      try {
+        const created = await persistLinesToCatalog(editLines, produits as any);
+        if (created > 0) {
+          toast.success(`${created} article(s) ajouté(s) au catalogue`);
+          queryClient.invalidateQueries({ queryKey: ['produits'] });
+        }
+      } catch {}
       setEditOpen(false);
       setSelectedFacture(null);
     } catch {}
