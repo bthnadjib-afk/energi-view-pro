@@ -5,7 +5,7 @@ import {
   createIntervention, updateIntervention, deleteIntervention, validateIntervention, closeIntervention, setInterventionStatus, reopenIntervention,
   createDevis, updateDevis, updateDevisSocid, cloneDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
   createFacture, validateFacture, deleteFacture, updateFactureLines,
-  setFactureToDraft, setFactureToUnpaid, setDevisToDraft,
+  setFactureToDraft, setFactureToUnpaid, setDevisToDraft, reopenDevis,
   convertDevisToFacture, createAcompteFacture,
   createProduit, deleteProduit, updateProduit,
   bulkDeleteDevis, bulkDeleteFactures,
