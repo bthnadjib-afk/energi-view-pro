@@ -251,6 +251,28 @@ export const FACTURE_STATUTS: Record<number, string> = {
   3: 'Abandonnée',
 };
 
+export const FACTURE_TYPES: Record<number, string> = {
+  0: 'Standard',
+  1: 'Remplacement',
+  2: 'Avoir',
+  3: 'Acompte',
+  5: 'Situation',
+};
+
+export const FACTURE_CLOSE_CODES: Record<string, string> = {
+  badcustomer: 'Mauvais payeur',
+  abandon: 'Litige commercial',
+  replaced: 'Remplacée',
+  bankcharge: 'Frais bancaires',
+  withholdingtax: 'Retenue à la source',
+  other: 'Autre',
+};
+
+export function getFactureCloseCodeLabel(code?: string): string {
+  if (!code) return '';
+  return FACTURE_CLOSE_CODES[code] || code;
+}
+
 export const INTERVENTION_STATUTS: Record<number, string> = {
   0: 'Brouillon',
   1: 'Validée',
@@ -263,7 +285,9 @@ export function getDevisStatutLabel(fk_statut: number): string {
   return DEVIS_STATUTS[fk_statut] || `Statut ${fk_statut}`;
 }
 
-export function getFactureStatutLabel(fk_statut: number, paye: boolean, totalPaye?: number): string {
+export function getFactureStatutLabel(fk_statut: number, paye: boolean, totalPaye?: number, type?: number, close_code?: string): string {
+  if (type === 2) return 'Avoir';
+  if (fk_statut === 3 && (close_code === 'badcustomer' || close_code === 'abandon')) return 'Abandonnée';
   if (paye) return 'Payée';
   if (fk_statut === 3) return 'Abandonnée';
   if (fk_statut === 0) return 'Brouillon';
