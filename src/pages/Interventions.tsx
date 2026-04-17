@@ -224,6 +224,16 @@ export default function Interventions() {
   const [techNote, setTechNote] = useState('');
   const [heureArrivee, setHeureArrivee] = useState('');
   const [heureDepart, setHeureDepart] = useState('');
+  // Liste de créneaux par tranche de 15 min (00:00 → 23:45)
+  const timeSlots = useMemo(() => {
+    const slots: string[] = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+      }
+    }
+    return slots;
+  }, []);
   // App-side "En cours" state — stored in note_public, not sent to Dolibarr as fk_statut
   const [appEnCours, setAppEnCours] = useState(false);
 
@@ -914,17 +924,23 @@ export default function Interventions() {
                       <Clock className="h-4 w-4" /> Heure d'arrivée
                     </h3>
                     <div className="flex gap-2">
-                      <Input
-                        type="time"
-                        value={heureArrivee}
+                      <Select
+                        value={heureArrivee || undefined}
                         disabled={appEnCours}
-                        onChange={(e) => {
-                          const v = e.target.value;
+                        onValueChange={(v) => {
                           setHeureArrivee(v);
                           if (v) autoSaveTimes(v, heureDepart);
                         }}
-                        className="flex-1"
-                      />
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Sélectionner l'heure d'arrivée" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          {timeSlots.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Button
                         type="button"
                         variant="outline"
@@ -958,12 +974,9 @@ export default function Interventions() {
                       ) : (
                         <>
                           <div className="flex gap-2">
-                            <Input
-                              type="time"
-                              value={heureDepart}
-                              max={currentTime()}
-                              onChange={(e) => {
-                                const v = e.target.value;
+                            <Select
+                              value={heureDepart || undefined}
+                              onValueChange={(v) => {
                                 if (v && v > currentTime()) {
                                   toast.error(`Il est ${currentTime()} — impossible de saisir une heure de départ future (${v})`);
                                   return;
@@ -975,8 +988,18 @@ export default function Interventions() {
                                 setHeureDepart(v);
                                 if (v) autoSaveTimes(heureArrivee, v);
                               }}
-                              className="flex-1"
-                            />
+                            >
+                              <SelectTrigger className="flex-1">
+                                <SelectValue placeholder="Sélectionner l'heure de départ" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-72">
+                                {timeSlots
+                                  .filter((t) => t <= currentTime() && (!heureArrivee || t >= heureArrivee))
+                                  .map((t) => (
+                                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
                             <Button
                               type="button"
                               variant="outline"
