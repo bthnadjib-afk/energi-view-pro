@@ -982,6 +982,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
 }
 
 export default function Devis() {
+  const queryClient = useQueryClient();
   const { data: devis = [] } = useDevis();
   const { data: clients = [] } = useClients();
   const { data: produits = [] } = useProduits();
@@ -1031,6 +1032,13 @@ export default function Devis() {
       socid,
       lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx || 20, product_type: l.product_type, pa_ht: l.prixAchat })),
     });
+    try {
+      const created = await persistLinesToCatalog(lignes, produits as any);
+      if (created > 0) {
+        toast.success(`${created} article(s) ajouté(s) au catalogue`);
+        queryClient.invalidateQueries({ queryKey: ['produits'] });
+      }
+    } catch {}
     setDialogOpen(false);
     setSocid('');
     setLignes([emptyLigne()]);
