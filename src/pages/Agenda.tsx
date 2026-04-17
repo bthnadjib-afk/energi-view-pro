@@ -282,12 +282,12 @@ export default function Agenda() {
                 </span>
                 <div className="flex-1 flex flex-col gap-0.5 mt-0.5 overflow-hidden">
                   {dayInterventions.slice(0, 3).map((inter) => {
-                    const statusBg = inter.fk_statut >= 3 ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/20 border-amber-500/40 text-amber-700 dark:text-amber-400';
+                    const statusBg = STATUS_BADGE[getInterventionStatusKey(inter)];
                     return (
                       <div
                         key={inter.id}
                         className={`rounded px-1 py-0.5 text-[10px] leading-tight truncate border ${statusBg}`}
-                        title={`${inter.ref} - ${inter.client} (${TYPE_LABELS[inter.type] || inter.type})`}
+                        title={`${inter.ref} - ${inter.client} (${TYPE_LABELS[inter.type] || inter.type}) — ${STATUS_LABEL[getInterventionStatusKey(inter)]}`}
                         onClick={(e) => { e.stopPropagation(); setSelected(inter); }}
                       >
                         <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${TYPE_COLORS[inter.type] || 'bg-muted-foreground'}`} />
@@ -371,7 +371,7 @@ export default function Agenda() {
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`inline-block w-2 h-2 rounded-full ${statusColor[inter.statut] || 'bg-muted-foreground'}`} />
+                    <span className={`inline-block w-2 h-2 rounded-full ${STATUS_DOT_BG[getInterventionStatusKey(inter)]}`} />
                     <span className="font-mono text-xs text-muted-foreground">{inter.ref}</span>
                     <span className="text-xs text-muted-foreground">{inter.heureDebut}–{inter.heureFin}</span>
                   </div>
