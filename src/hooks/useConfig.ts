@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -65,55 +65,84 @@ const DEFAULT_CONFIG: AppConfig = {
   },
   smtp: {
     host: '',
-    port: '587',
+    port: '465',
     user: '',
     pass: '',
     from: '',
   },
 };
 
+function flattenConfig(cfg: AppConfig): Record<string, string> {
+  const flat: Record<string, string> = {};
+  for (const [section, values] of Object.entries(cfg)) {
+    if (typeof values === 'object' && values !== null) {
+      for (const [field, val] of Object.entries(values)) {
+        flat[`${section}.${field}`] = String(val);
+      }
+    }
+  }
+  return flat;
+}
+
+function parseRemoteConfig(remote: Record<string, string>): Partial<AppConfig> {
+  const parsed: Partial<AppConfig> = {};
+  for (const [key, value] of Object.entries(remote)) {
+    try {
+      const dotIdx = key.indexOf('.');
+      if (dotIdx === -1) continue;
+      const section = key.slice(0, dotIdx);
+      const field = key.slice(dotIdx + 1);
+      if (!section || !field) continue;
+      if (!parsed[section as keyof AppConfig]) {
+        parsed[section as keyof AppConfig] = { ...(DEFAULT_CONFIG as any)[section] } as any;
+      }
+      const sectionObj = parsed[section as keyof AppConfig] as any;
+      if (value === 'true') sectionObj[field] = true;
+      else if (value === 'false') sectionObj[field] = false;
+      else if (value !== '' && !isNaN(Number(value))) sectionObj[field] = Number(value);
+      else sectionObj[field] = value;
+    } catch { /* skip malformed keys */ }
+  }
+  return parsed;
+}
+
 export function useConfig() {
   const [config, setConfigState] = useState<AppConfig>(() => {
     try {
       const saved = localStorage.getItem('electropro-config');
-      return saved ? { ...DEFAULT_CONFIG, ...JSON.parse(saved) } : DEFAULT_CONFIG;
-    } catch {
-      return DEFAULT_CONFIG;
-    }
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Deep merge with defaults to ensure all keys exist
+        const merged: AppConfig = { ...DEFAULT_CONFIG };
+        for (const section of Object.keys(DEFAULT_CONFIG) as (keyof AppConfig)[]) {
+          if (parsed[section] && typeof parsed[section] === 'object') {
+            (merged as any)[section] = { ...(DEFAULT_CONFIG as any)[section], ...parsed[section] };
+          }
+        }
+        return merged;
+      }
+    } catch { /* ignore */ }
+    return DEFAULT_CONFIG;
   });
+
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const initialLoadDone = useRef(false);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load from Supabase on mount
+  // Load from Supabase on mount — works for ALL authenticated users
   useEffect(() => {
     (async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) { setLoading(false); return; }
+        if (!session) { setLoading(false); initialLoadDone.current = true; return; }
 
         const { data, error } = await supabase.functions.invoke('manage-config', { method: 'GET' });
-        if (error || !data) { setLoading(false); return; }
+        if (error || !data) { setLoading(false); initialLoadDone.current = true; return; }
 
-        // data is a Record<string, string>
         const remote = data as Record<string, string>;
         if (Object.keys(remote).length > 0) {
-          const parsed: Partial<AppConfig> = {};
-          for (const [key, value] of Object.entries(remote)) {
-            try {
-              const [section, field] = key.split('.');
-              if (section && field) {
-                if (!parsed[section as keyof AppConfig]) {
-                  parsed[section as keyof AppConfig] = { ...(DEFAULT_CONFIG as any)[section] } as any;
-                }
-                const sectionObj = parsed[section as keyof AppConfig] as any;
-                // Try to parse numbers and booleans
-                if (value === 'true') sectionObj[field] = true;
-                else if (value === 'false') sectionObj[field] = false;
-                else if (!isNaN(Number(value)) && value !== '') sectionObj[field] = Number(value);
-                else sectionObj[field] = value;
-              }
-            } catch { /* skip malformed keys */ }
-          }
+          const parsed = parseRemoteConfig(remote);
           setConfigState(prev => {
             const merged = { ...prev };
             for (const [k, v] of Object.entries(parsed)) {
@@ -127,11 +156,29 @@ export function useConfig() {
         console.warn('Failed to load remote config:', e);
       }
       setLoading(false);
+      // Mark initial load done after a tick so the auto-save effect doesn't fire on mount
+      setTimeout(() => { initialLoadDone.current = true; }, 200);
     })();
   }, []);
 
+  // Always keep localStorage in sync
   useEffect(() => {
     localStorage.setItem('electropro-config', JSON.stringify(config));
+  }, [config]);
+
+  // Auto-save to Supabase 2 seconds after any change (admin only — non-admins get 403, ignored silently)
+  useEffect(() => {
+    if (!initialLoadDone.current) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(async () => {
+      try {
+        await supabase.functions.invoke('manage-config', {
+          method: 'POST',
+          body: flattenConfig(config),
+        });
+      } catch { /* silent — 403 for non-admins is expected */ }
+    }, 2000);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
   }, [config]);
 
   const updateConfig = useCallback((updates: Partial<AppConfig>) => {
@@ -158,20 +205,13 @@ export function useConfig() {
     setConfigState(prev => ({ ...prev, smtp: { ...prev.smtp, ...updates } }));
   }, []);
 
+  // Manual save — shows toast confirmation, for the "Sauvegarder les paramètres" button
   const saveToSupabase = useCallback(async () => {
     setSaving(true);
     try {
-      const flat: Record<string, string> = {};
-      for (const [section, values] of Object.entries(config)) {
-        if (typeof values === 'object' && values !== null) {
-          for (const [field, val] of Object.entries(values)) {
-            flat[`${section}.${field}`] = String(val);
-          }
-        }
-      }
       const { error } = await supabase.functions.invoke('manage-config', {
         method: 'POST',
-        body: flat,
+        body: flattenConfig(config),
       });
       if (error) throw error;
       toast.success('Configuration sauvegardée');
