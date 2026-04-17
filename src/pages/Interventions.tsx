@@ -73,6 +73,17 @@ export default function Interventions() {
   
   const reopenMutation = useReopenIntervention();
   const { role } = useAuth();
+  const { profile } = useAuthContext();
+  const isTechnicien = role === 'technicien';
+  const currentTechName = useMemo(() => {
+    if (!isTechnicien || !profile) return '';
+    if (profile.dolibarr_user_id) {
+      const u = dolibarrUsers.find(d => String(d.id) === String(profile.dolibarr_user_id));
+      if (u?.fullname) return u.fullname;
+    }
+    const u = dolibarrUsers.find(d => (d.email || '').toLowerCase() === (profile.email || '').toLowerCase());
+    return u?.fullname || profile.nom || '';
+  }, [isTechnicien, profile, dolibarrUsers]);
 
   const [deleteAllPending, setDeleteAllPending] = useState(false);
 
