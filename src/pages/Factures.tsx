@@ -15,15 +15,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { persistLinesToCatalog } from '@/lib/catalogHelpers';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface LigneForm {
   desc: string;
   qty: number;
   subprice: number;
   tva_tx: number;
-  product_type: number;
+  product_type: number; // 0 fourniture, 1 main d'œuvre
   productId: string;
   prixAchat: number;
+  saveToCatalog?: boolean;
 }
 
 export default function Factures() {
