@@ -19,6 +19,7 @@ export interface Facture {
   totalPaye: number;
   lignes: DevisLigne[];
   note_private?: string;
+  dateValidation?: string;
 }
 
 export interface DevisLigne {
@@ -47,6 +48,7 @@ export interface Devis {
   finValidite: string;
   note_private?: string;
   sent?: boolean;
+  dateValidation?: string;
 }
 
 export type InterventionType = 'devis' | 'panne' | 'panne_urgence' | 'sav' | 'chantier';
@@ -1135,6 +1137,7 @@ function mapDolibarrFacture(d: any): Facture {
       };
     }),
     note_private: d.note_private || undefined,
+    dateValidation: parseDolibarrDate(d.date_validation || d.datev || ''),
   };
 }
 
@@ -1176,6 +1179,7 @@ function mapDolibarrDevis(d: any): Devis {
     }),
     finValidite: parseDolibarrDate(d.fin_validite || d.duree_validite || ''),
     note_private: d.note_private || undefined,
+    dateValidation: parseDolibarrDate(d.date_validation || d.datev || ''),
   };
 }
 
