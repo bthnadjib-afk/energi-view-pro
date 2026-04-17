@@ -360,13 +360,28 @@ export default function Interventions() {
     }
 
     const selectedUser = dolibarrUsers.find(u => u.fullname === newTech);
-    await createInterventionMutation.mutateAsync({
-      socid: clientId, description: newDescription || ' ', date: newDate,
-      heureDebut: newHeureDebut, heureFin: newHeureFin,
-      fk_user_assign: selectedUser?.id, type: (newType || 'devis') as InterventionType, note_private: notePrivee || undefined,
-    });
+
+    // Cas chantier multi-jours : créer N interventions liées
+    if (newType === 'chantier' && chantierDates.length > 1) {
+      await createChantierMutation.mutateAsync({
+        socid: clientId,
+        description: newDescription || ' ',
+        dates: chantierDates,
+        heureDebut: newHeureDebut,
+        heureFin: newHeureFin,
+        fk_user_assign: selectedUser?.id,
+        note_private: notePrivee || undefined,
+      });
+    } else {
+      await createInterventionMutation.mutateAsync({
+        socid: clientId, description: newDescription || ' ', date: newDate,
+        heureDebut: newHeureDebut, heureFin: newHeureFin,
+        fk_user_assign: selectedUser?.id, type: (newType || 'devis') as InterventionType, note_private: notePrivee || undefined,
+      });
+    }
     setDialogOpen(false);
     setNewClientId(''); setNewClientSearch(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee(''); setNewType('');
+    setChantierDateFin(''); setChantierJoursActifs([]); setChantierDatesExtra([]); setChantierDatesExclues([]);
     resetNewClientForm();
   };
 
