@@ -33,6 +33,7 @@ interface LigneForm {
 export default function Factures() {
   const { config } = useConfig();
   const { role } = useAuthContext();
+  const queryClient = useQueryClient();
   const canRecordPayment = role === 'admin' || role === 'secretaire';
   const { data: factures = [] } = useFactures();
   const { data: relances = [] } = useFactureRelances();
