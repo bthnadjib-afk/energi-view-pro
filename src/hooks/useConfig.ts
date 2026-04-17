@@ -97,9 +97,10 @@ function parseRemoteConfig(remote: Record<string, string>): Partial<AppConfig> {
         parsed[section as keyof AppConfig] = { ...(DEFAULT_CONFIG as any)[section] } as any;
       }
       const sectionObj = parsed[section as keyof AppConfig] as any;
-      if (value === 'true') sectionObj[field] = true;
-      else if (value === 'false') sectionObj[field] = false;
-      else if (value !== '' && !isNaN(Number(value))) sectionObj[field] = Number(value);
+      const defaultValue = (DEFAULT_CONFIG as any)[section]?.[field];
+
+      if (typeof defaultValue === 'boolean') sectionObj[field] = value === 'true';
+      else if (typeof defaultValue === 'number') sectionObj[field] = value === '' ? defaultValue : Number(value);
       else sectionObj[field] = value;
     } catch { /* skip malformed keys */ }
   }
