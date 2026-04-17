@@ -6,7 +6,7 @@ import {
   createDevis, updateDevis, updateDevisSocid, cloneDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
   createFacture, validateFacture, deleteFacture, updateFactureLines,
   setFactureToDraft, setFactureToUnpaid, setDevisToDraft, reopenDevis,
-  convertDevisToFacture, createAcompteFacture,
+  convertDevisToFacture, createAcompteFacture, createAcompteLibre, createAvoirFromFacture, classifyFactureAbandonee,
   createProduit, deleteProduit, updateProduit,
   bulkDeleteDevis, bulkDeleteFactures,
   createDolibarrUser, addPayment, updateDolibarrUser, saveInterventionSignatures,
@@ -354,6 +354,35 @@ export function useCreateAcompte() {
   return useMutation({
     mutationFn: (data: { socid: string; montantHT: number; devisRef: string }) => createAcompteFacture(data.socid, data.montantHT, data.devisRef),
     onSuccess: () => { toast.success("Facture d'acompte créée"); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useCreateAcompteLibre() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { socid: string; montant: number; description: string; tva_tx?: number }) =>
+      createAcompteLibre(data.socid, data.montant, data.description, data.tva_tx),
+    onSuccess: () => { toast.success("Facture d'acompte créée"); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useCreateAvoir() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { factureSourceId: string }) => createAvoirFromFacture(data.factureSourceId),
+    onSuccess: () => { toast.success("Avoir créé depuis la facture"); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useClassifyFactureAbandonee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { factureId: string; close_code: 'badcustomer' | 'abandon' | 'other'; close_note: string }) =>
+      classifyFactureAbandonee(data.factureId, data.close_code, data.close_note),
+    onSuccess: () => { toast.success("Facture classée abandonnée"); qc.invalidateQueries({ queryKey: ['factures'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
