@@ -1090,7 +1090,9 @@ function mapDolibarrFacture(d: any): Facture {
 }
 
 function mapDolibarrDevis(d: any): Devis {
-  const fk_statut = Number(d.fk_statut) || 0;
+  // Dolibarr /proposals returns the status as `statut` / `status` (no `fk_statut` field).
+  // Fallback chain ensures we always read the real value.
+  const fk_statut = Number(d.fk_statut ?? d.statut ?? d.status) || 0;
   let noteMeta: Record<string, any> = {};
   try { if (d.note_private) noteMeta = JSON.parse(d.note_private); } catch {}
   const isSent = fk_statut === 1 && noteMeta.sent === true;
