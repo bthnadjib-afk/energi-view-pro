@@ -5,7 +5,7 @@ import {
   useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture,
   useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis,
   useUpdateDevisLines, useSetDevisToDraft, useCloneDevis, useUpdateDevisSocid,
-  useReopenDevis,
+  useReopenDevis, useCreateIntervention, useDolibarrUsers,
 } from '@/hooks/useDolibarr';
 import {
   getAcompteBadge, formatDateFR, replaceEmailVariables, DEVIS_STATUTS,
@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import {
   ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2,
   XCircle, Send, FileCheck, FileDown, Pencil, Search, Filter, Zap, Copy,
-  UserPen, Ban, Link2, Loader2, RotateCcw,
+  UserPen, Ban, Link2, Loader2, RotateCcw, Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,6 +69,8 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const updateLinesMutation = useUpdateDevisLines();
   const setToDraftMutation = useSetDevisToDraft();
   const reopenMutation = useReopenDevis();
+  const createInterventionMutation = useCreateIntervention();
+  const { data: dolibarrUsers = [] } = useDolibarrUsers();
   const cloneMutation = useCloneDevis();
   const updateSocidMutation = useUpdateDevisSocid();
   const { config } = useConfig();
@@ -93,6 +95,11 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const [acceptRefuseOpen, setAcceptRefuseOpen] = useState(false);
+  const [createInterOpen, setCreateInterOpen] = useState(false);
+  const [interDate, setInterDate] = useState('');
+  const [interTechId, setInterTechId] = useState('');
+  const [interHeureDebut, setInterHeureDebut] = useState('08:00');
+  const [interHeureFin, setInterHeureFin] = useState('10:00');
 
   const client = clients.find(c => c.id === devis.socid);
 
@@ -263,6 +270,38 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
     try {
       await reopenMutation.mutateAsync(devis.id);
     } catch {}
+  };
+
+  const openCreateIntervention = () => {
+    const today = new Date();
+    setInterDate(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`);
+    setInterTechId('');
+    setInterHeureDebut('08:00');
+    setInterHeureFin('10:00');
+    setCreateInterOpen(true);
+  };
+
+  const handleCreateIntervention = async () => {
+    if (!devis.socid || !interDate) {
+      toast.error('Date requise');
+      return;
+    }
+    try {
+      await createInterventionMutation.mutateAsync({
+        socid: devis.socid,
+        description: `Chantier issu du devis ${devis.ref}`,
+        date: interDate,
+        heureDebut: interHeureDebut,
+        heureFin: interHeureFin,
+        fk_user_assign: interTechId || undefined,
+        type: 'chantier',
+        note_private: `Devis source : ${devis.ref}`,
+      });
+      setCreateInterOpen(false);
+      toast.success('Intervention "Chantier" créée depuis le devis');
+    } catch (e: any) {
+      toast.error(`Erreur création intervention : ${e?.message || e}`);
+    }
   };
 
   const handleGenerateSignatureLink = async () => {
@@ -461,7 +500,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                   variant="outline"
                   className="gap-1.5"
                 >
-                  <ArrowRightLeft className="h-3.5 w-3.5" /> Générer facture
+                  <ArrowRightLeft className="h-3.5 w-3.5" /> Classer facturé (brouillon)
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -487,8 +526,11 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
             {isSigned && (
               <div className="flex flex-wrap gap-2">
                 <span className="text-xs font-semibold text-emerald-600 self-center mr-1">Accepté :</span>
-                <Button onClick={handleConvert} disabled={convertPending} size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700">
-                  <ArrowRightLeft className="h-3.5 w-3.5" /> Générer facture
+                <Button onClick={openCreateIntervention} size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700">
+                  <Wrench className="h-3.5 w-3.5" /> Créer intervention
+                </Button>
+                <Button onClick={handleConvert} disabled={convertPending} size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700">
+                  <ArrowRightLeft className="h-3.5 w-3.5" /> Classer facturé (brouillon)
                 </Button>
                 <Button onClick={onAcompte} disabled={acomptePending} size="sm" variant="outline" className="gap-1.5">
                   <Receipt className="h-3.5 w-3.5" /> Saisir un acompte
@@ -723,7 +765,55 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
             </DialogContent>
           </Dialog>
 
-          {/* Dialog modifier les lignes */}
+          {/* Dialog créer intervention depuis devis accepté */}
+          <Dialog open={createInterOpen} onOpenChange={setCreateInterOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4" /> Créer un chantier — {devis.ref}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <p className="text-sm text-muted-foreground">
+                  Une intervention de type <strong>Chantier</strong> sera créée pour <strong>{devis.client}</strong>.
+                </p>
+                <div className="space-y-1.5">
+                  <label className="text-sm text-muted-foreground">Date *</label>
+                  <Input type="date" value={interDate} onChange={e => setInterDate(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-sm text-muted-foreground">Heure début</label>
+                    <Input type="time" value={interHeureDebut} onChange={e => setInterHeureDebut(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm text-muted-foreground">Heure fin</label>
+                    <Input type="time" value={interHeureFin} onChange={e => setInterHeureFin(e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm text-muted-foreground">Technicien</label>
+                  <Select value={interTechId} onValueChange={setInterTechId}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner un technicien (optionnel)" /></SelectTrigger>
+                    <SelectContent>
+                      {dolibarrUsers.map((u: any) => (
+                        <SelectItem key={u.id} value={String(u.id)}>
+                          {u.firstname || ''} {u.lastname || u.login}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setCreateInterOpen(false)}>Annuler</Button>
+                  <Button onClick={handleCreateIntervention} disabled={createInterventionMutation.isPending || !interDate} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                    {createInterventionMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
+                    Créer le chantier
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={editOpen} onOpenChange={setEditOpen}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Modifier les lignes — {devis.ref}</DialogTitle></DialogHeader>
