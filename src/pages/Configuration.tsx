@@ -217,6 +217,60 @@ export default function Configuration() {
                 <Input type="number" value={config.defaults.tauxHoraire} onChange={(e) => updateDefaults({ tauxHoraire: Number(e.target.value) })} />
               </div>
             </div>
+
+            <div className="mt-6 pt-6 border-t border-border space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Chantier — valeurs par défaut</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Heure début chantier</label>
+                  <Input
+                    type="time"
+                    value={config.defaults.chantierHeureDebut}
+                    onChange={(e) => updateDefaults({ chantierHeureDebut: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Heure fin chantier</label>
+                  <Input
+                    type="time"
+                    value={config.defaults.chantierHeureFin}
+                    onChange={(e) => updateDefaults({ chantierHeureFin: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Jours travaillés par défaut sur chantier</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { v: '1', l: 'Lun' }, { v: '2', l: 'Mar' }, { v: '3', l: 'Mer' },
+                    { v: '4', l: 'Jeu' }, { v: '5', l: 'Ven' }, { v: '6', l: 'Sam' }, { v: '7', l: 'Dim' },
+                  ].map(d => {
+                    const active = (config.defaults.chantierJours || '').split(',').filter(Boolean).includes(d.v);
+                    return (
+                      <button
+                        key={d.v}
+                        type="button"
+                        onClick={() => {
+                          const cur = (config.defaults.chantierJours || '').split(',').filter(Boolean);
+                          const next = active ? cur.filter(x => x !== d.v) : [...cur, d.v].sort();
+                          updateDefaults({ chantierJours: next.join(',') });
+                        }}
+                        className={
+                          active
+                            ? 'px-3 py-1.5 rounded-md border text-sm font-medium transition-colors bg-primary text-primary-foreground border-primary'
+                            : 'px-3 py-1.5 rounded-md border text-sm font-medium transition-colors bg-card text-muted-foreground border-border hover:bg-muted'
+                        }
+                      >
+                        {d.l}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Sélection appliquée par défaut quand on planifie un chantier sur plusieurs jours (ex: Lun, Mer, Ven).
+                </p>
+              </div>
+            </div>
           </div>
         </TabsContent>
 
