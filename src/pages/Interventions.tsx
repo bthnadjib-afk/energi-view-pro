@@ -1585,7 +1585,7 @@ export default function Interventions() {
       {/* Edit draft dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Modifier l'intervention (Brouillon)</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Modifier l'intervention {selectedIntervention?.ref ? `— ${selectedIntervention.ref}` : ''}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             <Select value={editType} onValueChange={(v) => setEditType(v as InterventionType)}>
               <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
