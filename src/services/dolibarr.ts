@@ -20,6 +20,14 @@ export interface Facture {
   lignes: DevisLigne[];
   note_private?: string;
   dateValidation?: string;
+  /** Dolibarr type: 0=standard, 1=remplacement, 2=avoir, 3=acompte, 5=situation */
+  type: number;
+  /** ID de la facture source (pour avoir/remplacement) */
+  fk_facture_source?: string;
+  /** Code de classement à la fermeture: 'badcustomer', 'abandon', 'replaced'... */
+  close_code?: string;
+  /** Note libre saisie au moment de l'abandon */
+  close_note?: string;
 }
 
 export interface DevisLigne {
@@ -243,6 +251,28 @@ export const FACTURE_STATUTS: Record<number, string> = {
   3: 'Abandonnée',
 };
 
+export const FACTURE_TYPES: Record<number, string> = {
+  0: 'Standard',
+  1: 'Remplacement',
+  2: 'Avoir',
+  3: 'Acompte',
+  5: 'Situation',
+};
+
+export const FACTURE_CLOSE_CODES: Record<string, string> = {
+  badcustomer: 'Mauvais payeur',
+  abandon: 'Litige commercial',
+  replaced: 'Remplacée',
+  bankcharge: 'Frais bancaires',
+  withholdingtax: 'Retenue à la source',
+  other: 'Autre',
+};
+
+export function getFactureCloseCodeLabel(code?: string): string {
+  if (!code) return '';
+  return FACTURE_CLOSE_CODES[code] || code;
+}
+
 export const INTERVENTION_STATUTS: Record<number, string> = {
   0: 'Brouillon',
   1: 'Validée',
@@ -255,7 +285,9 @@ export function getDevisStatutLabel(fk_statut: number): string {
   return DEVIS_STATUTS[fk_statut] || `Statut ${fk_statut}`;
 }
 
-export function getFactureStatutLabel(fk_statut: number, paye: boolean, totalPaye?: number): string {
+export function getFactureStatutLabel(fk_statut: number, paye: boolean, totalPaye?: number, type?: number, close_code?: string): string {
+  if (type === 2) return 'Avoir';
+  if (fk_statut === 3 && (close_code === 'badcustomer' || close_code === 'abandon')) return 'Abandonnée';
   if (paye) return 'Payée';
   if (fk_statut === 3) return 'Abandonnée';
   if (fk_statut === 0) return 'Brouillon';
@@ -799,6 +831,71 @@ export async function createAcompteFacture(socid: string, montantHT: number, dev
     }],
   });
   return result || '';
+}
+
+// --- Acompte libre (depuis Factures, sans devis) ---
+export async function createAcompteLibre(socid: string, montant: number, description: string, tva_tx = 20): Promise<string> {
+  const result = await dolibarrCall<string>('/invoices', 'POST', {
+    socid: parseInt(socid, 10) || socid,
+    type: 3,
+    date: toUnixTimestamp(new Date().toISOString()),
+    lines: [{
+      desc: description || 'Acompte',
+      qty: 1,
+      subprice: Math.round(montant * 100) / 100,
+      tva_tx,
+      product_type: 1,
+    }],
+  });
+  return result || '';
+}
+
+// --- Avoir lié à une facture (Dolibarr type=2) ---
+// Lignes auto-remplies en NÉGATIF depuis la facture source (Dolibarr l'exige : avoir = montants négatifs).
+export async function createAvoirFromFacture(
+  factureSourceId: string,
+  lines?: { desc: string; qty: number; subprice: number; tva_tx: number; product_type: number }[]
+): Promise<string> {
+  const facture = await dolibarrCall<any>(`/invoices/${factureSourceId}`, 'GET');
+  if (!facture) throw new Error('Facture source introuvable');
+
+  const sourceLines = lines || (facture.lines || []).map((l: any) => ({
+    desc: l.desc || l.label || '',
+    qty: parseFloat(l.qty) || 1,
+    subprice: parseFloat(l.subprice) || 0,
+    tva_tx: parseFloat(l.tva_tx) || 0,
+    product_type: parseInt(l.product_type || '0', 10),
+  }));
+
+  // Avoir = lignes en négatif. On force le signe négatif sur subprice.
+  const avoirLines = sourceLines.map(l => ({
+    ...l,
+    subprice: -Math.abs(l.subprice),
+  }));
+
+  const result = await dolibarrCall<string>('/invoices', 'POST', {
+    socid: parseInt(facture.socid, 10) || facture.socid,
+    type: 2,
+    fk_facture_source: parseInt(factureSourceId, 10) || factureSourceId,
+    date: toUnixTimestamp(new Date().toISOString()),
+    lines: avoirLines,
+    note_private: `Avoir lié à facture ${facture.ref || factureSourceId}`,
+  });
+  return result || '';
+}
+
+// --- Classer une facture en "abandonnée" ---
+// Dolibarr utilise POST /invoices/{id}/settopaid avec close_code='badcustomer'|'abandon'
+// Résultat : statut Dolibarr = 3 (Closed), paye=0, close_code rempli.
+export async function classifyFactureAbandonee(
+  factureId: string,
+  close_code: 'badcustomer' | 'abandon' | 'other',
+  close_note: string
+): Promise<string | null> {
+  return dolibarrCall<string>(`/invoices/${factureId}/settopaid`, 'POST', {
+    close_code,
+    close_note: close_note || '',
+  });
 }
 
 // --- Products ---
@@ -1354,6 +1451,9 @@ function mapDolibarrFacture(d: any): Facture {
   const paye = d.paye === '1' || d.paye === 1;
   const totalPaye = parseFloat(d.sumpayed) || 0;
   const resteAPayer = parseFloat(d.remaintopay) || (parseFloat(d.total_ttc) || 0) - totalPaye;
+  const type = Number(d.type ?? 0);
+  const close_code = d.close_code || undefined;
+  const close_note = d.close_note || undefined;
   return {
     id: String(d.id),
     ref: d.ref || `FA-${d.id}`,
@@ -1362,11 +1462,15 @@ function mapDolibarrFacture(d: any): Facture {
     date: parseDolibarrDate(d.date || d.datef || d.date_creation),
     montantHT: parseFloat(d.total_ht) || 0,
     montantTTC: parseFloat(d.total_ttc) || 0,
-    statut: getFactureStatutLabel(fk_statut, paye, totalPaye),
+    statut: getFactureStatutLabel(fk_statut, paye, totalPaye, type, close_code),
     fk_statut,
     paye,
     resteAPayer,
     totalPaye,
+    type,
+    fk_facture_source: d.fk_facture_source ? String(d.fk_facture_source) : undefined,
+    close_code,
+    close_note,
     lignes: (d.lines || []).map((l: any) => {
       const rawDesc: string = l.desc || l.label || '';
       const refMatch = rawDesc.match(/^\[([^\]]+)\]\s*/);

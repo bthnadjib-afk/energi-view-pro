@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil, Search, XCircle, Zap } from 'lucide-react';
+import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil, Search, XCircle, Zap, RotateCcw, Ban } from 'lucide-react';
 import { HelpTooltip } from '@/components/HelpTooltip';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid } from '@/hooks/useDolibarr';
+import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid, useCreateAvoir, useCreateAcompteLibre, useClassifyFactureAbandonee } from '@/hooks/useDolibarr';
 import { useFactureRelances, useRecordFactureEnvoi, useSetFactureEnvoiDate, getRelanceStatus } from '@/hooks/useFactureRelances';
-import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
+import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, getFactureCloseCodeLabel, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
 import { useQuery } from '@tanstack/react-query';
 import { openFacturePdf, facturePdfToBase64, facturePdfToBlobUrl } from '@/services/facturePdf';
 import { useConfig } from '@/hooks/useConfig';
@@ -55,6 +55,9 @@ export default function Factures() {
   const updateLinesMutation = useUpdateFactureLines();
   const setToDraftMutation = useSetFactureToDraft();
   const setToUnpaidMutation = useSetFactureToUnpaid();
+  const createAvoirMutation = useCreateAvoir();
+  const createAcompteLibreMutation = useCreateAcompteLibre();
+  const classifyAbandoneeMutation = useClassifyFactureAbandonee();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedFacture, setSelectedFacture] = useState<Facture | null>(null);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -97,6 +100,18 @@ export default function Factures() {
   // Edit draft state
   const [editOpen, setEditOpen] = useState(false);
   const [editLines, setEditLines] = useState<LigneForm[]>([]);
+
+  // Acompte libre
+  const [acompteOpen, setAcompteOpen] = useState(false);
+  const [acompteSocid, setAcompteSocid] = useState('');
+  const [acompteMontant, setAcompteMontant] = useState(0);
+  const [acompteDescription, setAcompteDescription] = useState('Acompte');
+  const [acompteTva, setAcompteTva] = useState(20);
+
+  // Abandon
+  const [abandonOpen, setAbandonOpen] = useState(false);
+  const [abandonCode, setAbandonCode] = useState<'badcustomer' | 'abandon' | 'other'>('badcustomer');
+  const [abandonNote, setAbandonNote] = useState('');
 
   // Filters
   const [filterStatut, setFilterStatut] = useState('all');
@@ -278,12 +293,26 @@ export default function Factures() {
           </h1>
           <p className="text-muted-foreground text-sm">Gestion des factures — statuts natifs Dolibarr</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2 h-12 px-6 text-base">
-              <Plus className="h-4 w-4" /> Créer une facture
-            </Button>
-          </DialogTrigger>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            className="gap-2 h-12 px-4"
+            onClick={() => {
+              setAcompteSocid('');
+              setAcompteMontant(0);
+              setAcompteDescription('Acompte');
+              setAcompteTva(20);
+              setAcompteOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" /> Facture d'acompte
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2 h-12 px-6 text-base">
+                <Plus className="h-4 w-4" /> Créer une facture
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Nouvelle facture (Brouillon)</DialogTitle>
@@ -397,6 +426,7 @@ export default function Factures() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -706,6 +736,47 @@ export default function Factures() {
                     >
                       <Send className="h-4 w-4" /> Envoyer par email
                     </Button>
+                  )}
+
+                  {/* Avoir : seulement sur facture standard validée (type 0, fk_statut >= 1, pas déjà un avoir) */}
+                  {selectedFacture.type === 0 && selectedFacture.fk_statut >= 1 && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={async () => {
+                        if (!confirm(`Créer un avoir lié à la facture ${selectedFacture.ref} ?\n\nL'avoir reprendra les lignes en montant négatif.`)) return;
+                        await createAvoirMutation.mutateAsync({ factureSourceId: selectedFacture.id });
+                        setSelectedFacture(null);
+                      }}
+                      disabled={createAvoirMutation.isPending}
+                    >
+                      <RotateCcw className="h-4 w-4" /> {createAvoirMutation.isPending ? 'Création...' : 'Créer un avoir'}
+                    </Button>
+                  )}
+
+                  {/* Classer abandonnée : facture validée non payée et pas déjà abandonnée */}
+                  {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && selectedFacture.fk_statut !== 3 && (
+                    <Button
+                      variant="outline"
+                      className="gap-2 text-destructive hover:text-destructive"
+                      onClick={() => {
+                        setAbandonCode('badcustomer');
+                        setAbandonNote('');
+                        setAbandonOpen(true);
+                      }}
+                    >
+                      <Ban className="h-4 w-4" /> Classer abandonnée
+                    </Button>
+                  )}
+
+                  {/* Affichage du motif d'abandon si déjà abandonnée */}
+                  {selectedFacture.fk_statut === 3 && selectedFacture.close_code && (
+                    <div className="w-full text-sm rounded-md border border-border bg-muted/40 p-3">
+                      <div><span className="text-muted-foreground">Motif :</span> <span className="text-foreground font-medium ml-1">{getFactureCloseCodeLabel(selectedFacture.close_code)}</span></div>
+                      {selectedFacture.close_note && (
+                        <div className="mt-1"><span className="text-muted-foreground">Note :</span> <span className="text-foreground ml-1 whitespace-pre-wrap">{selectedFacture.close_note}</span></div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -1030,6 +1101,113 @@ export default function Factures() {
             }}>
               Télécharger
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Acompte libre dialog */}
+      <Dialog open={acompteOpen} onOpenChange={setAcompteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nouvelle facture d'acompte</DialogTitle>
+            <DialogDescription>Crée une facture d'acompte indépendante d'un devis.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Client</label>
+              <Select value={acompteSocid} onValueChange={setAcompteSocid}>
+                <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
+                <SelectContent>
+                  {clients.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Description</label>
+              <Input value={acompteDescription} onChange={e => setAcompteDescription(e.target.value.slice(0, 200))} placeholder="Acompte chantier..." maxLength={200} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Montant HT (€)</label>
+                <Input type="number" step="0.01" min="0" value={acompteMontant} onChange={e => setAcompteMontant(Math.max(0, Number(e.target.value)))} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">TVA (%)</label>
+                <Select value={String(acompteTva)} onValueChange={v => setAcompteTva(Number(v))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0 %</SelectItem>
+                    <SelectItem value="10">10 %</SelectItem>
+                    <SelectItem value="20">20 %</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button
+              onClick={async () => {
+                if (!acompteSocid || acompteMontant <= 0) { toast.error('Sélectionnez un client et saisissez un montant'); return; }
+                await createAcompteLibreMutation.mutateAsync({ socid: acompteSocid, montant: acompteMontant, description: acompteDescription.trim() || 'Acompte', tva_tx: acompteTva });
+                setAcompteOpen(false);
+              }}
+              disabled={createAcompteLibreMutation.isPending || !acompteSocid || acompteMontant <= 0}
+              className="w-full"
+            >
+              {createAcompteLibreMutation.isPending ? 'Création...' : "Créer la facture d'acompte"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Abandon dialog */}
+      <Dialog open={abandonOpen} onOpenChange={setAbandonOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Classer la facture en abandonnée</DialogTitle>
+            <DialogDescription>
+              {selectedFacture ? `Facture ${selectedFacture.ref} — ${selectedFacture.resteAPayer.toLocaleString('fr-FR')} € restants` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Motif</label>
+              <Select value={abandonCode} onValueChange={(v: any) => setAbandonCode(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="badcustomer">Mauvais payeur</SelectItem>
+                  <SelectItem value="abandon">Litige commercial</SelectItem>
+                  <SelectItem value="other">Autre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">
+                Précision {abandonCode === 'other' ? '(obligatoire)' : '(optionnel)'}
+              </label>
+              <Textarea value={abandonNote} onChange={e => setAbandonNote(e.target.value.slice(0, 500))} placeholder="Détails sur l'abandon..." rows={4} maxLength={500} />
+              <p className="text-xs text-muted-foreground text-right">{abandonNote.length}/500</p>
+            </div>
+            <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
+              Cette action classe définitivement la facture comme abandonnée (statut 3 Dolibarr). Elle reste consultable mais ne sera plus relancée.
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setAbandonOpen(false)} className="flex-1">Annuler</Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={async () => {
+                  if (!selectedFacture) return;
+                  if (abandonCode === 'other' && !abandonNote.trim()) { toast.error('Précisez le motif'); return; }
+                  await classifyAbandoneeMutation.mutateAsync({ factureId: selectedFacture.id, close_code: abandonCode, close_note: abandonNote.trim() });
+                  setAbandonOpen(false);
+                  setSelectedFacture(null);
+                }}
+                disabled={classifyAbandoneeMutation.isPending}
+              >
+                {classifyAbandoneeMutation.isPending ? 'En cours...' : "Confirmer l'abandon"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
