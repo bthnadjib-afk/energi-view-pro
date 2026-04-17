@@ -37,6 +37,7 @@ import { persistLinesToCatalog } from '@/lib/catalogHelpers';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useProductGroups } from '@/hooks/useProductGroups';
 import { Layers } from 'lucide-react';
+import { HelpTooltip } from '@/components/HelpTooltip';
 
 interface LigneForm {
   desc: string;
@@ -370,6 +371,11 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
 
   const handleSaveLines = async () => {
     if (!devis.socid) return;
+    const zeroLines = editLines.filter(l => l.qty <= 0);
+    if (zeroLines.length > 0) {
+      toast.error(`${zeroLines.length} ligne${zeroLines.length > 1 ? 's ont' : ' a'} une quantité à 0 — corrigez avant d'enregistrer`);
+      return;
+    }
     try {
       await updateLinesMutation.mutateAsync({
         id: devis.id,
@@ -909,10 +915,13 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                     const ligneAchat = l.qty * l.prixAchat;
                     const ligneMarge = ligneHT - ligneAchat;
                     const lignePct = ligneHT > 0 ? (ligneMarge / ligneHT) * 100 : 0;
+                    const hasZeroQty = l.qty <= 0;
                     return (
-                      <div key={i} className="p-4 rounded-lg bg-muted/40 border border-border space-y-3">
+                      <div key={i} className={cn('p-4 rounded-lg border space-y-3', hasZeroQty ? 'bg-red-50 border-red-300 dark:bg-red-950/30 dark:border-red-700' : 'bg-muted/40 border-border')}>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ligne {i + 1}</span>
+                          <span className={cn('text-xs font-semibold uppercase tracking-wide', hasZeroQty ? 'text-red-600' : 'text-muted-foreground')}>
+                            Ligne {i + 1}{hasZeroQty && ' — Quantité requise'}
+                          </span>
                           {editLines.length > 1 && (
                             <Button variant="ghost" size="sm" className="h-7 gap-1 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setEditLines(editLines.filter((_, idx) => idx !== i))}>
                               <Trash2 className="h-3.5 w-3.5" /> Supprimer
@@ -1024,7 +1033,12 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                   );
                 })()}
 
-                <Button onClick={handleSaveLines} disabled={updateLinesMutation.isPending} className="w-full h-12 text-base">
+                {editLines.some(l => l.qty <= 0) && (
+                  <p className="text-sm text-red-600 font-medium text-center">
+                    Corrigez les lignes avec quantité 0 avant d'enregistrer
+                  </p>
+                )}
+                <Button onClick={handleSaveLines} disabled={updateLinesMutation.isPending || editLines.some(l => l.qty <= 0)} className="w-full h-12 text-base">
                   {updateLinesMutation.isPending ? 'Enregistrement...' : 'Enregistrer les modifications'}
                 </Button>
               </div>
@@ -1141,6 +1155,11 @@ export default function Devis() {
 
   const handleCreate = async () => {
     if (!socid || !lignes[0].desc) return;
+    const zeroLines = lignes.filter(l => l.qty <= 0);
+    if (zeroLines.length > 0) {
+      toast.error(`${zeroLines.length} ligne${zeroLines.length > 1 ? 's ont' : ' a'} une quantité à 0 — corrigez avant de créer le devis`);
+      return;
+    }
     await createDevisMutation.mutateAsync({
       socid,
       lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx || 20, product_type: l.product_type, pa_ht: l.prixAchat })),
@@ -1179,7 +1198,10 @@ export default function Devis() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Devis</h1>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            Devis
+            <HelpTooltip text="Les devis vous permettent de proposer un chiffrage à vos clients. Un devis passe par les statuts : Brouillon → Validé → Envoyé → Accepté / Refusé → Facturé." />
+          </h1>
           <p className="text-muted-foreground text-sm">Propositions commerciales</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -1209,7 +1231,10 @@ export default function Devis() {
               {/* Lignes */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-foreground">Lignes du devis</h3>
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    Lignes du devis
+                    <HelpTooltip text="Chaque ligne représente une prestation ou une fourniture. Vous pouvez choisir un article du catalogue ou saisir librement. Cochez 'Ajouter au catalogue' pour sauvegarder une ligne libre pour la prochaine fois. Utilisez 'Insérer un lot' pour pré-remplir avec un groupe d'articles fréquent." />
+                  </h3>
                   <div className="flex gap-2">
                     {productGroups.length > 0 && (
                       <Button variant="outline" size="sm" onClick={() => setInsertLotOpen(true)} className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10">
@@ -1225,11 +1250,14 @@ export default function Devis() {
                   const ligneAchat = l.qty * l.prixAchat;
                   const ligneMarge = ligneHT - ligneAchat;
                   const lignePct = ligneHT > 0 ? (ligneMarge / ligneHT) * 100 : 0;
+                  const hasZeroQty = l.qty <= 0 && !!l.desc;
                   return (
-                    <div key={i} className="p-4 rounded-lg bg-muted/40 border border-border space-y-3">
+                    <div key={i} className={cn('p-4 rounded-lg border space-y-3', hasZeroQty ? 'bg-red-50 border-red-300 dark:bg-red-950/30 dark:border-red-700' : 'bg-muted/40 border-border')}>
                       {/* Ligne numéro + supprimer */}
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ligne {i + 1}</span>
+                        <span className={cn('text-xs font-semibold uppercase tracking-wide', hasZeroQty ? 'text-red-600' : 'text-muted-foreground')}>
+                          Ligne {i + 1}{hasZeroQty && ' — Quantité requise'}
+                        </span>
                         {lignes.length > 1 && (
                           <Button variant="ghost" size="sm" className="h-7 gap-1 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => removeLigne(i)}>
                             <Trash2 className="h-3.5 w-3.5" /> Supprimer
@@ -1329,7 +1357,12 @@ export default function Devis() {
                 </div>
               </div>
 
-              <Button onClick={handleCreate} disabled={createDevisMutation.isPending || !socid || !lignes[0].desc} className="w-full h-12 text-base">
+              {lignes.some(l => l.qty <= 0 && !!l.desc) && (
+                <p className="text-sm text-red-600 font-medium text-center">
+                  Corrigez les lignes avec quantité 0 avant de créer le devis
+                </p>
+              )}
+              <Button onClick={handleCreate} disabled={createDevisMutation.isPending || !socid || !lignes[0].desc || lignes.some(l => l.qty <= 0 && !!l.desc)} className="w-full h-12 text-base">
                 {createDevisMutation.isPending ? 'Création en cours...' : 'Créer le devis (Brouillon)'}
               </Button>
             </div>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, FileText, ClipboardList, Wrench, Users, Package, Calendar,
   Settings, UserCog, LogOut, ShoppingCart, Truck, FileCheck, FolderOpen,
-  Landmark, Warehouse, BarChart2, ChevronDown, Building2, BookOpen,
+  Landmark, Warehouse, BarChart2, ChevronDown, Building2, BookOpen, SlidersHorizontal,
 } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import { NavLink } from '@/components/NavLink';
@@ -216,10 +216,24 @@ export function AppSidebar() {
         {!collapsed && profile && (
           <p className="text-xs text-muted-foreground truncate mb-2 px-1">{profile.nom || profile.email}</p>
         )}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <NavLink
+                to="/preferences"
+                className="hover:bg-sidebar-accent text-muted-foreground"
+                activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+              >
+                <SlidersHorizontal className="mr-2 h-4 w-4" />
+                {!collapsed && <span>Préférences</span>}
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <Button
           variant="ghost"
           size="sm"
-          className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+          className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground mt-1"
           onClick={signOut}
         >
           <LogOut className="h-4 w-4" />

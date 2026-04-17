@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AuthProvider, useAuthContext } from "@/contexts/AuthContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
+import { UserPrefsProvider } from "@/contexts/UserPrefsContext";
 import { RouteGuard } from "@/components/RouteGuard";
 import { Loader2, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import Utilisateurs from "./pages/Utilisateurs";
 import Fournisseurs from "./pages/Fournisseurs";
 import Contrats from "./pages/Contrats";
 import Lots from "./pages/Lots";
+import Preferences from "./pages/Preferences";
 import Projets from "./pages/Projets";
 import Banque from "./pages/Banque";
 import Stock from "./pages/Stock";
@@ -129,6 +131,7 @@ function AuthenticatedApp() {
               {/* Admin */}
               <Route path="/configuration" element={<RouteGuard feature="configuration"><Configuration /></RouteGuard>} />
               <Route path="/utilisateurs" element={<RouteGuard feature="utilisateurs"><Utilisateurs /></RouteGuard>} />
+              <Route path="/preferences" element={<Preferences />} />
               <Route path="/login" element={<Navigate to="/" replace />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
@@ -141,17 +144,19 @@ function AuthenticatedApp() {
 
 const App = () => (
   <ThemeProvider>
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <AuthenticatedApp />
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <UserPrefsProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthProvider>
+              <AuthenticatedApp />
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </UserPrefsProvider>
   </ThemeProvider>
 );
 

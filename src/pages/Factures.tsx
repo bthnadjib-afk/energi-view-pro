@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil, Search, XCircle, Zap } from 'lucide-react';
+import { HelpTooltip } from '@/components/HelpTooltip';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid } from '@/hooks/useDolibarr';
@@ -254,7 +255,10 @@ export default function Factures() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Factures</h1>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            Factures
+            <HelpTooltip text="Gérez vos factures clients. Une facture passe par : Brouillon → Validée → Payée. Enregistrez les paiements reçus, envoyez par email avec PDF. Les relances automatiques sont suivies dans le système." />
+          </h1>
           <p className="text-muted-foreground text-sm">Gestion des factures — statuts natifs Dolibarr</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -14,6 +14,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Layers, Plus, Trash2, Pencil, Package, Wrench, AlertCircle, Loader2 } from 'lucide-react';
+import { HelpTooltip } from '@/components/HelpTooltip';
 import { cn } from '@/lib/utils';
 
 interface LineForm extends GroupLine {
@@ -219,6 +220,7 @@ export default function Lots() {
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Layers className="h-6 w-6 text-primary" /> Lots / Gabarits de devis
+            <HelpTooltip text="Les lots sont des groupes d'articles pré-définis. Créez-en un pour chaque type de chantier fréquent (ex. borne de recharge). Lors de la création d'un devis, cliquez 'Insérer un lot' pour pré-remplir toutes les lignes automatiquement. Les lignes marquées ⚠ ont une quantité variable à saisir." />
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             Créez des lots prédéfinis à insérer en un clic dans vos devis

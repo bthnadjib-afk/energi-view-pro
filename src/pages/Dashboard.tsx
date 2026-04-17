@@ -4,6 +4,7 @@ import {
   Euro, FileText, ClipboardList, TrendingUp, Users, AlertTriangle,
   Receipt, CalendarDays, Wrench, ChevronRight,
 } from 'lucide-react';
+import { HelpTooltip } from '@/components/HelpTooltip';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PeriodSelector, type Period } from '@/components/PeriodSelector';
@@ -118,7 +119,10 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Tableau de bord</h1>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            Tableau de bord
+            <HelpTooltip text="Vue synthétique de votre activité. Changez la période (Jour / Semaine / Mois / Année) pour filtrer le chiffre d'affaires. Les priorités en bas indiquent les actions urgentes à traiter." />
+          </h1>
           <p className="text-muted-foreground text-sm">Vue d'ensemble de votre activité</p>
         </div>
         <PeriodSelector value={period} onChange={setPeriod} />
