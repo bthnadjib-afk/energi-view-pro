@@ -272,25 +272,33 @@ export function useReopenDevis() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      // Dolibarr's /proposals API has no /reopen endpoint — settodraft is the
-      // single supported way to reopen a closed devis (status 2 signed,
-      // 3 refused or 4 billed) → returns it to status 0 (Brouillon).
+      // Dolibarr's /proposals API has no /reopen endpoint. To reopen a closed devis
+      // (status 2 signed, 3 refused, 4 billed) and land it in Validé (status 1):
+      //   1) POST /proposals/{id}/settodraft  → status 0 (Brouillon)
+      //   2) POST /proposals/{id}/validate    → status 1 (Validé)
       try {
-        await reopenDevis(id);
+        await reopenDevis(id); // settodraft under the hood
       } catch (e: any) {
         console.error('[useReopenDevis] settodraft failed', e);
         throw new Error(`Réouverture impossible : ${e?.message || e}`);
       }
+      try {
+        await validateDevis(id);
+      } catch (e: any) {
+        console.error('[useReopenDevis] validate after settodraft failed', e);
+        throw new Error(`Re-validation impossible : ${e?.message || e}`);
+      }
       return id;
     },
     onSuccess: async () => {
-      toast.success('Devis rouvert et repassé en brouillon');
+      toast.success('Devis rouvert en Validé');
       await new Promise(r => setTimeout(r, 800));
       await qc.invalidateQueries({ queryKey: ['devis'], refetchType: 'all' });
     },
     onError: (e: any) => toast.error(`Erreur réouverture : ${e.message || e}`),
   });
 }
+
 
 export function useCloneDevis() {
   const qc = useQueryClient();
