@@ -941,7 +941,7 @@ export async function updateDevisLines(id: string, socid: string, lines: CreateD
         tva_tx: l.tva_tx ?? 20,
         product_type: l.product_type ?? 0,
         pa_ht: l.pa_ht ?? 0,
-        ...(l.fk_product ? { fk_product: l.fk_product } : {}),
+        ...(((l as any).fk_product) ? { fk_product: (l as any).fk_product } : {}),
       });
     } catch (e) {
       console.error('[updateDevisLines] add line failed', l, e);
