@@ -1357,7 +1357,13 @@ export default function Interventions() {
                   {/* Modifier — admin/secrétaire peuvent modifier tant que l'intervention n'est pas clôturée (statut < 3) */}
                   {!isTechnicien && selectedIntervention.fk_statut < 3 && (
                     <Button onClick={openEditDraft} variant="outline" className="gap-2">
-                      <Pencil className="h-4 w-4" /> Modifier
+                      <Pencil className="h-4 w-4" /> Modifier {selectedIntervention.chantierId ? '(ce jour)' : ''}
+                    </Button>
+                  )}
+                  {/* Modifier le chantier complet (multi-jours) */}
+                  {!isTechnicien && selectedIntervention.chantierId && selectedIntervention.fk_statut < 3 && (
+                    <Button onClick={openEditChantier} variant="outline" className="gap-2 border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
+                      <CalendarDays className="h-4 w-4" /> Modifier le chantier complet
                     </Button>
                   )}
                   {/* Brouillon (0) — Valider (admin/secrétaire) */}
