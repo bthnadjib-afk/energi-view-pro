@@ -213,15 +213,19 @@ export default function Agenda() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Agenda</h1>
-          <p className="text-muted-foreground text-sm">Cliquez sur un jour vide pour créer une intervention</p>
+          <p className="text-muted-foreground text-sm">
+            {isTechnicien ? 'Vos interventions planifiées' : 'Cliquez sur un jour vide pour créer une intervention'}
+          </p>
         </div>
-        <Select value={filterTech} onValueChange={setFilterTech}>
-          <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Filtrer par technicien" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous les techniciens</SelectItem>
-            {technicienNames.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {!isTechnicien && (
+          <Select value={filterTech} onValueChange={setFilterTech}>
+            <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Filtrer par technicien" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les techniciens</SelectItem>
+              {technicienNames.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm">
