@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useConfig } from '@/hooks/useConfig';
-import { testDolibarrConnection } from '@/services/dolibarr';
+import { testDolibarrConnection, purgeAllDevisAndFactures } from '@/services/dolibarr';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2, Save, Mail, Plus, Trash2, Edit2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2, Save, Mail, Plus, Trash2, Edit2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface EmailTemplate {
   id: string;
@@ -20,6 +22,7 @@ interface EmailTemplate {
 
 export default function Configuration() {
   const { config, saving, updateEntreprise, updateDefaults, updateNotifications, updateDolibarr, updateSmtp, saveToSupabase } = useConfig();
+  const queryClient = useQueryClient();
   const [testing, setTesting] = useState(false);
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -28,6 +31,30 @@ export default function Configuration() {
   const [editNom, setEditNom] = useState('');
   const [editObjet, setEditObjet] = useState('');
   const [editCorps, setEditCorps] = useState('');
+  const [purging, setPurging] = useState(false);
+
+  const handlePurgeAll = async () => {
+    setPurging(true);
+    try {
+      const result = await purgeAllDevisAndFactures();
+      // Nettoie aussi les tables de relances
+      await Promise.all([
+        supabase.from('devis_relances').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('facture_relances').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      ]);
+      queryClient.invalidateQueries();
+      toast.success(
+        `Purge terminée : ${result.devisDeleted} devis et ${result.facturesDeleted} factures supprimés` +
+          (result.devisFailed + result.facturesFailed > 0
+            ? ` (${result.devisFailed + result.facturesFailed} échecs)`
+            : '')
+      );
+    } catch (e: any) {
+      toast.error(`Échec de la purge : ${e.message || e}`);
+    } finally {
+      setPurging(false);
+    }
+  };
 
   const handleTestSmtp = async () => {
     if (!config.smtp.host || !config.smtp.user || !config.smtp.pass) {
@@ -138,6 +165,7 @@ export default function Configuration() {
           <TabsTrigger value="emails" className="gap-1.5"><Mail className="h-3.5 w-3.5" /> Modèles emails</TabsTrigger>
           <TabsTrigger value="smtp" className="gap-1.5"><Mail className="h-3.5 w-3.5" /> Serveur mail</TabsTrigger>
           <TabsTrigger value="dolibarr" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Dolibarr</TabsTrigger>
+          <TabsTrigger value="maintenance" className="gap-1.5"><AlertTriangle className="h-3.5 w-3.5" /> Maintenance</TabsTrigger>
         </TabsList>
 
         <TabsContent value="entreprise">
@@ -351,6 +379,54 @@ export default function Configuration() {
               {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
               Tester la connexion
             </Button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="maintenance">
+          <div className="bg-card rounded-lg border border-destructive/50 p-6 shadow-sm space-y-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <h2 className="text-lg font-semibold text-foreground">Zone dangereuse — Tests</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Outils destinés uniquement à la phase de test. Les actions ci-dessous sont <strong>irréversibles</strong> et impactent directement Dolibarr.
+            </p>
+
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Supprimer tous les devis et factures</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Repasse chaque document validé en brouillon puis le supprime de Dolibarr. Vide aussi les tables de relances. Les paiements enregistrés bloqueront la suppression de leur facture.
+                </p>
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={purging} className="gap-2">
+                    {purging ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    Tout supprimer (devis + factures)
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmer la suppression totale ?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Cette action va supprimer <strong>tous les devis et toutes les factures</strong> de Dolibarr, ainsi que leurs relances associées. Les factures avec paiements enregistrés seront ignorées.
+                      <br /><br />
+                      Cette action est <strong>irréversible</strong>.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handlePurgeAll}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Confirmer la suppression
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
