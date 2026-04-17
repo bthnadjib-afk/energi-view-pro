@@ -271,9 +271,25 @@ export function useSetDevisToDraft() {
 export function useReopenDevis() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => reopenDevis(id),
+    mutationFn: async (id: string) => {
+      // 1) Reopen: closed (signed/refused/billed) → validated (status 1)
+      try {
+        await reopenDevis(id);
+      } catch (e: any) {
+        console.error('[useReopenDevis] reopen failed', e);
+        throw new Error(`Réouverture impossible : ${e?.message || e}`);
+      }
+      // 2) Then set back to draft so user can freely edit
+      try {
+        await setDevisToDraft(id);
+      } catch (e: any) {
+        console.error('[useReopenDevis] setToDraft after reopen failed', e);
+        // Not fatal: at least the devis is reopened in "Validé"
+      }
+      return id;
+    },
     onSuccess: async () => {
-      toast.success('Devis rouvert');
+      toast.success('Devis rouvert et repassé en brouillon');
       await new Promise(r => setTimeout(r, 1200));
       await qc.invalidateQueries({ queryKey: ['devis'], refetchType: 'all' });
     },
