@@ -146,22 +146,16 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
-      <SidebarHeader className="p-3">
-        <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
+      <SidebarHeader className={cn(collapsed ? "p-2" : "p-3")}>
+        <div className="flex items-center justify-center w-full">
           <img
             src={logo}
             alt="Electricien Du Genevois"
             className={cn(
-              "object-contain flex-shrink-0 transition-all",
-              collapsed ? "h-10 w-10" : "h-16 w-16"
+              "object-contain transition-all",
+              collapsed ? "h-10 w-10" : "h-32 w-full max-w-[200px]"
             )}
           />
-          {!collapsed && (
-            <div className="flex flex-col leading-tight min-w-0">
-              <span className="text-base font-bold text-foreground truncate">Electricien</span>
-              <span className="text-sm text-muted-foreground truncate">Du Genevois</span>
-            </div>
-          )}
         </div>
       </SidebarHeader>
 
