@@ -888,7 +888,17 @@ export default function Factures() {
                   });
                   if (error) throw new Error(error.message);
                   if (data && !data.ok) throw new Error(data.error || 'Erreur SMTP');
-                  // Enregistrer la date d'envoi pour le suivi des relances
+                  // Si la facture est encore en brouillon → la valider automatiquement
+                  // Brouillon (0) → Validée (1 = "Non payée") à l'envoi par email
+                  if (selectedFacture.fk_statut === 0) {
+                    try {
+                      await validateFactureMutation.mutateAsync(selectedFacture.id);
+                    } catch (e) {
+                      console.error('Erreur validation auto facture:', e);
+                      toast.error('Email envoyé mais validation auto échouée — validez manuellement');
+                    }
+                  }
+                  // Enregistrer la date d'envoi pour le suivi des relances (10j → relance, +5j → mise en demeure)
                   try {
                     await recordEnvoi.mutateAsync({
                       facture_id: selectedFacture.id,
