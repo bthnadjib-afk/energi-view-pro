@@ -1447,12 +1447,12 @@ function parseDolibarrTime(val: any): string {
 }
 
 function parseNotePrivateMetadata(notePrivate: string | null | undefined): {
-  type: string; technicien: string; heureDebut: string; heureFin: string; dateIntervention?: string; notePrivee: string;
+  type?: string; technicien?: string; heureDebut?: string; heureFin?: string; dateIntervention?: string; notePrivee?: string; chantierId?: string;
 } | null {
   if (!notePrivate) return null;
   try {
     const parsed = JSON.parse(notePrivate);
-    if (parsed && typeof parsed === 'object' && ('type' in parsed || 'heureDebut' in parsed)) {
+    if (parsed && typeof parsed === 'object' && ('type' in parsed || 'heureDebut' in parsed || 'chantierId' in parsed)) {
       return parsed;
     }
   } catch { /* not JSON, legacy intervention */ }
