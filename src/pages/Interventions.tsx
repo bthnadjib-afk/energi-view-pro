@@ -233,6 +233,11 @@ export default function Interventions() {
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [replaceSource, setReplaceSource] = useState<Intervention | null>(null);
   const [replaceDescription, setReplaceDescription] = useState('');
+  const [replaceType, setReplaceType] = useState<InterventionType>('panne');
+  const [replaceDate, setReplaceDate] = useState('');
+  const [replaceHeureDebut, setReplaceHeureDebut] = useState('');
+  const [replaceHeureFin, setReplaceHeureFin] = useState('');
+  const [replaceTech, setReplaceTech] = useState('');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const handleCancelIntervention = async (inter: Intervention) => {
