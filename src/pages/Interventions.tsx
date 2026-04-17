@@ -189,6 +189,12 @@ export default function Interventions() {
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [notePrivee, setNotePrivee] = useState('');
 
+  // ===== Chantier multi-jours =====
+  const [chantierDateFin, setChantierDateFin] = useState('');
+  const [chantierJoursActifs, setChantierJoursActifs] = useState<string[]>([]); // ['1','3','5']
+  const [chantierDatesExtra, setChantierDatesExtra] = useState<string[]>([]); // dates ajoutées manuellement
+  const [chantierDatesExclues, setChantierDatesExclues] = useState<string[]>([]); // dates retirées
+
   const [collisionOpen, setCollisionOpen] = useState(false);
   const [collisionInfo, setCollisionInfo] = useState({ technicien: '', creneauExistant: '' });
   const [confirmTerminerOpen, setConfirmTerminerOpen] = useState(false);
