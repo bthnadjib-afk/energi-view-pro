@@ -30,6 +30,20 @@ export default function Rapports() {
   const devisSignes = devis.filter(d => d.fk_statut === 2).length;
   const tauxConversion = devis.length > 0 ? Math.round((devisSignes / devis.length) * 100) : 0;
 
+  // Devis par mois pour l'année sélectionnée
+  const moisLabels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+  const devisParMois = moisLabels.map((mois, idx) => {
+    const devisDuMois = devis.filter(d => {
+      if (!d.date) return false;
+      const dt = new Date(d.date);
+      return dt.getFullYear() === year && dt.getMonth() === idx;
+    });
+    const signes = devisDuMois.filter(d => d.fk_statut === 2).length;
+    const total = devisDuMois.length;
+    const taux = total > 0 ? Math.round((signes / total) * 100) : 0;
+    return { mois, total, signes, taux };
+  });
+
   // Top clients par CA
   const caParClient: Record<string, number> = {};
   factures.filter(f => f.paye).forEach(f => {
@@ -101,7 +115,7 @@ export default function Rapports() {
         )}
       </div>
 
-      {/* Évolution nombre de factures */}
+      {/* Évolution nombre de factures + Devis par mois */}
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="bg-card rounded-xl border border-border p-4">
           <h2 className="font-semibold mb-4">Nombre de factures / mois</h2>
@@ -114,6 +128,32 @@ export default function Rapports() {
               <Line type="monotone" dataKey="nb_factures" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} name="Factures" />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+
+        <div className="bg-card rounded-xl border border-border p-4">
+          <h2 className="font-semibold mb-4">Devis créés / mois — {year}</h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={devisParMois} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip
+                formatter={(value: any, name: string) => {
+                  if (name === 'Taux signés') return [`${value}%`, name];
+                  return [value, name];
+                }}
+              />
+              <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Total devis" />
+              <Bar dataKey="signes" fill="hsl(142 76% 36%)" radius={[4, 4, 0, 0]} name="Signés" />
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            {devisParMois.filter(m => m.total > 0).map(m => (
+              <span key={m.mois}>
+                <span className="font-medium text-foreground">{m.mois}</span> : {m.taux}%
+              </span>
+            ))}
+          </div>
         </div>
 
         {/* Top clients */}
