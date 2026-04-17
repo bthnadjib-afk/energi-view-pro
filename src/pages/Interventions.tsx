@@ -75,6 +75,18 @@ export default function Interventions() {
 
   const [deleteAllPending, setDeleteAllPending] = useState(false);
 
+  const handleDeleteSingle = async (id: string, fk_statut: number) => {
+    try {
+      if (fk_statut !== 0) {
+        await setInterventionStatus(id, 0);
+      }
+      await deleteMutation.mutateAsync(id);
+      setDetailOpen(false);
+    } catch (e: any) {
+      toast.error(`Erreur suppression : ${e.message || e}`);
+    }
+  };
+
   const handleDeleteAll = async () => {
     setDeleteAllPending(true);
     let count = 0;
@@ -252,6 +264,12 @@ export default function Interventions() {
     if (!clientId || !newDate) { toast.error((!clientId && newClientSearch) ? 'Sélectionnez un client dans la liste ou créez-en un nouveau' : 'Veuillez remplir client et date'); return; }
     if (!newDescription.trim()) { toast.error('La description est obligatoire'); return; }
 
+    // Bloquer si la date est aujourd'hui et l'heure de début est déjà passée
+    if (newDate === todayStr() && newHeureDebut < currentTime()) {
+      toast.error(`Il est ${currentTime()} — impossible de planifier une intervention à ${newHeureDebut} (heure déjà passée)`);
+      return;
+    }
+
     const slots: InterventionSlot[] = resolvedInterventions.map(i => ({
       technicien: i.technicien, date: i.date, heureDebut: i.heureDebut, heureFin: i.heureFin, ref: i.ref,
     }));
@@ -283,6 +301,11 @@ export default function Interventions() {
   const currentTime = (): string => {
     const now = new Date();
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  };
+
+  const todayStr = (): string => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
   const addTwoHours = (time: string): string => {
@@ -836,34 +859,29 @@ export default function Interventions() {
                   </div>
                 )}
 
-                {/* Heure d'arrivée — visible dès que l'intervention est validée */}
+                {/* Heure d'arrivée — capture automatique, non modifiable */}
                 {selectedIntervention.fk_statut === 1 && (
                   <div className="p-3 rounded-lg bg-muted/30 border border-border space-y-2">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                       <Clock className="h-4 w-4" /> Heure d'arrivée
                     </h3>
-                    <div className="flex gap-1.5">
-                      <Input
-                        type="time"
-                        value={heureArrivee}
-                        onChange={e => { setHeureArrivee(e.target.value); autoSaveTimes(e.target.value, heureDepart); }}
+                    {!heureArrivee ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full gap-2"
                         disabled={appEnCours}
-                        className="flex-1"
-                      />
-                      {!appEnCours && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="shrink-0 h-10 w-10"
-                          title="Heure actuelle"
-                          onClick={() => { const t = currentTime(); setHeureArrivee(t); autoSaveTimes(t, heureDepart); }}
-                        >
-                          <Clock className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    {appEnCours && <p className="text-xs text-muted-foreground">Heure d'arrivée figée — intervention démarrée</p>}
+                        onClick={() => { const t = currentTime(); setHeureArrivee(t); autoSaveTimes(t, heureDepart); }}
+                      >
+                        <Clock className="h-4 w-4" /> Enregistrer mon arrivée ({currentTime()})
+                      </Button>
+                    ) : (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-50 border border-emerald-200">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <span className="text-sm font-semibold text-emerald-700">Arrivée enregistrée à {heureArrivee}</span>
+                        <span className="text-xs text-emerald-600 ml-auto">🔒 non modifiable</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -875,28 +893,24 @@ export default function Interventions() {
                     </h3>
                     <div className="space-y-1">
                       <label className="text-xs text-muted-foreground">Heure de départ {selectedIntervention.fk_statut < 3 && <span className="text-destructive">*</span>}</label>
-                      <div className="flex gap-1.5">
-                        <Input
-                          type="time"
-                          value={heureDepart}
-                          onChange={e => setHeureDepart(e.target.value)}
-                          onBlur={e => autoSaveTimes(heureArrivee, e.target.value)}
-                          disabled={selectedIntervention.fk_statut >= 3}
-                          className="flex-1"
-                        />
-                        {selectedIntervention.fk_statut < 3 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="shrink-0 h-10 w-10"
-                            title="Heure actuelle"
-                            onClick={() => { const t = currentTime(); setHeureDepart(t); autoSaveTimes(heureArrivee, t); }}
-                          >
-                            <Clock className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
+                      {selectedIntervention.fk_statut >= 3 ? (
+                        <div className="px-3 py-2 rounded-md bg-muted/50 border border-border text-sm text-muted-foreground">{heureDepart || '—'}</div>
+                      ) : !heureDepart ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full gap-2"
+                          onClick={() => { const t = currentTime(); setHeureDepart(t); autoSaveTimes(heureArrivee, t); }}
+                        >
+                          <Clock className="h-4 w-4" /> Enregistrer mon départ ({currentTime()})
+                        </Button>
+                      ) : (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-50 border border-emerald-200">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                          <span className="text-sm font-semibold text-emerald-700">Départ enregistré à {heureDepart}</span>
+                          <span className="text-xs text-emerald-600 ml-auto">🔒 non modifiable</span>
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs text-muted-foreground">Note du technicien {selectedIntervention.fk_statut < 3 && <span className="text-destructive">*</span>}</label>
@@ -1008,62 +1022,61 @@ export default function Interventions() {
                       <Button onClick={async () => { await validateMutation.mutateAsync(selectedIntervention.id); setDetailOpen(false); }} disabled={validateMutation.isPending} className="gap-2">
                         <Play className="h-4 w-4" /> {validateMutation.isPending ? 'Validation...' : 'Valider'}
                       </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" className="gap-2 border-destructive/30 text-destructive"><Trash2 className="h-4 w-4" /> Supprimer</Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Supprimer {selectedIntervention.ref} ?</AlertDialogTitle>
-                            <AlertDialogDescription>Suppression définitive.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
-                            <AlertDialogAction onClick={async () => { await deleteMutation.mutateAsync(selectedIntervention.id); setDetailOpen(false); }} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
                     </>
+                  )}
+
+                  {/* Supprimer — brouillon (0) ou validée (1) */}
+                  {(selectedIntervention.fk_statut === 0 || selectedIntervention.fk_statut === 1) && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" className="gap-2 border-destructive/30 text-destructive" disabled={deleteMutation.isPending}>
+                          <Trash2 className="h-4 w-4" /> Supprimer
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Supprimer {selectedIntervention.ref} ?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Suppression définitive.{selectedIntervention.fk_statut === 1 ? " L'intervention sera repassée en brouillon puis supprimée." : ''}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteSingle(selectedIntervention.id, selectedIntervention.fk_statut)}
+                            className="bg-destructive text-destructive-foreground"
+                          >
+                            Supprimer
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
 
                   {/* Validée (1) + pas encore démarrée → Démarrer (app-side only) */}
                   {selectedIntervention.fk_statut === 1 && !appEnCours && (
                     <Button
                       onClick={async () => {
-                        if (role !== 'admin') {
-                          const now = currentTime();
+                        // L'heure d'arrivée doit être enregistrée via le bouton de capture
+                        if (!heureArrivee) {
+                          toast.error('Enregistrez d\'abord votre heure d\'arrivée en cliquant sur le bouton ci-dessus');
+                          return;
+                        }
 
-                          // Heure d'arrivée ne peut pas être dans le futur
-                          if (heureArrivee && heureArrivee > now) {
-                            toast.error(`L'heure d'arrivée (${heureArrivee}) est dans le futur — impossible de démarrer`);
+                        // Vérifier qu'un technicien ne démarre pas 2 interventions en même temps
+                        const techName = selectedIntervention.technicien;
+                        if (techName) {
+                          const autresEnCours = resolvedInterventions.filter(i => {
+                            if (i.id === selectedIntervention.id) return false;
+                            if (i.fk_statut !== 1) return false;
+                            if (i.technicien !== techName) return false;
+                            try { return JSON.parse(i.descriptionClient || '{}').appStatus === 'en_cours'; }
+                            catch { return false; }
+                          });
+                          const conflit = autresEnCours.filter(i => i.socid !== selectedIntervention.socid);
+                          if (conflit.length > 0) {
+                            toast.error(`${techName} est déjà en cours sur ${conflit.map(i => i.ref).join(', ')} — impossible de démarrer 2 interventions simultanées`);
                             return;
-                          }
-
-                          // Heure d'arrivée ne peut pas être plus d'1h avant le RDV prévu
-                          if (heureArrivee && selectedIntervention.heureDebut) {
-                            const [ah, am] = heureArrivee.split(':').map(Number);
-                            const [sh, sm] = selectedIntervention.heureDebut.split(':').map(Number);
-                            if (ah * 60 + am < sh * 60 + sm - 60) {
-                              toast.error(`Arrivée trop tôt — le RDV est prévu à ${selectedIntervention.heureDebut}, vous ne pouvez pas arriver avant ${String(sh - 1).padStart(2, '0')}:${String(sm).padStart(2, '0')}`);
-                              return;
-                            }
-                          }
-
-                          // Même technicien ne peut pas avoir 2 interventions en cours simultanément (sauf même client)
-                          const techName = selectedIntervention.technicien;
-                          if (techName) {
-                            const autresEnCours = resolvedInterventions.filter(i => {
-                              if (i.id === selectedIntervention.id) return false;
-                              if (i.fk_statut !== 1) return false;
-                              if (i.technicien !== techName) return false;
-                              try { return JSON.parse(i.descriptionClient || '{}').appStatus === 'en_cours'; }
-                              catch { return false; }
-                            });
-                            const conflit = autresEnCours.filter(i => i.socid !== selectedIntervention.socid);
-                            if (conflit.length > 0) {
-                              toast.error(`${techName} est déjà en cours sur ${conflit.map(i => i.ref).join(', ')} — impossible de démarrer 2 interventions simultanées`);
-                              return;
-                            }
                           }
                         }
 
@@ -1081,11 +1094,10 @@ export default function Interventions() {
                     <>
                       <Button
                         onClick={() => {
-                          if (!techNote.trim()) { toast.error('La note du technicien est obligatoire'); return; }
-                          if (!heureArrivee) { toast.error('L\'heure d\'arrivée est obligatoire'); return; }
-                          if (!heureDepart) { toast.error('L\'heure de départ est obligatoire'); return; }
+                          if (!heureArrivee) { toast.error('Enregistrez d\'abord votre heure d\'arrivée'); return; }
+                          if (!heureDepart) { toast.error('Enregistrez d\'abord votre heure de départ en cliquant sur le bouton ci-dessus'); return; }
                           if (heureArrivee >= heureDepart) { toast.error('L\'heure d\'arrivée doit être avant l\'heure de départ'); return; }
-                          if (role !== 'admin' && heureDepart > currentTime()) { toast.error(`Bien essayé 😏 — il est ${currentTime()}, impossible de partir à ${heureDepart}`); return; }
+                          if (!techNote.trim()) { toast.error('La note du technicien est obligatoire'); return; }
                           if (!signatureData) { toast.error('Signature client manquante'); return; }
                           if (!signatureTechData) { toast.error('Signature technicien manquante'); return; }
                           setConfirmTerminerOpen(true);
