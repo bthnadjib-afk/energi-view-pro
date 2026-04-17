@@ -1263,16 +1263,17 @@ export default function Interventions() {
 
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-3 pt-2">
-                  {/* Brouillon (0) — admin/secrétaire only (techniciens don't see brouillons) */}
-                  {selectedIntervention.fk_statut === 0 && (
-                    <>
-                      <Button onClick={openEditDraft} variant="outline" className="gap-2">
-                        <Pencil className="h-4 w-4" /> Modifier
-                      </Button>
-                      <Button onClick={async () => { await validateMutation.mutateAsync(selectedIntervention.id); setDetailOpen(false); }} disabled={validateMutation.isPending} className="gap-2">
-                        <Play className="h-4 w-4" /> {validateMutation.isPending ? 'Validation...' : 'Valider'}
-                      </Button>
-                    </>
+                  {/* Modifier — admin/secrétaire peuvent modifier tant que l'intervention n'est pas clôturée (statut < 3) */}
+                  {!isTechnicien && selectedIntervention.fk_statut < 3 && (
+                    <Button onClick={openEditDraft} variant="outline" className="gap-2">
+                      <Pencil className="h-4 w-4" /> Modifier
+                    </Button>
+                  )}
+                  {/* Brouillon (0) — Valider (admin/secrétaire) */}
+                  {selectedIntervention.fk_statut === 0 && !isTechnicien && (
+                    <Button onClick={async () => { await validateMutation.mutateAsync(selectedIntervention.id); setDetailOpen(false); }} disabled={validateMutation.isPending} className="gap-2">
+                      <Play className="h-4 w-4" /> {validateMutation.isPending ? 'Validation...' : 'Valider'}
+                    </Button>
                   )}
 
                   {/* Supprimer — brouillon (0) ou validée (1), admin/secrétaire uniquement */}
@@ -1584,7 +1585,7 @@ export default function Interventions() {
       {/* Edit draft dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Modifier l'intervention (Brouillon)</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Modifier l'intervention {selectedIntervention?.ref ? `— ${selectedIntervention.ref}` : ''}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             <Select value={editType} onValueChange={(v) => setEditType(v as InterventionType)}>
               <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>

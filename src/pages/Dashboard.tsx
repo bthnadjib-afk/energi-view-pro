@@ -9,19 +9,42 @@ import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PeriodSelector, type Period } from '@/components/PeriodSelector';
 import { UrgencyWidget } from '@/components/UrgencyWidget';
-import { useFactures, useDevis, useInterventions } from '@/hooks/useDolibarr';
+import { useFactures, useDevis, useInterventions, useDolibarrUsers } from '@/hooks/useDolibarr';
 import { useFactureRelances, getRelanceStatus } from '@/hooks/useFactureRelances';
 import { useDevisRelances, getDevisRelanceStatus } from '@/hooks/useDevisRelances';
 import { formatDateFR } from '@/services/dolibarr';
+import { useAuth } from '@/hooks/useAuth';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { data: factures = [] } = useFactures();
   const { data: devis = [] } = useDevis();
-  const { data: interventions = [] } = useInterventions();
+  const { data: allInterventions = [] } = useInterventions();
+  const { data: dolibarrUsers = [] } = useDolibarrUsers();
   const { data: factureRelances = [] } = useFactureRelances();
   const { data: devisRelancesData = [] } = useDevisRelances();
   const [period, setPeriod] = useState<Period>('annuel');
+  const { role } = useAuth();
+  const { profile } = useAuthContext();
+  const isTechnicien = role === 'technicien';
+  const currentTechName = useMemo(() => {
+    if (!isTechnicien || !profile) return '';
+    if (profile.dolibarr_user_id) {
+      const u = dolibarrUsers.find(d => String(d.id) === String(profile.dolibarr_user_id));
+      if (u?.fullname) return u.fullname;
+    }
+    const u = dolibarrUsers.find(d => (d.email || '').toLowerCase() === (profile.email || '').toLowerCase());
+    return u?.fullname || profile.nom || '';
+  }, [isTechnicien, profile, dolibarrUsers]);
+
+  // Filtrer interventions selon le rôle
+  const interventions = useMemo(() => {
+    if (isTechnicien && currentTechName) {
+      return allInterventions.filter(i => i.technicien === currentTechName);
+    }
+    return allInterventions;
+  }, [allInterventions, isTechnicien, currentTechName]);
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
