@@ -765,7 +765,55 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
             </DialogContent>
           </Dialog>
 
-          {/* Dialog modifier les lignes */}
+          {/* Dialog créer intervention depuis devis accepté */}
+          <Dialog open={createInterOpen} onOpenChange={setCreateInterOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4" /> Créer un chantier — {devis.ref}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <p className="text-sm text-muted-foreground">
+                  Une intervention de type <strong>Chantier</strong> sera créée pour <strong>{devis.client}</strong>.
+                </p>
+                <div className="space-y-1.5">
+                  <label className="text-sm text-muted-foreground">Date *</label>
+                  <Input type="date" value={interDate} onChange={e => setInterDate(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-sm text-muted-foreground">Heure début</label>
+                    <Input type="time" value={interHeureDebut} onChange={e => setInterHeureDebut(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm text-muted-foreground">Heure fin</label>
+                    <Input type="time" value={interHeureFin} onChange={e => setInterHeureFin(e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm text-muted-foreground">Technicien</label>
+                  <Select value={interTechId} onValueChange={setInterTechId}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner un technicien (optionnel)" /></SelectTrigger>
+                    <SelectContent>
+                      {dolibarrUsers.map((u: any) => (
+                        <SelectItem key={u.id} value={String(u.id)}>
+                          {u.firstname || ''} {u.lastname || u.login}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setCreateInterOpen(false)}>Annuler</Button>
+                  <Button onClick={handleCreateIntervention} disabled={createInterventionMutation.isPending || !interDate} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                    {createInterventionMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
+                    Créer le chantier
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={editOpen} onOpenChange={setEditOpen}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Modifier les lignes — {devis.ref}</DialogTitle></DialogHeader>
