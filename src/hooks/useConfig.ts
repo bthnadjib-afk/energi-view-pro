@@ -17,6 +17,9 @@ export interface AppConfig {
     delaiPaiement: number;
     dureeIntervention: number;
     tauxHoraire: number;
+    chantierHeureDebut: string;
+    chantierHeureFin: string;
+    chantierJours: string; // CSV des jours actifs : "1,3,5" = Lun,Mer,Ven (1=Lun, 7=Dim)
   };
   notifications: {
     nouveauDevis: boolean;
@@ -52,6 +55,9 @@ const DEFAULT_CONFIG: AppConfig = {
     delaiPaiement: 30,
     dureeIntervention: 2,
     tauxHoraire: 45,
+    chantierHeureDebut: '08:00',
+    chantierHeureFin: '18:00',
+    chantierJours: '1,2,3,4,5',
   },
   notifications: {
     nouveauDevis: true,

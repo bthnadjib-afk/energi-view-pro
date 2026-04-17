@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useConfig } from '@/hooks/useConfig';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
-  useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture,
+  useInterventions, useClients, useCreateIntervention, useCreateChantierMultiJours, useCreateDevis, useCreateFacture,
   useValidateIntervention, useDeleteIntervention, useCloseIntervention, useSetInterventionStatus,
   useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures,
   useCreateClient, useReopenIntervention, useProduits,
@@ -61,6 +61,7 @@ export default function Interventions() {
   const { data: produits = [] } = useProduits();
   const queryClient = useQueryClient();
   const createInterventionMutation = useCreateIntervention();
+  const createChantierMutation = useCreateChantierMultiJours();
   const createDevisMutation = useCreateDevis();
   const createFactureMutation = useCreateFacture();
   const createClientMutation = useCreateClient();
@@ -188,6 +189,12 @@ export default function Interventions() {
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [notePrivee, setNotePrivee] = useState('');
 
+  // ===== Chantier multi-jours =====
+  const [chantierDateFin, setChantierDateFin] = useState('');
+  const [chantierJoursActifs, setChantierJoursActifs] = useState<string[]>([]); // ['1','3','5']
+  const [chantierDatesExtra, setChantierDatesExtra] = useState<string[]>([]); // dates ajoutées manuellement
+  const [chantierDatesExclues, setChantierDatesExclues] = useState<string[]>([]); // dates retirées
+
   const [collisionOpen, setCollisionOpen] = useState(false);
   const [collisionInfo, setCollisionInfo] = useState({ technicien: '', creneauExistant: '' });
   const [confirmTerminerOpen, setConfirmTerminerOpen] = useState(false);
@@ -255,6 +262,41 @@ export default function Interventions() {
     }
   }, [selectedIntervention?.id, detailOpen]);
 
+  // Auto-pré-remplissage des défauts chantier quand on choisit le type "chantier"
+  useEffect(() => {
+    if (newType === 'chantier') {
+      setNewHeureDebut(config.defaults.chantierHeureDebut || '08:00');
+      setNewHeureFin(config.defaults.chantierHeureFin || '18:00');
+      const defaultJours = (config.defaults.chantierJours || '1,2,3,4,5').split(',').filter(Boolean);
+      if (chantierJoursActifs.length === 0) setChantierJoursActifs(defaultJours);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newType]);
+
+  // Calcule la liste finale des dates pour un chantier multi-jours
+  const chantierDates = useMemo(() => {
+    if (newType !== 'chantier' || !newDate) return [] as string[];
+    const start = new Date(`${newDate}T12:00:00`);
+    const end = chantierDateFin ? new Date(`${chantierDateFin}T12:00:00`) : start;
+    if (end.getTime() < start.getTime()) return [];
+    const result: string[] = [];
+    const cur = new Date(start);
+    while (cur.getTime() <= end.getTime()) {
+      // getDay : 0=Dim, 1=Lun..6=Sam → on convertit en notre format 1..7 (1=Lun..7=Dim)
+      const jsDay = cur.getDay();
+      const ourDay = jsDay === 0 ? '7' : String(jsDay);
+      if (chantierJoursActifs.includes(ourDay)) {
+        const iso = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+        result.push(iso);
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    // Ajout des dates extra et exclusion des dates retirées
+    const merged = [...new Set([...result, ...chantierDatesExtra])].filter(d => !chantierDatesExclues.includes(d));
+    return merged.sort();
+  }, [newType, newDate, chantierDateFin, chantierJoursActifs, chantierDatesExtra, chantierDatesExclues]);
+
+
   const resolvedInterventions = interventions.map(i => {
     const techFromMeta = resolveTechnicianName(i.technicien, dolibarrUsers);
     const techFromAuthor = resolveTechnicianName(i.user_author_id, dolibarrUsers);
@@ -318,13 +360,28 @@ export default function Interventions() {
     }
 
     const selectedUser = dolibarrUsers.find(u => u.fullname === newTech);
-    await createInterventionMutation.mutateAsync({
-      socid: clientId, description: newDescription || ' ', date: newDate,
-      heureDebut: newHeureDebut, heureFin: newHeureFin,
-      fk_user_assign: selectedUser?.id, type: (newType || 'devis') as InterventionType, note_private: notePrivee || undefined,
-    });
+
+    // Cas chantier multi-jours : créer N interventions liées
+    if (newType === 'chantier' && chantierDates.length > 1) {
+      await createChantierMutation.mutateAsync({
+        socid: clientId,
+        description: newDescription || ' ',
+        dates: chantierDates,
+        heureDebut: newHeureDebut,
+        heureFin: newHeureFin,
+        fk_user_assign: selectedUser?.id,
+        note_private: notePrivee || undefined,
+      });
+    } else {
+      await createInterventionMutation.mutateAsync({
+        socid: clientId, description: newDescription || ' ', date: newDate,
+        heureDebut: newHeureDebut, heureFin: newHeureFin,
+        fk_user_assign: selectedUser?.id, type: (newType || 'devis') as InterventionType, note_private: notePrivee || undefined,
+      });
+    }
     setDialogOpen(false);
     setNewClientId(''); setNewClientSearch(''); setNewDescription(''); setNewDate(''); setNewTech(''); setNotePrivee(''); setNewType('');
+    setChantierDateFin(''); setChantierJoursActifs([]); setChantierDatesExtra([]); setChantierDatesExclues([]);
     resetNewClientForm();
   };
 
@@ -650,6 +707,82 @@ export default function Interventions() {
                   Aujourd'hui
                 </Button>
               </div>
+
+              {newType === 'chantier' && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20 dark:border-emerald-900 p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-foreground">Chantier multi-jours</h4>
+                    <span className="text-xs text-muted-foreground">{chantierDates.length} jour(s) planifié(s)</span>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Date de fin (vide = 1 seul jour)</label>
+                    <Input type="date" value={chantierDateFin} onChange={(e) => setChantierDateFin(e.target.value)} min={newDate} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Jours travaillés</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { v: '1', l: 'Lun' }, { v: '2', l: 'Mar' }, { v: '3', l: 'Mer' },
+                        { v: '4', l: 'Jeu' }, { v: '5', l: 'Ven' }, { v: '6', l: 'Sam' }, { v: '7', l: 'Dim' },
+                      ].map(d => {
+                        const active = chantierJoursActifs.includes(d.v);
+                        return (
+                          <button
+                            key={d.v}
+                            type="button"
+                            onClick={() => setChantierJoursActifs(prev => active ? prev.filter(x => x !== d.v) : [...prev, d.v].sort())}
+                            className={
+                              active
+                                ? 'px-2.5 py-1 rounded-md border text-xs font-medium bg-primary text-primary-foreground border-primary'
+                                : 'px-2.5 py-1 rounded-md border text-xs font-medium bg-card text-muted-foreground border-border hover:bg-muted'
+                            }
+                          >
+                            {d.l}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {chantierDates.length > 0 && (
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Dates générées (cliquer pour retirer)</label>
+                      <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto p-1 rounded border border-border bg-background">
+                        {chantierDates.map(d => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => {
+                              if (chantierDatesExtra.includes(d)) {
+                                setChantierDatesExtra(prev => prev.filter(x => x !== d));
+                              } else {
+                                setChantierDatesExclues(prev => [...prev, d]);
+                              }
+                            }}
+                            className="px-2 py-0.5 rounded text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 hover:line-through"
+                            title="Cliquer pour retirer ce jour"
+                          >
+                            {formatDateFR(d)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Ajouter une date hors plage</label>
+                    <Input
+                      type="date"
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v && !chantierDatesExtra.includes(v)) {
+                          setChantierDatesExtra(prev => [...prev, v]);
+                          setChantierDatesExclues(prev => prev.filter(x => x !== v));
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
               {(() => {
                 return (
                   <div className="grid grid-cols-2 gap-3">

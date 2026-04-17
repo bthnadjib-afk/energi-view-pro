@@ -80,6 +80,8 @@ export interface Intervention {
   descriptionClient?: string;
   compteRendu?: string;
   lines?: InterventionLine[];
+  /** Identifiant partagé entre toutes les interventions d'un même chantier multi-jours */
+  chantierId?: string;
 }
 
 export type TypeLogement = 'maison' | 'immeuble' | '';
@@ -507,14 +509,16 @@ export async function createIntervention(data: {
   fk_user_assign?: string;
   type?: string;
   note_private?: string;
+  /** Identifiant chantier partagé entre toutes les interventions d'un chantier multi-jours */
+  chantierId?: string;
 }): Promise<string> {
   const socidInt = parseInt(data.socid, 10) || data.socid;
-  
+
   const baseDate = data.date; // YYYY-MM-DD
   const startTime = data.heureDebut || '08:00';
   const endTime = data.heureFin || '10:00';
   const dateTimestamp = Math.floor(new Date(`${baseDate}T12:00:00`).getTime() / 1000);
-  
+
   const body: any = {
     socid: socidInt,
     fk_soc: socidInt,
@@ -522,7 +526,7 @@ export async function createIntervention(data: {
     description: data.description || ' ',
     date: dateTimestamp,
   };
-  
+
   if (data.fk_user_assign) body.fk_user_assign = data.fk_user_assign;
 
   // Use extrafields if available, otherwise fallback to note_private JSON
@@ -532,7 +536,11 @@ export async function createIntervention(data: {
     if (extrafields['type_intervention']) body.array_options.options_type_intervention = data.type || 'devis';
     if (extrafields['heure_debut']) body.array_options.options_heure_debut = startTime;
     if (extrafields['heure_fin']) body.array_options.options_heure_fin = endTime;
-    body.note_private = data.note_private || '';
+    if (data.chantierId) {
+      body.note_private = JSON.stringify({ chantierId: data.chantierId, notePrivee: data.note_private || '' });
+    } else {
+      body.note_private = data.note_private || '';
+    }
   } else {
     // Fallback: serialize metadata into note_private as JSON
     body.note_private = JSON.stringify({
@@ -542,15 +550,53 @@ export async function createIntervention(data: {
       heureFin: endTime,
       dateIntervention: baseDate,
       notePrivee: data.note_private || '',
+      ...(data.chantierId ? { chantierId: data.chantierId } : {}),
     });
   }
-  
+
   const result = await dolibarrCall<string>('/interventions', 'POST', body);
   const newId = result || '';
   if (newId) {
     // PDF generation is now handled locally — no server builddoc call
   }
   return newId;
+}
+
+/**
+ * Crée plusieurs interventions liées par un même `chantierId` (une par date fournie).
+ * Toutes les interventions partagent le même technicien, horaires et description.
+ * Retourne la liste des IDs créés et le chantierId généré.
+ */
+export async function createChantierMultiJours(data: {
+  socid: string;
+  description: string;
+  dates: string[]; // liste de dates YYYY-MM-DD
+  heureDebut?: string;
+  heureFin?: string;
+  fk_user_assign?: string;
+  note_private?: string;
+}): Promise<{ ids: string[]; chantierId: string }> {
+  const chantierId = `CH-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const ids: string[] = [];
+  for (const date of data.dates) {
+    try {
+      const id = await createIntervention({
+        socid: data.socid,
+        description: data.description,
+        date,
+        heureDebut: data.heureDebut,
+        heureFin: data.heureFin,
+        fk_user_assign: data.fk_user_assign,
+        type: 'chantier',
+        note_private: data.note_private,
+        chantierId,
+      });
+      if (id) ids.push(id);
+    } catch (e) {
+      console.error(`Erreur création chantier sur ${date}:`, e);
+    }
+  }
+  return { ids, chantierId };
 }
 
 // --- Devis ---
@@ -1401,12 +1447,12 @@ function parseDolibarrTime(val: any): string {
 }
 
 function parseNotePrivateMetadata(notePrivate: string | null | undefined): {
-  type: string; technicien: string; heureDebut: string; heureFin: string; dateIntervention?: string; notePrivee: string;
+  type?: string; technicien?: string; heureDebut?: string; heureFin?: string; dateIntervention?: string; notePrivee?: string; chantierId?: string;
 } | null {
   if (!notePrivate) return null;
   try {
     const parsed = JSON.parse(notePrivate);
-    if (parsed && typeof parsed === 'object' && ('type' in parsed || 'heureDebut' in parsed)) {
+    if (parsed && typeof parsed === 'object' && ('type' in parsed || 'heureDebut' in parsed || 'chantierId' in parsed)) {
       return parsed;
     }
   } catch { /* not JSON, legacy intervention */ }
@@ -1450,6 +1496,7 @@ function mapDolibarrIntervention(d: any): Intervention {
     description: d.description || '',
     descriptionClient: d.note_public || '',
     compteRendu: meta?.notePrivee || (meta ? '' : (d.note_private || '')),
+    chantierId: meta?.chantierId || undefined,
   };
 }
 

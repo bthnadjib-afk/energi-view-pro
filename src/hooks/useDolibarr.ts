@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchFactures, fetchDevis, fetchInterventions, fetchClients, fetchProduits, fetchDolibarrUsers,
   createClient, deleteClient, updateClient,
-  createIntervention, updateIntervention, deleteIntervention, validateIntervention, closeIntervention, setInterventionStatus, reopenIntervention,
+  createIntervention, createChantierMultiJours, updateIntervention, deleteIntervention, validateIntervention, closeIntervention, setInterventionStatus, reopenIntervention,
   createDevis, updateDevis, updateDevisSocid, cloneDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
   createFacture, validateFacture, deleteFacture, updateFactureLines,
   setFactureToDraft, setFactureToUnpaid, setDevisToDraft, reopenDevis,
@@ -87,6 +87,26 @@ export function useCreateIntervention() {
     }) => createIntervention(data),
     onSuccess: () => { toast.success('Intervention créée'); qc.invalidateQueries({ queryKey: ['interventions'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useCreateChantierMultiJours() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      socid: string;
+      description: string;
+      dates: string[];
+      heureDebut?: string;
+      heureFin?: string;
+      fk_user_assign?: string;
+      note_private?: string;
+    }) => createChantierMultiJours(data),
+    onSuccess: (res) => {
+      toast.success(`Chantier créé : ${res.ids.length} jour(s) planifié(s)`);
+      qc.invalidateQueries({ queryKey: ['interventions'] });
+    },
+    onError: (e: any) => toast.error(`Erreur création chantier : ${e.message || e}`),
   });
 }
 
