@@ -737,6 +737,47 @@ export default function Factures() {
                       <Send className="h-4 w-4" /> Envoyer par email
                     </Button>
                   )}
+
+                  {/* Avoir : seulement sur facture standard validée (type 0, fk_statut >= 1, pas déjà un avoir) */}
+                  {selectedFacture.type === 0 && selectedFacture.fk_statut >= 1 && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={async () => {
+                        if (!confirm(`Créer un avoir lié à la facture ${selectedFacture.ref} ?\n\nL'avoir reprendra les lignes en montant négatif.`)) return;
+                        await createAvoirMutation.mutateAsync({ factureSourceId: selectedFacture.id });
+                        setSelectedFacture(null);
+                      }}
+                      disabled={createAvoirMutation.isPending}
+                    >
+                      <RotateCcw className="h-4 w-4" /> {createAvoirMutation.isPending ? 'Création...' : 'Créer un avoir'}
+                    </Button>
+                  )}
+
+                  {/* Classer abandonnée : facture validée non payée et pas déjà abandonnée */}
+                  {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && selectedFacture.fk_statut !== 3 && (
+                    <Button
+                      variant="outline"
+                      className="gap-2 text-destructive hover:text-destructive"
+                      onClick={() => {
+                        setAbandonCode('badcustomer');
+                        setAbandonNote('');
+                        setAbandonOpen(true);
+                      }}
+                    >
+                      <Ban className="h-4 w-4" /> Classer abandonnée
+                    </Button>
+                  )}
+
+                  {/* Affichage du motif d'abandon si déjà abandonnée */}
+                  {selectedFacture.fk_statut === 3 && selectedFacture.close_code && (
+                    <div className="w-full text-sm rounded-md border border-border bg-muted/40 p-3">
+                      <div><span className="text-muted-foreground">Motif :</span> <span className="text-foreground font-medium ml-1">{getFactureCloseCodeLabel(selectedFacture.close_code)}</span></div>
+                      {selectedFacture.close_note && (
+                        <div className="mt-1"><span className="text-muted-foreground">Note :</span> <span className="text-foreground ml-1 whitespace-pre-wrap">{selectedFacture.close_note}</span></div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </>
