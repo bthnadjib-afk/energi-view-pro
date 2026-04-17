@@ -12,6 +12,7 @@ import { typesIntervention, formatDateFR, type InterventionType, resolveTechnici
 import type { Intervention } from '@/services/dolibarr';
 import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
 import { toast } from 'sonner';
+import { getInterventionStatusKey, STATUS_DOT_BG, STATUS_BADGE, STATUS_LABEL } from '@/lib/interventionStatus';
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -45,13 +46,6 @@ const TYPE_COLORS: Record<InterventionType, string> = {
   chantier: 'bg-emerald-500',
 };
 
-const statusColor: Record<string, string> = {
-  'Brouillon': 'bg-muted-foreground',
-  'Validée': 'bg-blue-500',
-  'En cours': 'bg-amber-500',
-  'Terminée': 'bg-emerald-500',
-  'Annulée': 'bg-red-500',
-};
 
 export default function Agenda() {
   const { data: interventions = [] } = useInterventions();
