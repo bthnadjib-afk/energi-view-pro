@@ -5,7 +5,7 @@ import {
   useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture,
   useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis,
   useUpdateDevisLines, useSetDevisToDraft, useCloneDevis, useUpdateDevisSocid,
-  useReopenDevis,
+  useReopenDevis, useCreateIntervention, useDolibarrUsers,
 } from '@/hooks/useDolibarr';
 import {
   getAcompteBadge, formatDateFR, replaceEmailVariables, DEVIS_STATUTS,
@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import {
   ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2,
   XCircle, Send, FileCheck, FileDown, Pencil, Search, Filter, Zap, Copy,
-  UserPen, Ban, Link2, Loader2, RotateCcw,
+  UserPen, Ban, Link2, Loader2, RotateCcw, Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
