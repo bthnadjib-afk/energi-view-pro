@@ -870,11 +870,9 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                           <Input type="number" placeholder="PA HT" value={l.prixAchat} onChange={e => { const u = [...editLines]; u[i].prixAchat = Number(e.target.value); setEditLines(u); }} className="text-xs" />
                         </div>
                         <div className="col-span-1">
-                          {editLines.length > 1 && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditLines(editLines.filter((_, idx) => idx !== i))}>
-                              <Trash2 className="h-3 w-3 text-destructive" />
-                            </Button>
-                          )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditLines(editLines.filter((_, idx) => idx !== i))} title="Supprimer la ligne">
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
                         </div>
                       </div>
                     </div>
