@@ -87,6 +87,7 @@ const adminNav: NavItem[] = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
+  const { theme } = useTheme();
   const { canAccess, signOut, profile } = useAuthContext();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
