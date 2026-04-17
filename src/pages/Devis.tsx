@@ -361,6 +361,14 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
         socid: devis.socid,
         lines: editLines.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx || 20, product_type: l.product_type, pa_ht: l.prixAchat })),
       });
+      // Persist new "free" lines into the catalog if requested
+      try {
+        const created = await persistLinesToCatalog(editLines, produits as any);
+        if (created > 0) {
+          toast.success(`${created} article(s) ajouté(s) au catalogue`);
+          queryClient.invalidateQueries({ queryKey: ['produits'] });
+        }
+      } catch {}
       // If we were editing a previously validated devis, re-validate so it
       // returns to "Open" in Dolibarr / "Validé" in the app — never stays in draft.
       if (editingValidatedDevis) {
