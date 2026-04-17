@@ -429,13 +429,24 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                   <CheckCircle2 className="h-3.5 w-3.5" /> Accepter / Refuser
                 </Button>
                 <Button
-                  onClick={async () => { await setToDraftMutation.mutateAsync(devis.id); openEditLines(); }}
-                  disabled={setToDraftMutation.isPending}
+                  onClick={async () => {
+                    // Edit a validated devis: temporarily set to draft, open editor.
+                    // After save, handleSaveLines will re-validate so it stays "Validé".
+                    setEditingValidatedDevis(true);
+                    try {
+                      await setToDraftMutation.mutateAsync(devis.id);
+                      openEditLines();
+                    } catch (e: any) {
+                      setEditingValidatedDevis(false);
+                      toast.error(`Erreur : ${e?.message || e}`);
+                    }
+                  }}
+                  disabled={setToDraftMutation.isPending || updateLinesMutation.isPending || validateMutation.isPending}
                   size="sm"
                   variant="outline"
                   className="gap-1.5"
                 >
-                  <Pencil className="h-3.5 w-3.5" /> Modifier
+                  <Pencil className="h-3.5 w-3.5" /> Modifier les lignes
                 </Button>
                 <Button
                   onClick={handleConvert}
