@@ -736,6 +736,16 @@ export default function Factures() {
                   });
                   if (error) throw new Error(error.message);
                   if (data && !data.ok) throw new Error(data.error || 'Erreur SMTP');
+                  // Enregistrer la date d'envoi pour le suivi des relances
+                  try {
+                    await recordEnvoi.mutateAsync({
+                      facture_id: selectedFacture.id,
+                      facture_ref: selectedFacture.ref,
+                      client_email: emailDest,
+                    });
+                  } catch (e) {
+                    console.error('Erreur enregistrement date envoi:', e);
+                  }
                   toast.success(`Facture ${selectedFacture.ref} envoyée à ${emailDest}`);
                   setEmailOpen(false);
                 } catch (e: any) {
