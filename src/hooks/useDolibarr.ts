@@ -268,6 +268,19 @@ export function useSetDevisToDraft() {
   });
 }
 
+export function useReopenDevis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => reopenDevis(id),
+    onSuccess: async () => {
+      toast.success('Devis rouvert');
+      await new Promise(r => setTimeout(r, 1200));
+      await qc.invalidateQueries({ queryKey: ['devis'], refetchType: 'all' });
+    },
+    onError: (e: any) => toast.error(`Erreur réouverture : ${e.message || e}`),
+  });
+}
+
 export function useCloneDevis() {
   const qc = useQueryClient();
   return useMutation({
