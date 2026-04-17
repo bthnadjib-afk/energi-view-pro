@@ -259,41 +259,61 @@ export default function Factures() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-foreground">Lignes</h3>
-                  <Button variant="outline" size="sm" onClick={addLigne} className="gap-1"><Plus className="h-3 w-3" /> Ajouter</Button>
+                  <h3 className="text-sm font-semibold text-foreground">Lignes de la facture</h3>
+                  <Button variant="outline" size="sm" onClick={addLigne} className="gap-1.5"><Plus className="h-3.5 w-3.5" /> Ajouter une ligne</Button>
                 </div>
-                {lignes.map((l, i) => (
-                  <div key={i} className="space-y-2 p-3 rounded-lg bg-muted/50 border border-border">
-                    <Select value={l.productId || '__libre__'} onValueChange={(v) => selectProduct(i, v)}>
-                      <SelectTrigger className="text-xs"><SelectValue placeholder="Sélectionner un article" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__libre__">✏️ Ligne libre</SelectItem>
-                        {produits.map(p => (
-                          <SelectItem key={p.id} value={p.id}>[{p.ref}] — {p.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="grid grid-cols-12 gap-2 items-end">
-                      <div className="col-span-5">
-                        <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="text-xs" />
-                      </div>
-                      <div className="col-span-2">
-                        <Input type="number" placeholder="Qté" value={l.qty} onChange={e => updateLigne(i, 'qty', Number(e.target.value))} className="text-xs" />
-                      </div>
-                      <div className="col-span-2">
-                        <Input type="number" placeholder="Prix HT" value={l.subprice} onChange={e => updateLigne(i, 'subprice', Number(e.target.value))} className="text-xs" />
-                      </div>
-                      <div className="col-span-2">
-                        <Input type="number" placeholder="TVA%" value={l.tva_tx} onChange={e => updateLigne(i, 'tva_tx', Number(e.target.value))} className="text-xs" />
-                      </div>
-                      <div className="col-span-1">
+                {lignes.map((l, i) => {
+                  const ligneHT = l.qty * l.subprice;
+                  return (
+                    <div key={i} className="p-4 rounded-lg bg-muted/40 border border-border space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ligne {i + 1}</span>
                         {lignes.length > 1 && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeLigne(i)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                          <Button variant="ghost" size="sm" className="h-7 gap-1 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => removeLigne(i)}>
+                            <Trash2 className="h-3.5 w-3.5" /> Supprimer
+                          </Button>
                         )}
                       </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Article du catalogue (optionnel)</label>
+                        <Select value={l.productId || '__libre__'} onValueChange={(v) => selectProduct(i, v)}>
+                          <SelectTrigger className="text-sm"><SelectValue placeholder="Choisir un article..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__libre__">✏️ Ligne libre (saisie manuelle)</SelectItem>
+                            {produits.map(p => <SelectItem key={p.id} value={p.id}>[{p.ref}] {p.label} — {p.prixHT.toLocaleString('fr-FR')} € HT ({p.type === 'main_oeuvre' ? "Main d'œuvre" : 'Fourniture'})</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Désignation *</label>
+                        <Input placeholder="Description de la prestation ou fourniture..." value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} />
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground font-medium">Quantité</label>
+                          <Input type="number" min="0" step="0.01" value={l.qty} onChange={e => updateLigne(i, 'qty', Number(e.target.value))} />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground font-medium">Prix unitaire HT (€)</label>
+                          <Input type="number" min="0" step="0.01" value={l.subprice} onChange={e => updateLigne(i, 'subprice', Number(e.target.value))} />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground font-medium">TVA (%)</label>
+                          <Input type="number" min="0" step="0.01" value={l.tva_tx} onChange={e => updateLigne(i, 'tva_tx', Number(e.target.value))} />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground font-medium">Total HT</label>
+                          <div className="h-10 flex items-center px-3 rounded-md bg-background border border-border text-sm font-semibold text-foreground">
+                            {ligneHT.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="rounded-lg bg-muted/50 border border-border p-4 space-y-1">
