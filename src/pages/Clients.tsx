@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useClients, useCreateClient, useDeleteClient, useUpdateClient, useDevis, useInterventions } from '@/hooks/useDolibarr';
 import { UserPlus, Search, Trash2, Pencil, FolderOpen, Building2, User, Users } from 'lucide-react';
@@ -36,6 +36,16 @@ const emptyForm: FormState = {
 
 export default function Clients() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [typeFilter, setTypeFilter] = useState<'all' | 'professionnel' | 'particulier'>(
+    searchParams.get('type') === 'professionnel' ? 'professionnel' : 'all'
+  );
+  // Sync URL param changes (e.g. sidebar navigation)
+  useEffect(() => {
+    const t = searchParams.get('type');
+    setTypeFilter(t === 'professionnel' ? 'professionnel' : t === 'particulier' ? 'particulier' : 'all');
+  }, [searchParams]);
+
   const { data: clients = [] } = useClients();
   const { data: allDevis = [] } = useDevis();
   const { data: allInterventions = [] } = useInterventions();
@@ -77,6 +87,8 @@ export default function Clients() {
   const prosList = useMemo(() => clients.filter(c => c.clientType === 'professionnel'), [clients]);
 
   const filtered = clients.filter((c) => {
+    if (typeFilter === 'professionnel' && c.clientType !== 'professionnel') return false;
+    if (typeFilter === 'particulier' && c.clientType !== 'particulier') return false;
     const q = search.toLowerCase();
     return c.nom.toLowerCase().includes(q) ||
       c.ville.toLowerCase().includes(q) ||
@@ -259,9 +271,25 @@ export default function Clients() {
         </Dialog>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Rechercher (nom, ville, SIRET...)" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Rechercher (nom, ville, SIRET...)" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <div className="inline-flex rounded-lg bg-muted p-1 gap-0.5 border border-border">
+          {([['all', 'Tous'], ['professionnel', 'Pro'], ['particulier', 'Particuliers']] as const).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setTypeFilter(val)}
+              className={cn(
+                'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                typeFilter === val ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="bg-card rounded-lg border border-border p-5 shadow-sm">

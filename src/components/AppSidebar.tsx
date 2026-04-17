@@ -35,15 +35,8 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Commercial',
     items: [
-      {
-        title: 'Devis', url: '/devis', icon: ClipboardList, feature: 'devis',
-        children: [
-          { title: 'Liste des devis', url: '/devis', icon: ClipboardList, feature: 'devis' },
-          { title: 'Contrats', url: '/contrats', icon: FileCheck, feature: 'devis' },
-        ],
-      },
+      { title: 'Devis', url: '/devis', icon: ClipboardList, feature: 'devis' },
       { title: 'Interventions', url: '/interventions', icon: Wrench, feature: 'interventions' },
-      { title: 'Projets', url: '/projets', icon: FolderOpen, feature: 'agenda' },
     ],
   },
   {
@@ -57,7 +50,15 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Tiers',
     items: [
-      { title: 'Clients', url: '/clients', icon: Users, feature: 'clients' },
+      {
+        title: 'Clients', url: '/clients', icon: Users, feature: 'clients',
+        children: [
+          { title: 'Tous les clients', url: '/clients', icon: Users, feature: 'clients' },
+          { title: 'Clients Pro', url: '/clients?type=professionnel', icon: Building2, feature: 'clients' },
+          { title: 'Projets', url: '/projets', icon: FolderOpen, feature: 'agenda' },
+          { title: 'Contrats', url: '/contrats', icon: FileCheck, feature: 'devis' },
+        ],
+      },
       { title: 'Fournisseurs', url: '/fournisseurs', icon: Truck, feature: 'clients' },
     ],
   },
