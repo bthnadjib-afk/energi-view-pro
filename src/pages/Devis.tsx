@@ -5,6 +5,7 @@ import {
   useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture,
   useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis,
   useUpdateDevisLines, useSetDevisToDraft, useCloneDevis, useUpdateDevisSocid,
+  useReopenDevis,
 } from '@/hooks/useDolibarr';
 import {
   getAcompteBadge, formatDateFR, replaceEmailVariables, DEVIS_STATUTS,
@@ -67,10 +68,14 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const deleteMutation = useDeleteDevis();
   const updateLinesMutation = useUpdateDevisLines();
   const setToDraftMutation = useSetDevisToDraft();
+  const reopenMutation = useReopenDevis();
   const cloneMutation = useCloneDevis();
   const updateSocidMutation = useUpdateDevisSocid();
   const { config } = useConfig();
   const queryClient = useQueryClient();
+
+  // Tracks if we're editing a previously-validated devis (so we re-validate after save)
+  const [editingValidatedDevis, setEditingValidatedDevis] = useState(false);
 
   const [showSignature, setShowSignature] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -254,6 +259,12 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
     } catch {}
   };
 
+  const handleReopen = async () => {
+    try {
+      await reopenMutation.mutateAsync(devis.id);
+    } catch {}
+  };
+
   const handleGenerateSignatureLink = async () => {
     try {
       const token = crypto.randomUUID();
@@ -303,6 +314,16 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
         socid: devis.socid,
         lines: editLines.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx || 20, product_type: l.product_type, pa_ht: l.prixAchat })),
       });
+      // If we were editing a previously validated devis, re-validate so it
+      // returns to "Open" in Dolibarr / "Validé" in the app — never stays in draft.
+      if (editingValidatedDevis) {
+        try {
+          await validateMutation.mutateAsync(devis.id);
+        } catch (e: any) {
+          toast.error(`Erreur revalidation : ${e?.message || e}`);
+        }
+        setEditingValidatedDevis(false);
+      }
       setEditOpen(false);
     } catch {}
   };
@@ -414,13 +435,24 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                   <CheckCircle2 className="h-3.5 w-3.5" /> Accepter / Refuser
                 </Button>
                 <Button
-                  onClick={async () => { await setToDraftMutation.mutateAsync(devis.id); openEditLines(); }}
-                  disabled={setToDraftMutation.isPending}
+                  onClick={async () => {
+                    // Edit a validated devis: temporarily set to draft, open editor.
+                    // After save, handleSaveLines will re-validate so it stays "Validé".
+                    setEditingValidatedDevis(true);
+                    try {
+                      await setToDraftMutation.mutateAsync(devis.id);
+                      openEditLines();
+                    } catch (e: any) {
+                      setEditingValidatedDevis(false);
+                      toast.error(`Erreur : ${e?.message || e}`);
+                    }
+                  }}
+                  disabled={setToDraftMutation.isPending || updateLinesMutation.isPending || validateMutation.isPending}
                   size="sm"
                   variant="outline"
                   className="gap-1.5"
                 >
-                  <Pencil className="h-3.5 w-3.5" /> Modifier
+                  <Pencil className="h-3.5 w-3.5" /> Modifier les lignes
                 </Button>
                 <Button
                   onClick={handleConvert}
@@ -464,13 +496,19 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                 <Button onClick={handleClone} disabled={cloneMutation.isPending} size="sm" variant="outline" className="gap-1.5">
                   {cloneMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />} Cloner
                 </Button>
+                <Button onClick={handleReopen} disabled={reopenMutation.isPending} size="sm" variant="outline" className="gap-1.5">
+                  {reopenMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />} Rouvrir
+                </Button>
               </div>
             )}
 
             {/* REFUSÉ */}
             {isRefused && (
               <div className="flex flex-wrap gap-2">
-                <span className="text-xs font-semibold text-red-600 self-center mr-1">Refusé :</span>
+                <span className="text-xs font-semibold text-red-600 self-center mr-1">Refusé / Annulé :</span>
+                <Button onClick={handleReopen} disabled={reopenMutation.isPending} size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700">
+                  {reopenMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />} Rouvrir
+                </Button>
                 <Button onClick={handleClone} disabled={cloneMutation.isPending} size="sm" variant="outline" className="gap-1.5">
                   {cloneMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />} Cloner
                 </Button>

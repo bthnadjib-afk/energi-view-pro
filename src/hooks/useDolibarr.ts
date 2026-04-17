@@ -5,7 +5,7 @@ import {
   createIntervention, updateIntervention, deleteIntervention, validateIntervention, closeIntervention, setInterventionStatus, reopenIntervention,
   createDevis, updateDevis, updateDevisSocid, cloneDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
   createFacture, validateFacture, deleteFacture, updateFactureLines,
-  setFactureToDraft, setFactureToUnpaid, setDevisToDraft,
+  setFactureToDraft, setFactureToUnpaid, setDevisToDraft, reopenDevis,
   convertDevisToFacture, createAcompteFacture,
   createProduit, deleteProduit, updateProduit,
   bulkDeleteDevis, bulkDeleteFactures,
@@ -265,6 +265,19 @@ export function useSetDevisToDraft() {
     mutationFn: (id: string) => setDevisToDraft(id),
     onSuccess: () => { toast.success('Devis repassé en brouillon'); qc.invalidateQueries({ queryKey: ['devis'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useReopenDevis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => reopenDevis(id),
+    onSuccess: async () => {
+      toast.success('Devis rouvert');
+      await new Promise(r => setTimeout(r, 1200));
+      await qc.invalidateQueries({ queryKey: ['devis'], refetchType: 'all' });
+    },
+    onError: (e: any) => toast.error(`Erreur réouverture : ${e.message || e}`),
   });
 }
 
