@@ -85,6 +85,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const { config } = useConfig();
   const queryClient = useQueryClient();
   const recordEnvoi = useRecordDevisEnvoi();
+  const markRelanceDevis = useMarkDevisRelance();
   const { data: productGroups = [] } = useProductGroups();
   const [insertEditLotOpen, setInsertEditLotOpen] = useState(false);
 
