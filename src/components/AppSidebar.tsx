@@ -50,11 +50,11 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Tiers',
     items: [
+      { title: 'Clients', url: '/clients', icon: Users, feature: 'clients' },
       {
-        title: 'Clients', url: '/clients', icon: Users, feature: 'clients',
+        title: 'Clients Pro', url: '/clients?type=professionnel', icon: Building2, feature: 'clients',
         children: [
-          { title: 'Tous les clients', url: '/clients', icon: Users, feature: 'clients' },
-          { title: 'Clients Pro', url: '/clients?type=professionnel', icon: Building2, feature: 'clients' },
+          { title: 'Liste des pros', url: '/clients?type=professionnel', icon: Building2, feature: 'clients' },
           { title: 'Projets', url: '/projets', icon: FolderOpen, feature: 'agenda' },
           { title: 'Contrats', url: '/contrats', icon: FileCheck, feature: 'devis' },
         ],
