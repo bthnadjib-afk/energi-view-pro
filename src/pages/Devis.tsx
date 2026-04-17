@@ -574,6 +574,19 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
               </div>
             )}
 
+            {/* FACTURÉ */}
+            {isInvoiced && (
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs font-semibold text-violet-600 self-center mr-1">Facturé :</span>
+                <Button onClick={handleReopen} disabled={reopenMutation.isPending} size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700">
+                  {reopenMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />} Rouvrir (brouillon)
+                </Button>
+                <Button onClick={handleClone} disabled={cloneMutation.isPending} size="sm" variant="outline" className="gap-1.5">
+                  {cloneMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />} Cloner
+                </Button>
+              </div>
+            )}
+
             {/* Toujours disponibles : PDF + Lien Dolibarr + Clone (hors Facturé) */}
             <div className="flex flex-wrap gap-2 pt-1">
               <Button onClick={handleViewPDF} disabled={generatingPDF} size="sm" variant="outline" className="gap-1.5">
