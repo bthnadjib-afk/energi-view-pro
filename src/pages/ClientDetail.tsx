@@ -83,7 +83,7 @@ export default function ClientDetail() {
     return factures
       .filter(f => f.fk_statut >= 1 && !f.paye)
       .map(f => ({ facture: f, status: getRelanceStatus(factureRelanceById.get(f.id), f.paye, f.dateValidation) }))
-      .filter(({ status }) => status.variant !== 'none');
+      .filter(({ status }) => status.variant === 'relance_1' || status.variant === 'mise_en_demeure');
   }, [factures, factureRelanceById]);
 
   // Stats
