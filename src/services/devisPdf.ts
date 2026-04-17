@@ -20,8 +20,9 @@ const PAGE_H = 297;
 const COL_R = PAGE_W - MARGIN; // bord droit
 
 // ─── Helpers ───
-function fmt(n: number): string {
-  return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function fmt(n: number | null | undefined): string {
+  const num = typeof n === 'number' && isFinite(n) ? n : 0;
+  return num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatDateFR(dateStr: string): string {
@@ -159,9 +160,9 @@ function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): jsPDF {
 
   function buildRows(lignes: DevisLigne[]): (string | { content: string; styles: object })[][] {
     return lignes.map(l => [
-      l.designation,
-      l.ref,
-      String(l.quantite),
+      String(l.designation || ''),
+      String(l.ref || ''),
+      String(l.quantite ?? ''),
       l.unite || 'U',
       `${fmt(l.prixUnitaire)} €`,
       `${l.tauxTVA}%`,
@@ -173,16 +174,15 @@ function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): jsPDF {
     fillColor: [243, 244, 246] as [number, number, number],
     textColor: BLEU,
     fontStyle: 'bold' as const,
-    colSpan: 7,
   };
 
   const body: any[] = [];
   if (lignesMO.length > 0) {
-    body.push([{ content: "Main d'œuvre", styles: sectionHeaderStyle }]);
+    body.push([{ content: "Main d'œuvre", colSpan: 7, styles: sectionHeaderStyle }]);
     buildRows(lignesMO).forEach(r => body.push(r));
   }
   if (lignesFO.length > 0) {
-    body.push([{ content: 'Fournitures', styles: sectionHeaderStyle }]);
+    body.push([{ content: 'Fournitures', colSpan: 7, styles: sectionHeaderStyle }]);
     buildRows(lignesFO).forEach(r => body.push(r));
   }
   if (body.length === 0) {

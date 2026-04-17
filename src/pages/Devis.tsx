@@ -87,6 +87,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const [sigLinkCopied, setSigLinkCopied] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [acceptRefuseOpen, setAcceptRefuseOpen] = useState(false);
 
   const client = clients.find(c => c.id === devis.socid);
 
@@ -395,30 +396,12 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                   <Send className="h-3.5 w-3.5" /> {isSent ? 'Renvoyer par email' : 'Envoyer par email'}
                 </Button>
                 <Button
-                  onClick={handleAccepterSansSignature}
+                  onClick={() => setAcceptRefuseOpen(true)}
                   disabled={closeMutation.isPending}
                   size="sm"
-                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                  className="gap-1.5 bg-violet-600 hover:bg-violet-700"
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Accepter
-                </Button>
-                <Button
-                  onClick={() => setShowSignature(true)}
-                  disabled={closeMutation.isPending}
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 border-emerald-400 text-emerald-700 hover:bg-emerald-50"
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Signer (pad)
-                </Button>
-                <Button
-                  onClick={handleRefuser}
-                  disabled={closeMutation.isPending}
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50"
-                >
-                  <XCircle className="h-3.5 w-3.5" /> Refuser
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Accepter / Refuser
                 </Button>
                 <Button
                   onClick={async () => { await setToDraftMutation.mutateAsync(devis.id); openEditLines(); }}
@@ -648,6 +631,46 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                     Enregistrer
                   </Button>
                 </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog Accepter / Refuser */}
+          <Dialog open={acceptRefuseOpen} onOpenChange={setAcceptRefuseOpen}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader><DialogTitle>Réponse client — {devis.ref}</DialogTitle></DialogHeader>
+              <div className="space-y-3 pt-2">
+                <p className="text-sm text-muted-foreground">Choisissez la décision du client pour ce devis :</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    onClick={async () => { setAcceptRefuseOpen(false); await handleAccepterSansSignature(); }}
+                    disabled={closeMutation.isPending}
+                    className="h-16 flex-col gap-1 bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span className="text-xs font-semibold">Accepté</span>
+                  </Button>
+                  <Button
+                    onClick={async () => { setAcceptRefuseOpen(false); await handleRefuser(); }}
+                    disabled={closeMutation.isPending}
+                    variant="outline"
+                    className="h-16 flex-col gap-1 border-red-300 text-red-600 hover:bg-red-50"
+                  >
+                    <XCircle className="h-5 w-5" />
+                    <span className="text-xs font-semibold">Refusé</span>
+                  </Button>
+                </div>
+                <Button
+                  onClick={() => { setAcceptRefuseOpen(false); setShowSignature(true); }}
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-1.5 border-emerald-400 text-emerald-700 hover:bg-emerald-50"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Accepté avec signature (pad)
+                </Button>
+                <Button variant="ghost" size="sm" className="w-full" onClick={() => setAcceptRefuseOpen(false)}>
+                  Annuler
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
