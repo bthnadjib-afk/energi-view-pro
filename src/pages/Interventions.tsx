@@ -229,6 +229,59 @@ export default function Interventions() {
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
 
+  // Annulation + remplacement
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replaceSource, setReplaceSource] = useState<Intervention | null>(null);
+  const [replaceDescription, setReplaceDescription] = useState('');
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  const handleCancelIntervention = async (inter: Intervention) => {
+    setCancellingId(inter.id);
+    try {
+      // Tag note_public avec appStatus: annule (préserve les autres champs)
+      let existing: any = {};
+      try { existing = JSON.parse(inter.descriptionClient || '{}'); } catch { existing = {}; }
+      existing.appStatus = 'annule';
+      existing.cancelledAt = new Date().toISOString();
+      await updateIntervention(inter.id, { note_public: JSON.stringify(existing) });
+      queryClient.invalidateQueries({ queryKey: ['interventions'] });
+      toast.success(`${inter.ref} annulée`);
+      // Proposer le remplacement avec mêmes tech / date / horaires
+      setReplaceSource(inter);
+      setReplaceDescription('');
+      setReplaceOpen(true);
+      setDetailOpen(false);
+    } catch (e: any) {
+      toast.error(`Échec annulation : ${e.message || e}`);
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const handleCreateReplacement = async () => {
+    if (!replaceSource) return;
+    if (!replaceDescription.trim()) { toast.error('Description requise pour le remplacement'); return; }
+    const selectedUser = dolibarrUsers.find(u => u.fullname === replaceSource.technicien);
+    try {
+      await createInterventionMutation.mutateAsync({
+        socid: replaceSource.socid || '',
+        description: replaceDescription,
+        date: replaceSource.date,
+        heureDebut: replaceSource.heureDebut,
+        heureFin: replaceSource.heureFin,
+        fk_user_assign: selectedUser?.id,
+        type: replaceSource.type,
+      });
+      toast.success('Intervention de remplacement créée');
+      setReplaceOpen(false);
+      setReplaceSource(null);
+      setReplaceDescription('');
+    } catch (e: any) {
+      toast.error(`Échec création : ${e.message || e}`);
+    }
+  };
+
+
   // Tech note & arrival/departure (internal, not on PDF)
   const [techNote, setTechNote] = useState('');
   const [heureArrivee, setHeureArrivee] = useState('');
