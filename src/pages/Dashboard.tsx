@@ -35,13 +35,17 @@ export default function Dashboard() {
   });
 
   const totalCA = filteredFactures.reduce((s, f) => s + f.montantHT, 0);
+  const todayStr = now.toISOString().slice(0, 10);
+  const caJournalier = factures
+    .filter(f => f.date === todayStr)
+    .reduce((s, f) => s + f.montantHT, 0);
+  const facturesJour = factures.filter(f => f.date === todayStr).length;
   const devisValides = devis.filter(d => d.fk_statut === 1).length;
   const interventionsActives = interventions.filter(i => i.fk_statut === 1 || i.fk_statut === 2).length;
   const devisSignes = devis.filter(d => d.fk_statut === 2).length;
   const tauxConversion = devis.length > 0 ? Math.round((devisSignes / devis.length) * 100) : 0;
 
-  const today = now.toISOString().slice(0, 10);
-  const todayInterventions = interventions.filter(i => i.date === today);
+  const todayInterventions = interventions.filter(i => i.date === todayStr);
 
   const techNames = useMemo(() => {
     const names = new Set<string>();
@@ -113,13 +117,14 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-foreground">Tableau de bord</h1>
           <p className="text-muted-foreground text-sm">Vue d'ensemble de votre activité</p>
         </div>
         <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <StatCard title="CA Aujourd'hui HT" value={`${caJournalier.toLocaleString('fr-FR')} €`} subtitle={`${facturesJour} facture${facturesJour > 1 ? 's' : ''}`} icon={CalendarDays} />
         <StatCard title="Chiffre d'Affaires HT" value={`${totalCA.toLocaleString('fr-FR')} €`} subtitle={`${filteredFactures.length} factures`} icon={Euro} />
         <StatCard title="Devis validés" value={String(devisValides)} subtitle={`${devis.length} devis total`} icon={ClipboardList} />
         <StatCard title="Interventions actives" value={String(interventionsActives)} subtitle={`${interventions.length} total`} icon={FileText} />
