@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Zap, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import logo from '@/assets/logo.png';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Login() {
@@ -42,10 +43,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <div className="bg-card rounded-xl p-8 w-full max-w-md space-y-6 border border-border shadow-lg">
         <div className="flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
-            <Zap className="h-6 w-6 text-primary-foreground" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">ÉlectroPro</h1>
+          <img src={logo} alt="Electricien Du Genevois" className="h-16 w-16 object-contain" />
+          <h1 className="text-2xl font-bold text-foreground text-center">Electricien Du Genevois</h1>
           <p className="text-sm text-muted-foreground">
             {forgotMode ? 'Réinitialisation du mot de passe' : 'Connectez-vous à votre compte'}
           </p>
