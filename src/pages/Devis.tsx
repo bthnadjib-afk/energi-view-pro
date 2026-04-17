@@ -259,6 +259,12 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
     } catch {}
   };
 
+  const handleReopen = async () => {
+    try {
+      await reopenMutation.mutateAsync(devis.id);
+    } catch {}
+  };
+
   const handleGenerateSignatureLink = async () => {
     try {
       const token = crypto.randomUUID();
