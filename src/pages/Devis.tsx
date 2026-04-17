@@ -69,6 +69,8 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const updateLinesMutation = useUpdateDevisLines();
   const setToDraftMutation = useSetDevisToDraft();
   const reopenMutation = useReopenDevis();
+  const createInterventionMutation = useCreateIntervention();
+  const { data: dolibarrUsers = [] } = useDolibarrUsers();
   const cloneMutation = useCloneDevis();
   const updateSocidMutation = useUpdateDevisSocid();
   const { config } = useConfig();
@@ -93,6 +95,11 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const [acceptRefuseOpen, setAcceptRefuseOpen] = useState(false);
+  const [createInterOpen, setCreateInterOpen] = useState(false);
+  const [interDate, setInterDate] = useState('');
+  const [interTechId, setInterTechId] = useState('');
+  const [interHeureDebut, setInterHeureDebut] = useState('08:00');
+  const [interHeureFin, setInterHeureFin] = useState('10:00');
 
   const client = clients.find(c => c.id === devis.socid);
 
