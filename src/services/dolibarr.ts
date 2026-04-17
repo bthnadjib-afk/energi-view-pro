@@ -83,6 +83,7 @@ export interface Intervention {
 }
 
 export type TypeLogement = 'maison' | 'immeuble' | '';
+export type ClientType = 'particulier' | 'professionnel';
 
 export interface Client {
   id: string;
@@ -95,6 +96,12 @@ export interface Client {
   etage?: string;
   codePorte?: string;
   typeLogement?: TypeLogement;
+  // Champs pro
+  clientType?: ClientType;
+  siret?: string;
+  tvaIntra?: string;
+  // Hiérarchie : parent = pro qui gère ce client final
+  parentId?: string;
 }
 
 export interface Produit {
@@ -330,6 +337,10 @@ export interface ClientMutationData {
   etage?: string;
   codePorte?: string;
   typeLogement?: TypeLogement;
+  clientType?: ClientType;
+  siret?: string;
+  tvaIntra?: string;
+  parentId?: string;
 }
 
 function buildClientArrayOptions(data: ClientMutationData) {
@@ -340,30 +351,38 @@ function buildClientArrayOptions(data: ClientMutationData) {
   };
 }
 
-export async function createClient(data: ClientMutationData): Promise<string> {
-  const result = await dolibarrCall<string>('/thirdparties', 'POST', {
+function buildClientPayload(data: ClientMutationData) {
+  const isPro = data.clientType === 'professionnel';
+  const payload: Record<string, unknown> = {
     name: data.nom,
     address: data.adresse || '',
     zip: data.codePostal || '',
     town: data.ville || '',
     phone: data.telephone || '',
     email: data.email || '',
-    client: 1,
     array_options: buildClientArrayOptions(data),
-  });
+    client: 1,
+  };
+  if (isPro) {
+    payload.idprof1 = data.siret || '';
+    payload.tva_intra = data.tvaIntra || '';
+  } else {
+    payload.idprof1 = '';
+    payload.tva_intra = '';
+  }
+  if (data.parentId) {
+    payload.parent = parseInt(data.parentId, 10) || data.parentId;
+  }
+  return payload;
+}
+
+export async function createClient(data: ClientMutationData): Promise<string> {
+  const result = await dolibarrCall<string>('/thirdparties', 'POST', buildClientPayload(data));
   return result || '';
 }
 
 export async function updateClient(id: string, data: ClientMutationData): Promise<string | null> {
-  return dolibarrCall<string>(`/thirdparties/${id}`, 'PUT', {
-    name: data.nom,
-    address: data.adresse || '',
-    zip: data.codePostal || '',
-    town: data.ville || '',
-    phone: data.telephone || '',
-    email: data.email || '',
-    array_options: buildClientArrayOptions(data),
-  });
+  return dolibarrCall<string>(`/thirdparties/${id}`, 'PUT', buildClientPayload(data));
 }
 
 export async function deleteClient(id: string): Promise<string | null> {
@@ -1330,6 +1349,11 @@ function mapDolibarrIntervention(d: any): Intervention {
 function mapDolibarrClient(d: any): Client {
   const ao = d.array_options || {};
   const tl = (ao.options_type_logement || '') as string;
+  const siret = String(d.idprof1 || '').trim();
+  const tvaIntra = String(d.tva_intra || '').trim();
+  const isPro = !!(siret || tvaIntra);
+  const parentRaw = d.parent ?? d.fk_parent;
+  const parentId = parentRaw && String(parentRaw) !== '0' ? String(parentRaw) : undefined;
   return {
     id: String(d.id),
     nom: d.name || '',
@@ -1341,6 +1365,10 @@ function mapDolibarrClient(d: any): Client {
     etage: ao.options_etage || '',
     codePorte: ao.options_code_porte || '',
     typeLogement: (tl === 'maison' || tl === 'immeuble' ? tl : '') as TypeLogement,
+    clientType: isPro ? 'professionnel' : 'particulier',
+    siret: siret || undefined,
+    tvaIntra: tvaIntra || undefined,
+    parentId,
   };
 }
 

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useClients, useCreateClient, useDeleteClient, useUpdateClient, useDevis, useInterventions } from '@/hooks/useDolibarr';
-import { UserPlus, Search, Trash2, Pencil, FolderOpen } from 'lucide-react';
+import { UserPlus, Search, Trash2, Pencil, FolderOpen, Building2, User, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { cn } from '@/lib/utils';
-import type { Client, TypeLogement } from '@/services/dolibarr';
+import type { Client, TypeLogement, ClientType } from '@/services/dolibarr';
 
 interface FormState {
   nom: string;
@@ -22,11 +22,16 @@ interface FormState {
   etage: string;
   codePorte: string;
   typeLogement: TypeLogement;
+  clientType: ClientType;
+  siret: string;
+  tvaIntra: string;
+  parentId: string;
 }
 
 const emptyForm: FormState = {
   nom: '', adresse: '', codePostal: '', ville: '', telephone: '', email: '',
   etage: '', codePorte: '', typeLogement: '',
+  clientType: 'particulier', siret: '', tvaIntra: '', parentId: '',
 };
 
 export default function Clients() {
@@ -42,6 +47,7 @@ export default function Clients() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [forcedParentId, setForcedParentId] = useState<string>('');
 
   const setField = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm(f => ({ ...f, [k]: v }));
 
@@ -60,17 +66,29 @@ export default function Clients() {
     return map;
   }, [allDevis, allInterventions]);
 
+  const enfantsParPro = useMemo(() => {
+    const m: Record<string, number> = {};
+    clients.forEach(c => {
+      if (c.parentId) m[c.parentId] = (m[c.parentId] || 0) + 1;
+    });
+    return m;
+  }, [clients]);
+
+  const prosList = useMemo(() => clients.filter(c => c.clientType === 'professionnel'), [clients]);
+
   const filtered = clients.filter((c) => {
     const q = search.toLowerCase();
     return c.nom.toLowerCase().includes(q) ||
       c.ville.toLowerCase().includes(q) ||
       (c.email || '').toLowerCase().includes(q) ||
       (c.telephone || '').toLowerCase().includes(q) ||
-      (c.codePostal || '').toLowerCase().includes(q);
+      (c.codePostal || '').toLowerCase().includes(q) ||
+      (c.siret || '').toLowerCase().includes(q);
   });
 
-  const openCreate = () => {
-    setForm(emptyForm);
+  const openCreate = (parentId?: string) => {
+    setForm({ ...emptyForm, parentId: parentId || '' });
+    setForcedParentId(parentId || '');
     setCreateOpen(true);
   };
 
@@ -85,6 +103,10 @@ export default function Clients() {
       etage: c.etage || '',
       codePorte: c.codePorte || '',
       typeLogement: c.typeLogement || '',
+      clientType: c.clientType || 'particulier',
+      siret: c.siret || '',
+      tvaIntra: c.tvaIntra || '',
+      parentId: c.parentId || '',
     });
     setEditClient(c);
   };
@@ -94,13 +116,22 @@ export default function Clients() {
       toast.error('Les champs nom, adresse, code postal, ville, téléphone et email sont obligatoires');
       return;
     }
+    if (form.clientType === 'professionnel' && !form.siret.trim()) {
+      toast.error('Le SIRET est obligatoire pour un client professionnel');
+      return;
+    }
     await createClientMutation.mutateAsync(form);
     setForm(emptyForm);
+    setForcedParentId('');
     setCreateOpen(false);
   };
 
   const handleUpdate = async () => {
     if (!editClient || !form.nom.trim()) return;
+    if (form.clientType === 'professionnel' && !form.siret.trim()) {
+      toast.error('Le SIRET est obligatoire pour un client professionnel');
+      return;
+    }
     await updateClientMutation.mutateAsync({ id: editClient.id, ...form });
     setEditClient(null);
   };
@@ -110,8 +141,65 @@ export default function Clients() {
   };
 
   const renderFormFields = () => (
-    <div className="space-y-4 pt-2">
-      <Input placeholder="Nom du client *" value={form.nom} onChange={e => setField('nom', e.target.value)} />
+    <div className="space-y-4 pt-2 max-h-[70vh] overflow-y-auto pr-1">
+      {/* Toggle type */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => setField('clientType', 'particulier')}
+          className={cn(
+            'flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors',
+            form.clientType === 'particulier'
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border bg-background text-muted-foreground hover:bg-muted'
+          )}
+        >
+          <User className="h-4 w-4" /> Particulier
+        </button>
+        <button
+          type="button"
+          onClick={() => setField('clientType', 'professionnel')}
+          className={cn(
+            'flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors',
+            form.clientType === 'professionnel'
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border bg-background text-muted-foreground hover:bg-muted'
+          )}
+        >
+          <Building2 className="h-4 w-4" /> Professionnel
+        </button>
+      </div>
+
+      <Input placeholder={form.clientType === 'professionnel' ? 'Raison sociale *' : 'Nom du client *'} value={form.nom} onChange={e => setField('nom', e.target.value)} />
+
+      {/* Champs pro */}
+      {form.clientType === 'professionnel' && (
+        <div className="grid grid-cols-2 gap-3 rounded-md border border-dashed border-border p-3 bg-muted/30">
+          <Input placeholder="SIRET *" value={form.siret} onChange={e => setField('siret', e.target.value.replace(/\s/g, ''))} maxLength={14} />
+          <Input placeholder="N° TVA intracom." value={form.tvaIntra} onChange={e => setField('tvaIntra', e.target.value.toUpperCase())} maxLength={20} />
+        </div>
+      )}
+
+      {/* Lien à un pro parent (uniquement pour particulier) */}
+      {form.clientType === 'particulier' && prosList.length > 0 && (
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">Client géré par un professionnel ? (facultatif)</label>
+          <Select
+            value={form.parentId || 'none'}
+            onValueChange={v => setField('parentId', v === 'none' ? '' : v)}
+            disabled={!!forcedParentId}
+          >
+            <SelectTrigger><SelectValue placeholder="Aucun" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Aucun (client direct)</SelectItem>
+              {prosList.map(p => (
+                <SelectItem key={p.id} value={p.id}>{p.nom}{p.siret ? ` — ${p.siret}` : ''}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <AddressAutocomplete
         value={form.adresse}
         onSelect={({ rue, codePostal: cp, ville: v }) => { setField('adresse', rue); setField('codePostal', cp); setField('ville', v); }}
@@ -145,14 +233,20 @@ export default function Clients() {
           <h1 className="text-2xl font-bold text-foreground">Clients</h1>
           <p className="text-muted-foreground text-sm">Répertoire clients</p>
         </div>
-        <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) setForm(emptyForm); }}>
+        <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) { setForm(emptyForm); setForcedParentId(''); } }}>
           <DialogTrigger asChild>
-            <Button className="gap-2" onClick={openCreate}>
+            <Button className="gap-2" onClick={() => openCreate()}>
               <UserPlus className="h-4 w-4" /> Ajouter un client
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Nouveau client</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>
+                {forcedParentId
+                  ? `Nouveau client géré par ${clients.find(c => c.id === forcedParentId)?.nom || ''}`
+                  : 'Nouveau client'}
+              </DialogTitle>
+            </DialogHeader>
             {renderFormFields()}
             <Button
               className="w-full mt-4"
@@ -167,7 +261,7 @@ export default function Clients() {
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Rechercher un client..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        <Input placeholder="Rechercher (nom, ville, SIRET...)" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
       </div>
 
       <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
@@ -176,19 +270,39 @@ export default function Clients() {
             <thead>
               <tr className="border-b border-border">
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Nom</th>
+                <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Type</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Ville</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden md:table-cell">Téléphone</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden lg:table-cell">Email</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Projets</th>
-                <th className="text-right py-3 px-2 text-muted-foreground font-medium w-28">Actions</th>
+                <th className="text-right py-3 px-2 text-muted-foreground font-medium w-36">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((c) => {
                 const nbProjets = projetsParClient[c.id] || 0;
+                const nbEnfants = enfantsParPro[c.id] || 0;
+                const isPro = c.clientType === 'professionnel';
                 return (
                   <tr key={c.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate(`/clients/${c.id}`)}>
-                    <td className="py-3 px-2 font-medium text-foreground">{c.nom}</td>
+                    <td className="py-3 px-2 font-medium text-foreground">
+                      <div className="flex items-center gap-2">
+                        {isPro ? <Building2 className="h-3.5 w-3.5 text-primary shrink-0" /> : <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                        <span>{c.nom}</span>
+                        {c.parentId && (
+                          <span className="text-xs text-muted-foreground italic">↳ {clients.find(x => x.id === c.parentId)?.nom || 'pro'}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 hidden sm:table-cell">
+                      {isPro ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+                          Pro{nbEnfants > 0 && <span className="text-muted-foreground">({nbEnfants} géré{nbEnfants > 1 ? 's' : ''})</span>}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Particulier</span>
+                      )}
+                    </td>
                     <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{c.ville}</td>
                     <td className="py-3 px-2 text-muted-foreground hidden md:table-cell font-mono text-xs">{c.telephone}</td>
                     <td className="py-3 px-2 text-muted-foreground hidden lg:table-cell text-xs">{c.email}</td>
@@ -199,6 +313,17 @@ export default function Clients() {
                     </td>
                     <td className="py-3 px-2 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
+                        {isPro && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="Ajouter un client géré par ce pro"
+                            onClick={(e) => { e.stopPropagation(); openCreate(c.id); }}
+                          >
+                            <Users className="h-3.5 w-3.5 text-primary" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"

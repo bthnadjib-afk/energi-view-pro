@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, Mail, FileText, ClipboardList, Wrench, AlertTriangle,
-  FileDown, MapPin, Phone, AtSign,
+  FileDown, MapPin, Phone, AtSign, Building2, User, Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -109,6 +109,10 @@ export default function ClientDetail() {
     return 'text-blue-600';
   };
 
+  const isPro = client.clientType === 'professionnel';
+  const parentClient = client.parentId ? clients.find(c => c.id === client.parentId) : null;
+  const enfants = clients.filter(c => c.parentId === client.id);
+
   return (
     <div className="space-y-6">
       <div>
@@ -117,8 +121,31 @@ export default function ClientDetail() {
         </Button>
         <div className="bg-card rounded-lg border border-border p-6 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            <div className="space-y-1">
-              <h1 className="text-2xl font-bold text-foreground">{client.nom}</h1>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {isPro ? <Building2 className="h-5 w-5 text-primary" /> : <User className="h-5 w-5 text-muted-foreground" />}
+                <h1 className="text-2xl font-bold text-foreground">{client.nom}</h1>
+                <span className={cn(
+                  'text-xs font-medium px-2 py-0.5 rounded-full border',
+                  isPro ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'
+                )}>
+                  {isPro ? 'Professionnel' : 'Particulier'}
+                </span>
+                {parentClient && (
+                  <button
+                    onClick={() => navigate(`/clients/${parentClient.id}`)}
+                    className="text-xs text-muted-foreground italic hover:text-primary underline-offset-2 hover:underline"
+                  >
+                    géré par {parentClient.nom}
+                  </button>
+                )}
+              </div>
+              {isPro && (client.siret || client.tvaIntra) && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  {client.siret && <span>SIRET : <span className="font-mono text-foreground">{client.siret}</span></span>}
+                  {client.tvaIntra && <span>TVA intracom. : <span className="font-mono text-foreground">{client.tvaIntra}</span></span>}
+                </div>
+              )}
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 {client.adresse && (
                   <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{client.adresse}, {client.codePostal} {client.ville}</span>
@@ -182,7 +209,52 @@ export default function ClientDetail() {
           <TabsTrigger value="documents" className="gap-1.5">
             <FileDown className="h-3.5 w-3.5" /> Documents
           </TabsTrigger>
+          {isPro && (
+            <TabsTrigger value="enfants" className="gap-1.5">
+              <Users className="h-3.5 w-3.5" /> Clients gérés ({enfants.length})
+            </TabsTrigger>
+          )}
         </TabsList>
+
+        {/* CLIENTS GÉRÉS (pro uniquement) */}
+        {isPro && (
+          <TabsContent value="enfants">
+            <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-foreground">Clients finaux gérés par {client.nom}</h2>
+                <Button size="sm" onClick={() => navigate('/clients')} className="gap-2">
+                  <Users className="h-4 w-4" /> Gérer depuis la liste
+                </Button>
+              </div>
+              {enfants.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Aucun client géré. Allez dans la liste des clients et cliquez sur l'icône <Users className="inline h-3.5 w-3.5" /> à côté de ce pro pour en ajouter.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-3 px-2 text-muted-foreground font-medium">Nom</th>
+                      <th className="text-left py-3 px-2 text-muted-foreground font-medium">Ville</th>
+                      <th className="text-left py-3 px-2 text-muted-foreground font-medium">Téléphone</th>
+                      <th className="text-left py-3 px-2 text-muted-foreground font-medium">Email</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {enfants.map(e => (
+                      <tr key={e.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate(`/clients/${e.id}`)}>
+                        <td className="py-3 px-2 font-medium text-foreground">{e.nom}</td>
+                        <td className="py-3 px-2 text-muted-foreground">{e.ville}</td>
+                        <td className="py-3 px-2 text-muted-foreground font-mono text-xs">{e.telephone}</td>
+                        <td className="py-3 px-2 text-muted-foreground text-xs">{e.email}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </TabsContent>
+        )}
 
         {/* DEVIS */}
         <TabsContent value="devis">
