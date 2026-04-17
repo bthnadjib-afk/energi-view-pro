@@ -45,8 +45,7 @@ export default function Dashboard() {
   const devisSignes = devis.filter(d => d.fk_statut === 2).length;
   const tauxConversion = devis.length > 0 ? Math.round((devisSignes / devis.length) * 100) : 0;
 
-  const today = now.toISOString().slice(0, 10);
-  const todayInterventions = interventions.filter(i => i.date === today);
+  const todayInterventions = interventions.filter(i => i.date === todayStr);
 
   const techNames = useMemo(() => {
     const names = new Set<string>();
