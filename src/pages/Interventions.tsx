@@ -990,6 +990,9 @@ export default function Interventions() {
                                 <SelectValue placeholder="Sélectionner l'heure de départ" />
                               </SelectTrigger>
                               <SelectContent className="max-h-72">
+                                {(heureDepart && !timeSlots.includes(heureDepart)) && (
+                                  <SelectItem value={heureDepart}>{heureDepart}</SelectItem>
+                                )}
                                 {timeSlots.map((t) => (
                                   <SelectItem key={t} value={t}>{t}</SelectItem>
                                 ))}
@@ -1000,17 +1003,11 @@ export default function Interventions() {
                               variant="outline"
                               size="icon"
                               title={`Maintenant (${liveTime})`}
-                              onClick={() => { const t = roundToQuarterHour(new Date()); setHeureDepart(t); autoSaveTimes(heureArrivee, t); }}
+                              onClick={() => { const t = currentTime(); setHeureDepart(t); autoSaveTimes(heureArrivee, t); }}
                             >
                               <Clock className="h-4 w-4" />
                             </Button>
                           </div>
-                          {heureDepart && (
-                            <div className="flex items-center gap-2 text-xs text-emerald-600 mt-1">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              <span>Départ enregistré à {heureDepart}</span>
-                            </div>
-                          )}
                           <p className="text-[11px] text-muted-foreground mt-1">⏱️ Vous ne pouvez pas saisir une heure postérieure à maintenant ({liveTime}).</p>
                         </>
                       )}
