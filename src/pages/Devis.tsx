@@ -1,4 +1,5 @@
 import { useState, Fragment, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
   useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture,
@@ -7,7 +8,7 @@ import {
 } from '@/hooks/useDolibarr';
 import {
   getAcompteBadge, formatDateFR, replaceEmailVariables, DEVIS_STATUTS,
-  saveDevisSignatureToken, type Devis as DevisType, type Client,
+  saveDevisSignatureToken, markDevisSent, type Devis as DevisType, type Client,
 } from '@/services/dolibarr';
 import { openDevisPdf, devisPdfToBase64, devisPdfToBlobUrl } from '@/services/devisPdf';
 import { useConfig } from '@/hooks/useConfig';
@@ -69,6 +70,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const cloneMutation = useCloneDevis();
   const updateSocidMutation = useUpdateDevisSocid();
   const { config } = useConfig();
+  const queryClient = useQueryClient();
 
   const [showSignature, setShowSignature] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -101,8 +103,9 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
 
   const isExpired = devis.finValidite && new Date(devis.finValidite) < new Date() && devis.fk_statut <= 1;
   const isDraft = devis.fk_statut === 0;
-  const isValidated = devis.fk_statut === 1;
-  const isSigned = devis.fk_statut === 2;
+  const isValidated = devis.fk_statut === 1 && !devis.sent;  // Validé mais pas encore envoyé
+  const isSent = devis.fk_statut === 1 && devis.sent === true; // Envoyé par email
+  const isSigned = devis.fk_statut === 2;   // Accepté
   const isRefused = devis.fk_statut === 3;
   const isInvoiced = devis.fk_statut === 4;
 
@@ -169,6 +172,11 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
       if (data && !data.ok) throw new Error(data.error || 'Erreur SMTP');
       toast.success(`Devis ${devis.ref} envoyé à ${emailDest}`);
       setEmailOpen(false);
+      // Marquer le devis comme "Envoyé" dans Dolibarr (note_private) + refresh
+      try {
+        await markDevisSent(devis.id, devis.note_private);
+        queryClient.invalidateQueries({ queryKey: ['devis'] });
+      } catch { /* non-bloquant */ }
     } catch (e: any) {
       toast.error(`Erreur envoi : ${e.message || e}`);
     }
@@ -333,12 +341,13 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
             </tbody>
           </table>
 
-          {/* Actions principales selon statut */}
-          <div className="flex flex-wrap gap-2 pt-3 border-t border-border">
+          {/* ── Actions selon statut ── */}
+          <div className="space-y-3 pt-3 border-t border-border">
 
             {/* BROUILLON */}
             {isDraft && (
-              <>
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs font-semibold text-muted-foreground self-center mr-1">Brouillon :</span>
                 <Button onClick={openEditLines} variant="outline" size="sm" className="gap-1.5">
                   <Pencil className="h-3.5 w-3.5" /> Modifier les lignes
                 </Button>
@@ -349,30 +358,58 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                   className="gap-1.5 bg-blue-600 hover:bg-blue-700"
                 >
                   {validateMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileCheck className="h-3.5 w-3.5" />}
-                  {validateMutation.isPending ? 'Validation...' : 'Valider'}
+                  {validateMutation.isPending ? 'Validation...' : 'Valider le devis'}
                 </Button>
-              </>
+                <Button onClick={() => { setNewSocid(devis.socid || ''); setChangeClientOpen(true); }} size="sm" variant="outline" className="gap-1.5">
+                  <UserPen className="h-3.5 w-3.5" /> Changer client
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="outline" className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10">
+                      <Ban className="h-3.5 w-3.5" /> Supprimer
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Supprimer {devis.ref} ?</AlertDialogTitle>
+                      <AlertDialogDescription>Ce devis sera supprimé définitivement.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Retour</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleAnnuler} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Supprimer</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             )}
 
-            {/* VALIDÉ */}
-            {isValidated && (
-              <>
+            {/* VALIDÉ (envoyé en attente de réponse client) */}
+            {(isValidated || isSent) && (
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs font-semibold text-muted-foreground self-center mr-1">{isSent ? 'Envoyé :' : 'Validé :'}</span>
                 <Button
-                  onClick={() => setShowSignature(true)}
-                  disabled={closeMutation.isPending}
+                  onClick={() => setEmailOpen(true)}
                   size="sm"
-                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                  className="gap-1.5 bg-blue-600 hover:bg-blue-700"
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Signer (avec pad)
+                  <Send className="h-3.5 w-3.5" /> {isSent ? 'Renvoyer par email' : 'Envoyer par email'}
                 </Button>
                 <Button
                   onClick={handleAccepterSansSignature}
                   disabled={closeMutation.isPending}
                   size="sm"
+                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Accepter
+                </Button>
+                <Button
+                  onClick={() => setShowSignature(true)}
+                  disabled={closeMutation.isPending}
+                  size="sm"
                   variant="outline"
                   className="gap-1.5 border-emerald-400 text-emerald-700 hover:bg-emerald-50"
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Accepter manuellement
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Signer (pad)
                 </Button>
                 <Button
                   onClick={handleRefuser}
@@ -384,13 +421,13 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                   <XCircle className="h-3.5 w-3.5" /> Refuser
                 </Button>
                 <Button
-                  onClick={async () => { await setToDraftMutation.mutateAsync(devis.id); }}
+                  onClick={async () => { await setToDraftMutation.mutateAsync(devis.id); openEditLines(); }}
                   disabled={setToDraftMutation.isPending}
                   size="sm"
                   variant="outline"
                   className="gap-1.5"
                 >
-                  <RotateCcw className="h-3.5 w-3.5" /> Brouillon
+                  <Pencil className="h-3.5 w-3.5" /> Modifier
                 </Button>
                 <Button
                   onClick={handleConvert}
@@ -401,94 +438,91 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                 >
                   <ArrowRightLeft className="h-3.5 w-3.5" /> Générer facture
                 </Button>
-              </>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="outline" className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10">
+                      <Ban className="h-3.5 w-3.5" /> Annuler
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Annuler le devis {devis.ref} ?</AlertDialogTitle>
+                      <AlertDialogDescription>Le devis sera repassé en brouillon puis supprimé.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Retour</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleAnnuler} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Annuler le devis</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             )}
 
-            {/* SIGNÉ */}
+            {/* ACCEPTÉ */}
             {isSigned && (
-              <>
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs font-semibold text-emerald-600 self-center mr-1">Accepté :</span>
                 <Button onClick={handleConvert} disabled={convertPending} size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700">
                   <ArrowRightLeft className="h-3.5 w-3.5" /> Générer facture
                 </Button>
                 <Button onClick={onAcompte} disabled={acomptePending} size="sm" variant="outline" className="gap-1.5">
                   <Receipt className="h-3.5 w-3.5" /> Saisir un acompte
                 </Button>
-              </>
+                <Button onClick={handleClone} disabled={cloneMutation.isPending} size="sm" variant="outline" className="gap-1.5">
+                  {cloneMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />} Cloner
+                </Button>
+              </div>
             )}
 
-            {/* Séparateur visuel */}
-            <div className="w-px bg-border self-stretch mx-1" />
+            {/* REFUSÉ */}
+            {isRefused && (
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs font-semibold text-red-600 self-center mr-1">Refusé :</span>
+                <Button onClick={handleClone} disabled={cloneMutation.isPending} size="sm" variant="outline" className="gap-1.5">
+                  {cloneMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />} Cloner
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="outline" className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10">
+                      <Ban className="h-3.5 w-3.5" /> Supprimer
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Supprimer {devis.ref} ?</AlertDialogTitle>
+                      <AlertDialogDescription>Le devis sera repassé en brouillon puis supprimé définitivement.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Retour</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleAnnuler} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Supprimer</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
 
-            {/* PDF */}
-            <Button onClick={handleViewPDF} disabled={generatingPDF} size="sm" variant="outline" className="gap-1.5">
-              <FileDown className="h-3.5 w-3.5" /> {generatingPDF ? 'PDF...' : 'Voir PDF'}
-            </Button>
-
-            {/* Email — disponible dans tous les états */}
-            <Button onClick={() => setEmailOpen(true)} size="sm" variant="outline" className="gap-1.5">
-              <Send className="h-3.5 w-3.5" /> Envoyer par email
-            </Button>
-
-            {/* Lien signature en ligne — pour brouillon ou validé */}
-            {(isDraft || isValidated) && (
-              <Button
-                onClick={handleGenerateSignatureLink}
-                size="sm"
-                variant="outline"
-                className={cn('gap-1.5', sigLinkCopied && 'border-green-400 text-green-700')}
-              >
-                <Link2 className="h-3.5 w-3.5" />
-                {sigLinkCopied ? 'Lien copié !' : 'Lien signature'}
+            {/* Toujours disponibles : PDF + Lien Dolibarr + Clone (hors Facturé) */}
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button onClick={handleViewPDF} disabled={generatingPDF} size="sm" variant="outline" className="gap-1.5">
+                <FileDown className="h-3.5 w-3.5" /> {generatingPDF ? 'PDF...' : 'Voir PDF'}
               </Button>
-            )}
-
-            {/* Clone */}
-            <Button
-              onClick={handleClone}
-              disabled={cloneMutation.isPending}
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-            >
-              {cloneMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />}
-              Cloner
-            </Button>
-
-            {/* Changer le client */}
-            {(isDraft || isValidated) && (
-              <Button onClick={() => { setNewSocid(devis.socid || ''); setChangeClientOpen(true); }} size="sm" variant="outline" className="gap-1.5">
-                <UserPen className="h-3.5 w-3.5" /> Changer client
-              </Button>
-            )}
-
-            {/* Annuler/Supprimer */}
-            {!isInvoiced && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" variant="outline" className="gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10">
-                    <Ban className="h-3.5 w-3.5" /> {isDraft ? 'Supprimer' : 'Annuler'}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      {isDraft ? `Supprimer ${devis.ref} ?` : `Annuler le devis ${devis.ref} ?`}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {isDraft
-                        ? 'Ce devis sera supprimé définitivement.'
-                        : 'Le devis sera repassé en brouillon puis supprimé. Action irréversible.'}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Retour</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleAnnuler} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      {isDraft ? 'Supprimer' : 'Annuler le devis'}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
+              {!isDraft && !isInvoiced && dolibarrSignUrl && (
+                <Button
+                  onClick={handleGenerateSignatureLink}
+                  size="sm"
+                  variant="outline"
+                  className={cn('gap-1.5', sigLinkCopied && 'border-green-400 text-green-700')}
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  {sigLinkCopied ? 'Lien copié !' : 'Lien signature Dolibarr'}
+                </Button>
+              )}
+              {!isInvoiced && (
+                <Button onClick={handleClone} disabled={cloneMutation.isPending || isSigned || isRefused} size="sm" variant="outline" className={cn('gap-1.5', (isSigned || isRefused) && 'hidden')}>
+                  {cloneMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />} Cloner
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Pad signature */}

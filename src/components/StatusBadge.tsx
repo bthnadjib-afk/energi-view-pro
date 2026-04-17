@@ -22,7 +22,6 @@ const statusStyles: Record<string, string> = {
   'annulée': 'bg-red-100 text-red-700 border-red-200',
   'annulé': 'bg-red-100 text-red-700 border-red-200',
   'en attente': 'bg-blue-100 text-blue-700 border-blue-200',
-  'accepté': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'en retard': 'bg-red-100 text-red-700 border-red-200',
   'planifié': 'bg-blue-100 text-blue-700 border-blue-200',
 };

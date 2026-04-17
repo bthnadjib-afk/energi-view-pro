@@ -46,6 +46,7 @@ export interface Devis {
   lignes: DevisLigne[];
   finValidite: string;
   note_private?: string;
+  sent?: boolean;
 }
 
 export type InterventionType = 'devis' | 'panne' | 'panne_urgence' | 'sav' | 'chantier';
@@ -213,7 +214,7 @@ async function fetchClientsRaw(): Promise<Client[]> {
 
 export const DEVIS_STATUTS: Record<number, string> = {
   0: 'Brouillon',
-  1: 'Envoyé',
+  1: 'Validé',
   2: 'Accepté',
   3: 'Refusé',
   4: 'Facturé',
@@ -506,6 +507,16 @@ export async function closeDevis(id: string, status: number): Promise<string | n
 
 export async function deleteDevis(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/proposals/${id}`, 'DELETE');
+}
+
+/** Marque un devis comme "envoyé par email" en stockant le flag dans note_private Dolibarr.
+ *  Merge avec le contenu existant pour ne pas écraser les métadonnées déjà stockées. */
+export async function markDevisSent(id: string, currentNotePrivate?: string): Promise<void> {
+  let meta: Record<string, any> = {};
+  try { if (currentNotePrivate) meta = JSON.parse(currentNotePrivate); } catch {}
+  meta.sent = true;
+  meta.sent_at = new Date().toISOString();
+  await dolibarrCall(`/proposals/${id}`, 'PUT', { note_private: JSON.stringify(meta) });
 }
 
 // --- Factures ---
@@ -1080,6 +1091,10 @@ function mapDolibarrFacture(d: any): Facture {
 
 function mapDolibarrDevis(d: any): Devis {
   const fk_statut = Number(d.fk_statut) || 0;
+  let noteMeta: Record<string, any> = {};
+  try { if (d.note_private) noteMeta = JSON.parse(d.note_private); } catch {}
+  const isSent = fk_statut === 1 && noteMeta.sent === true;
+  const statut = isSent ? 'Envoyé' : getDevisStatutLabel(fk_statut);
   return {
     id: String(d.id),
     ref: d.ref || `DE-${d.id}`,
@@ -1088,8 +1103,9 @@ function mapDolibarrDevis(d: any): Devis {
     date: parseDolibarrDate(d.date || d.datep || d.date_creation),
     montantHT: parseFloat(d.total_ht) || 0,
     montantTTC: parseFloat(d.total_ttc) || 0,
-    statut: getDevisStatutLabel(fk_statut),
+    statut,
     fk_statut,
+    sent: isSent,
     lignes: (d.lines || []).map((l: any) => {
       const rawDesc: string = l.desc || l.label || '';
       const refMatch = rawDesc.match(/^\[([^\]]+)\]\s*/);
