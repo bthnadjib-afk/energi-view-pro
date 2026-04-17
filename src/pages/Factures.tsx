@@ -524,7 +524,7 @@ export default function Factures() {
                     </Button>
                   )}
 
-                  {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && selectedFacture.fk_statut !== 3 && (
+                  {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && selectedFacture.fk_statut !== 3 && canRecordPayment && (
                     <Button
                       variant="outline"
                       className="gap-2"
