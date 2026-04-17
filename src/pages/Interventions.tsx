@@ -251,9 +251,14 @@ export default function Interventions() {
       await updateIntervention(inter.id, { note_public: JSON.stringify(existing) });
       queryClient.invalidateQueries({ queryKey: ['interventions'] });
       toast.success(`${inter.ref} annulée`);
-      // Proposer le remplacement avec mêmes tech / date / horaires
+      // Pré-remplir avec mêmes tech / date / horaires / type — tout reste modifiable
       setReplaceSource(inter);
       setReplaceDescription('');
+      setReplaceType((inter.type as InterventionType) || 'panne');
+      setReplaceDate(inter.date || '');
+      setReplaceHeureDebut(inter.heureDebut || '');
+      setReplaceHeureFin(inter.heureFin || '');
+      setReplaceTech(inter.technicien || '');
       setReplaceOpen(true);
       setDetailOpen(false);
     } catch (e: any) {
@@ -266,16 +271,18 @@ export default function Interventions() {
   const handleCreateReplacement = async () => {
     if (!replaceSource) return;
     if (!replaceDescription.trim()) { toast.error('Description requise pour le remplacement'); return; }
-    const selectedUser = dolibarrUsers.find(u => u.fullname === replaceSource.technicien);
+    if (!replaceDate) { toast.error('Date requise'); return; }
+    if (!replaceHeureDebut || !replaceHeureFin) { toast.error('Horaires requis'); return; }
+    const selectedUser = dolibarrUsers.find(u => u.fullname === replaceTech);
     try {
       await createInterventionMutation.mutateAsync({
         socid: replaceSource.socid || '',
         description: replaceDescription,
-        date: replaceSource.date,
-        heureDebut: replaceSource.heureDebut,
-        heureFin: replaceSource.heureFin,
+        date: replaceDate,
+        heureDebut: replaceHeureDebut,
+        heureFin: replaceHeureFin,
         fk_user_assign: selectedUser?.id,
-        type: replaceSource.type,
+        type: replaceType,
       });
       toast.success('Intervention de remplacement créée');
       setReplaceOpen(false);
