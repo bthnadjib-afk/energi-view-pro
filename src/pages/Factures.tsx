@@ -4,7 +4,7 @@ import { HelpTooltip } from '@/components/HelpTooltip';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid } from '@/hooks/useDolibarr';
-import { useFactureRelances, useRecordFactureEnvoi, getRelanceStatus } from '@/hooks/useFactureRelances';
+import { useFactureRelances, useRecordFactureEnvoi, useSetFactureEnvoiDate, getRelanceStatus } from '@/hooks/useFactureRelances';
 import { formatDateFR, sendFactureByEmail, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
 import { openFacturePdf, facturePdfToBase64, facturePdfToBlobUrl } from '@/services/facturePdf';
 import { useConfig } from '@/hooks/useConfig';
@@ -39,6 +39,7 @@ export default function Factures() {
   const { data: factures = [] } = useFactures();
   const { data: relances = [] } = useFactureRelances();
   const recordEnvoi = useRecordFactureEnvoi();
+  const setFactureEnvoiDate = useSetFactureEnvoiDate();
   const relanceByFactureId = useMemo(() => {
     const map = new Map<string, typeof relances[0]>();
     relances.forEach(r => map.set(r.facture_id, r));
@@ -636,7 +637,28 @@ export default function Factures() {
                   >
                     <FileDown className="h-4 w-4" /> Voir le PDF
                   </Button>
-                  {selectedFacture.fk_statut >= 1 && (
+                  {!selectedFacture.paye && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={async () => {
+                        const client = clients.find(cl => cl.id === selectedFacture.socid);
+                        const testDate = new Date();
+                        testDate.setDate(testDate.getDate() - 10);
+                        await setFactureEnvoiDate.mutateAsync({
+                          facture_id: selectedFacture.id,
+                          facture_ref: selectedFacture.ref,
+                          client_email: relanceByFactureId.get(selectedFacture.id)?.client_email || client?.email || null,
+                          date_envoi: testDate.toISOString(),
+                        });
+                        setSelectedFacture(null);
+                      }}
+                      disabled={setFactureEnvoiDate.isPending}
+                    >
+                      {setFactureEnvoiDate.isPending ? 'En cours...' : 'Tester relance +10j'}
+                    </Button>
+                  )}
+                  {selectedFacture.fk_statut !== 3 && (
                     <Button
                       variant="outline"
                       className="gap-2"
@@ -908,8 +930,13 @@ export default function Factures() {
                   } catch (e) {
                     console.error('Erreur enregistrement date envoi:', e);
                   }
+                  await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: ['factures'], refetchType: 'all' }),
+                    queryClient.invalidateQueries({ queryKey: ['facture_relances'], refetchType: 'all' }),
+                  ]);
                   toast.success(`Facture ${selectedFacture.ref} envoyée à ${emailDest}`);
                   setEmailOpen(false);
+                  setSelectedFacture(null);
                 } catch (e: any) {
                   toast.error(`Erreur envoi : ${e.message || e}`);
                 }
