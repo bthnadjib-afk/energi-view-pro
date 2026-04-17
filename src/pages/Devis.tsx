@@ -85,6 +85,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const { config } = useConfig();
   const queryClient = useQueryClient();
   const recordEnvoi = useRecordDevisEnvoi();
+  const markRelanceDevis = useMarkDevisRelance();
   const { data: productGroups = [] } = useProductGroups();
   const [insertEditLotOpen, setInsertEditLotOpen] = useState(false);
 
@@ -216,6 +217,14 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
           date_fin_validite: devis.finValidite || null,
         });
       } catch { /* non-bloquant */ }
+      // Si le devis était "À relancer", le passer automatiquement en "Relancé"
+      if (relanceVariant === 'a_relancer') {
+        try {
+          await markDevisRelanceDone(devis.id, devis.note_private);
+          markRelanceDevis.mutate(devis.id);
+          queryClient.invalidateQueries({ queryKey: ['devis'] });
+        } catch { /* non-bloquant */ }
+      }
     } catch (e: any) {
       toast.error(`Erreur envoi : ${e.message || e}`);
     }
