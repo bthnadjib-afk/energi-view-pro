@@ -1496,6 +1496,7 @@ function mapDolibarrIntervention(d: any): Intervention {
     description: d.description || '',
     descriptionClient: d.note_public || '',
     compteRendu: meta?.notePrivee || (meta ? '' : (d.note_private || '')),
+    chantierId: meta?.chantierId || undefined,
   };
 }
 
