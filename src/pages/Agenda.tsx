@@ -345,7 +345,7 @@ export default function Agenda() {
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Statut</p>
-              <StatusBadge statut={selected.statut} />
+              <StatusBadge statut={STATUS_LABEL[getInterventionStatusKey(selected)]} />
             </div>
             <div className="sm:col-span-2">
               <p className="text-muted-foreground text-xs">Description</p>
@@ -378,7 +378,7 @@ export default function Agenda() {
                   <p className="text-sm font-medium text-foreground truncate mt-0.5">{inter.client}</p>
                   <p className="text-xs text-muted-foreground">{inter.technicien || '—'} · {TYPE_LABELS[inter.type] || inter.type}</p>
                 </div>
-                <StatusBadge statut={inter.statut} />
+                <StatusBadge statut={STATUS_LABEL[getInterventionStatusKey(inter)]} />
               </div>
             ))}
           </div>
