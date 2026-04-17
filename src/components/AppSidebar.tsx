@@ -120,8 +120,8 @@ export function AppSidebar() {
                       <NavLink
                         to={child.url}
                         end={child.url === '/'}
-                        className="hover:bg-sidebar-accent"
-                        activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                        className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        activeClassName="bg-primary/15 text-primary font-medium [&_svg]:text-primary"
                       >
                         <child.icon className="mr-2 h-3 w-3" />
                         <span className="text-xs">{child.title}</span>
@@ -142,8 +142,8 @@ export function AppSidebar() {
           <NavLink
             to={item.url}
             end={item.url === '/'}
-            className="hover:bg-sidebar-accent"
-            activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+            className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            activeClassName="bg-primary/15 text-primary font-medium [&_svg]:text-primary"
           >
             <item.icon className="mr-2 h-4 w-4" />
             {!collapsed && <span>{item.title}</span>}
@@ -199,8 +199,8 @@ export function AppSidebar() {
                       <SidebarMenuButton asChild>
                         <NavLink
                           to={item.url}
-                          className="hover:bg-sidebar-accent"
-                          activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                          className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          activeClassName="bg-primary/15 text-primary font-medium [&_svg]:text-primary"
                         >
                           <item.icon className="mr-2 h-4 w-4" />
                           {!collapsed && <span>{item.title}</span>}
@@ -224,8 +224,8 @@ export function AppSidebar() {
             <SidebarMenuButton asChild>
               <NavLink
                 to="/preferences"
-                className="hover:bg-sidebar-accent text-muted-foreground"
-                activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-muted-foreground"
+                activeClassName="bg-primary/15 text-primary font-medium [&_svg]:text-primary"
               >
                 <SlidersHorizontal className="mr-2 h-4 w-4" />
                 {!collapsed && <span>Préférences</span>}
