@@ -183,8 +183,9 @@ export default function Factures() {
 
   const handlePayment = async () => {
     if (!selectedFacture || paymentAmount <= 0) return;
-    if (!paymentAccountId) {
-      toast.error('Veuillez sélectionner un compte bancaire');
+    const parsedAccountId = parseInt(paymentAccountId, 10);
+    if (!Number.isFinite(parsedAccountId) || parsedAccountId < 1) {
+      toast.error('Veuillez sélectionner un compte bancaire valide');
       return;
     }
     const reste = selectedFacture.resteAPayer;
@@ -195,7 +196,7 @@ export default function Factures() {
         paymentid: paymentMode,
         closepaidinvoices: (reste - paymentAmount) <= 0.01 ? 'yes' : 'no',
         amount: paymentAmount,
-        accountid: Number(paymentAccountId),
+        accountid: parsedAccountId,
       });
       setPaymentOpen(false);
       setSelectedFacture(null);

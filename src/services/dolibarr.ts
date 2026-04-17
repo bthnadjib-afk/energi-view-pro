@@ -1264,13 +1264,17 @@ export async function addPayment(invoiceId: string, data: {
   amount: number;
   accountid?: number;
 }): Promise<string | null> {
-  // Swagger requires accountid (mandatory field)
+  const accountid = Number(data.accountid);
+  if (!Number.isFinite(accountid) || accountid < 1) {
+    throw new Error('Compte bancaire Dolibarr invalide');
+  }
+
   const result = await dolibarrCall<string>(`/invoices/${invoiceId}/payments`, 'POST', {
     datepaye: toUnixTimestamp(data.datepaye),
     paymentid: data.paymentid,
     closepaidinvoices: data.closepaidinvoices,
     amount: data.amount,
-    accountid: data.accountid || 1,
+    accountid,
   });
   return result;
 }
