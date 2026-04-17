@@ -293,12 +293,26 @@ export default function Factures() {
           </h1>
           <p className="text-muted-foreground text-sm">Gestion des factures — statuts natifs Dolibarr</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2 h-12 px-6 text-base">
-              <Plus className="h-4 w-4" /> Créer une facture
-            </Button>
-          </DialogTrigger>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            className="gap-2 h-12 px-4"
+            onClick={() => {
+              setAcompteSocid('');
+              setAcompteMontant(0);
+              setAcompteDescription('Acompte');
+              setAcompteTva(20);
+              setAcompteOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" /> Facture d'acompte
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2 h-12 px-6 text-base">
+                <Plus className="h-4 w-4" /> Créer une facture
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Nouvelle facture (Brouillon)</DialogTitle>
