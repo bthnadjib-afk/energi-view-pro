@@ -200,7 +200,10 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
         action: { label: 'Créer acompte', onClick: onAcompte },
         duration: 8000,
       });
-    } catch {}
+    } catch (e: any) {
+      console.error('Accept devis error:', e);
+      toast.error(`Erreur acceptation : ${e?.message || JSON.stringify(e)}`);
+    }
   };
 
   const handleAccepterAvecSignature = async (_sig: string) => {
@@ -211,7 +214,10 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
         duration: 8000,
       });
       setShowSignature(false);
-    } catch {}
+    } catch (e: any) {
+      console.error('Sign devis error:', e);
+      toast.error(`Erreur signature : ${e?.message || JSON.stringify(e)}`);
+    }
   };
 
   const handleRefuser = async () => {
@@ -220,11 +226,15 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
     } catch {}
   };
 
+  // "Annuler" un devis = le fermer comme abandonné dans Dolibarr (status 3 = non signé/abandonné).
+  // Pour un brouillon, on supprime car il n'y a rien à fermer.
   const handleAnnuler = async () => {
-    // Remettre en brouillon puis supprimer
     try {
-      if (!isDraft) await setToDraftMutation.mutateAsync(devis.id);
-      await deleteMutation.mutateAsync(devis.id);
+      if (isDraft) {
+        await deleteMutation.mutateAsync(devis.id);
+      } else {
+        await closeMutation.mutateAsync({ id: devis.id, status: 3 });
+      }
       onCollapse();
     } catch {}
   };
