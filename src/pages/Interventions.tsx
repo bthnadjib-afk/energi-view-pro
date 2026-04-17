@@ -29,6 +29,7 @@ import { Plus, FileText, Receipt, Clock, ArrowRightLeft, Lock, FileDown, FileChe
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 const typeLabels: Record<InterventionType, string> = {
   devis: 'Devis', panne: 'Panne', panne_urgence: 'Panne urgence', sav: 'SAV', chantier: 'Chantier',
@@ -72,6 +73,17 @@ export default function Interventions() {
   
   const reopenMutation = useReopenIntervention();
   const { role } = useAuth();
+  const { profile } = useAuthContext();
+  const isTechnicien = role === 'technicien';
+  const currentTechName = useMemo(() => {
+    if (!isTechnicien || !profile) return '';
+    if (profile.dolibarr_user_id) {
+      const u = dolibarrUsers.find(d => String(d.id) === String(profile.dolibarr_user_id));
+      if (u?.fullname) return u.fullname;
+    }
+    const u = dolibarrUsers.find(d => (d.email || '').toLowerCase() === (profile.email || '').toLowerCase());
+    return u?.fullname || profile.nom || '';
+  }, [isTechnicien, profile, dolibarrUsers]);
 
   const [deleteAllPending, setDeleteAllPending] = useState(false);
 
@@ -244,6 +256,8 @@ export default function Interventions() {
   const technicienNames = dolibarrUsers.map(u => u.fullname).filter(Boolean);
 
   const filtered = resolvedInterventions.filter((i) => {
+    // Technicien : ne voit QUE ses propres interventions
+    if (isTechnicien && currentTechName && i.technicien !== currentTechName) return false;
     if (techFilter !== 'all' && i.technicien !== techFilter) return false;
     if (statutFilter !== 'all' && i.statut !== statutFilter) return false;
     if (typeFilter !== 'all' && i.type !== typeFilter) return false;
@@ -506,7 +520,7 @@ export default function Interventions() {
           <h1 className="text-2xl font-bold text-foreground">Interventions</h1>
           <p className="text-muted-foreground text-sm">Planning et suivi — statuts natifs Dolibarr</p>
         </div>
-        <div className="flex gap-2">
+        {!isTechnicien && <div className="flex gap-2">
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
@@ -689,7 +703,7 @@ export default function Interventions() {
             </div>
           </DialogContent>
         </Dialog>
-        </div>
+        </div>}
       </div>
 
       {/* Filters */}

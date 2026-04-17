@@ -48,7 +48,7 @@ function ThemeToggle() {
 }
 
 function AuthenticatedApp() {
-  const { loading, session, profile } = useAuthContext();
+  const { loading, session, profile, role } = useAuthContext();
 
   if (loading) {
     return (
@@ -103,7 +103,7 @@ function AuthenticatedApp() {
           </header>
           <main className="flex-1 p-4 md:p-6 overflow-auto bg-muted/30">
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={role === 'technicien' ? <Navigate to="/agenda" replace /> : <Index />} />
               {/* Facturation */}
               <Route path="/factures" element={<RouteGuard feature="factures"><Factures /></RouteGuard>} />
               <Route path="/devis" element={<RouteGuard feature="devis"><Devis /></RouteGuard>} />
