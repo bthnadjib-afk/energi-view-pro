@@ -924,17 +924,23 @@ export default function Interventions() {
                       <Clock className="h-4 w-4" /> Heure d'arrivée
                     </h3>
                     <div className="flex gap-2">
-                      <Input
-                        type="time"
-                        value={heureArrivee}
+                      <Select
+                        value={heureArrivee || undefined}
                         disabled={appEnCours}
-                        onChange={(e) => {
-                          const v = e.target.value;
+                        onValueChange={(v) => {
                           setHeureArrivee(v);
                           if (v) autoSaveTimes(v, heureDepart);
                         }}
-                        className="flex-1"
-                      />
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Sélectionner l'heure d'arrivée" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          {timeSlots.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Button
                         type="button"
                         variant="outline"
