@@ -1529,6 +1529,17 @@ export default function Interventions() {
                   {selectedIntervention.fk_statut === 1 && !appEnCours && (
                     <Button
                       onClick={async () => {
+                        // Bloquer le démarrage avant la date/heure prévue
+                        const today = todayStr();
+                        if (selectedIntervention.date > today) {
+                          toast.error(`Impossible de démarrer avant le ${formatDateFR(selectedIntervention.date)} (date prévue)`);
+                          return;
+                        }
+                        if (selectedIntervention.date === today && selectedIntervention.heureDebut && currentTime() < selectedIntervention.heureDebut) {
+                          toast.error(`Il est ${currentTime()} — l'intervention est prévue à ${selectedIntervention.heureDebut}, démarrage impossible avant cette heure`);
+                          return;
+                        }
+
                         // L'heure d'arrivée doit être enregistrée via le bouton de capture
                         if (!heureArrivee) {
                           toast.error('Enregistrez d\'abord votre heure d\'arrivée en cliquant sur le bouton ci-dessus');
