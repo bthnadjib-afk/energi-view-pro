@@ -130,6 +130,19 @@ export default function ClientDetail() {
                   <span className="flex items-center gap-1"><AtSign className="h-3.5 w-3.5" />{client.email}</span>
                 )}
               </div>
+              {(client.typeLogement || client.etage || client.codePorte) && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
+                  {client.typeLogement && (
+                    <span className="capitalize">🏠 {client.typeLogement}</span>
+                  )}
+                  {client.etage && (
+                    <span>Étage : <span className="text-foreground font-medium">{client.etage}</span></span>
+                  )}
+                  {client.codePorte && (
+                    <span>Code porte : <span className="text-foreground font-medium font-mono">{client.codePorte}</span></span>
+                  )}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div className="text-center px-3">
