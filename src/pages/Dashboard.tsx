@@ -35,6 +35,11 @@ export default function Dashboard() {
   });
 
   const totalCA = filteredFactures.reduce((s, f) => s + f.montantHT, 0);
+  const todayStr = now.toISOString().slice(0, 10);
+  const caJournalier = factures
+    .filter(f => f.date === todayStr)
+    .reduce((s, f) => s + f.montantHT, 0);
+  const facturesJour = factures.filter(f => f.date === todayStr).length;
   const devisValides = devis.filter(d => d.fk_statut === 1).length;
   const interventionsActives = interventions.filter(i => i.fk_statut === 1 || i.fk_statut === 2).length;
   const devisSignes = devis.filter(d => d.fk_statut === 2).length;
