@@ -13,6 +13,7 @@ import {
 } from '@/services/dolibarr';
 import { openDevisPdf, devisPdfToBase64, devisPdfToBlobUrl } from '@/services/devisPdf';
 import { useConfig } from '@/hooks/useConfig';
+import { useRecordDevisEnvoi } from '@/hooks/useDevisRelances';
 import { cn } from '@/lib/utils';
 import {
   ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2,
