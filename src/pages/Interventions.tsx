@@ -224,6 +224,16 @@ export default function Interventions() {
   const [techNote, setTechNote] = useState('');
   const [heureArrivee, setHeureArrivee] = useState('');
   const [heureDepart, setHeureDepart] = useState('');
+  // Liste de créneaux par tranche de 15 min (00:00 → 23:45)
+  const timeSlots = useMemo(() => {
+    const slots: string[] = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+      }
+    }
+    return slots;
+  }, []);
   // App-side "En cours" state — stored in note_public, not sent to Dolibarr as fk_statut
   const [appEnCours, setAppEnCours] = useState(false);
 
