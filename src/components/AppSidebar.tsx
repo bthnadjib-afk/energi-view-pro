@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import {
-  LayoutDashboard, FileText, ClipboardList, Wrench, Zap, Users, Package, Calendar,
+  LayoutDashboard, FileText, ClipboardList, Wrench, Users, Package, Calendar,
   Settings, UserCog, LogOut, ShoppingCart, Truck, FileCheck, FolderOpen,
   Landmark, Warehouse, BarChart2, ChevronDown, Building2, BookOpen,
 } from 'lucide-react';
+import logo from '@/assets/logo.png';
 import { NavLink } from '@/components/NavLink';
 import { useAuthContext } from '@/contexts/AuthContext';
 import {
@@ -145,13 +146,14 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
-      <SidebarHeader className="p-4">
+      <SidebarHeader className="p-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Zap className="h-4 w-4 text-primary-foreground" />
-          </div>
+          <img src={logo} alt="Electricien Du Genevois" className="h-10 w-10 object-contain flex-shrink-0" />
           {!collapsed && (
-            <span className="text-lg font-bold text-foreground">ÉlectroPro</span>
+            <div className="flex flex-col leading-tight min-w-0">
+              <span className="text-sm font-bold text-foreground truncate">Electricien</span>
+              <span className="text-xs text-muted-foreground truncate">Du Genevois</span>
+            </div>
           )}
         </div>
       </SidebarHeader>
