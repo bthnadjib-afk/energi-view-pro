@@ -65,7 +65,10 @@ export default function Dashboard() {
   const facturesARelancer = useMemo(() => {
     return factures
       .filter(f => f.fk_statut >= 1 && !f.paye)
-      .map(f => ({ facture: f, status: getRelanceStatus(factureRelanceById.get(f.id), f.paye) }))
+      .map(f => ({
+        facture: f,
+        status: getRelanceStatus(factureRelanceById.get(f.id), f.paye, f.dateValidation),
+      }))
       .filter(({ status }) => status.variant !== 'none');
   }, [factures, factureRelanceById]);
 
@@ -79,7 +82,7 @@ export default function Dashboard() {
     });
   }, [devis, interventions]);
 
-  // 3) Devis à relancer (envoyés depuis ≥7j sans signature)
+  // 3) Devis à relancer (envoyés/validés depuis ≥7j sans signature)
   const devisRelanceById = useMemo(() => {
     const m = new Map<string, typeof devisRelancesData[0]>();
     devisRelancesData.forEach(r => m.set(r.devis_id, r));
@@ -88,7 +91,10 @@ export default function Dashboard() {
   const devisARelancer = useMemo(() => {
     return devis
       .filter(d => d.fk_statut === 1) // envoyé/validé, pas signé
-      .map(d => ({ devis: d, status: getDevisRelanceStatus(devisRelanceById.get(d.id), d.fk_statut) }))
+      .map(d => ({
+        devis: d,
+        status: getDevisRelanceStatus(devisRelanceById.get(d.id), d.fk_statut, d.dateValidation),
+      }))
       .filter(({ status }) => status.variant === 'a_relancer' || status.variant === 'expire');
   }, [devis, devisRelanceById]);
 
