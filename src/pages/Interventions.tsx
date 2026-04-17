@@ -1486,7 +1486,34 @@ export default function Interventions() {
                     </AlertDialog>
                   )}
 
-                  {/* Validée (1) + pas encore démarrée → Démarrer (app-side only) */}
+                  {/* Annuler — validée (1) ou en cours (2) non démarrée app, admin/secrétaire — exclut déjà annulée */}
+                  {(selectedIntervention.fk_statut === 1 || selectedIntervention.fk_statut === 2) && role !== 'technicien' && getInterventionStatusKey(selectedIntervention) !== 'annulee' && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" className="gap-2 border-red-500/40 text-red-700 dark:text-red-400" disabled={cancellingId === selectedIntervention.id}>
+                          <XCircle className="h-4 w-4" /> {cancellingId === selectedIntervention.id ? 'Annulation...' : 'Annuler'}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Annuler {selectedIntervention.ref} ?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            L'intervention sera marquée <strong>Annulée</strong> (rouge) et restera visible dans l'historique. Vous pourrez ensuite créer une intervention de remplacement avec le même technicien sur le même créneau.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Retour</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleCancelIntervention(selectedIntervention)}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                          >
+                            Confirmer l'annulation
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+
                   {selectedIntervention.fk_statut === 1 && !appEnCours && (
                     <Button
                       onClick={async () => {
