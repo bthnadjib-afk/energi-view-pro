@@ -1349,6 +1349,11 @@ function mapDolibarrIntervention(d: any): Intervention {
 function mapDolibarrClient(d: any): Client {
   const ao = d.array_options || {};
   const tl = (ao.options_type_logement || '') as string;
+  const siret = String(d.idprof1 || '').trim();
+  const tvaIntra = String(d.tva_intra || '').trim();
+  const isPro = !!(siret || tvaIntra);
+  const parentRaw = d.parent ?? d.fk_parent;
+  const parentId = parentRaw && String(parentRaw) !== '0' ? String(parentRaw) : undefined;
   return {
     id: String(d.id),
     nom: d.name || '',
@@ -1360,6 +1365,10 @@ function mapDolibarrClient(d: any): Client {
     etage: ao.options_etage || '',
     codePorte: ao.options_code_porte || '',
     typeLogement: (tl === 'maison' || tl === 'immeuble' ? tl : '') as TypeLogement,
+    clientType: isPro ? 'professionnel' : 'particulier',
+    siret: siret || undefined,
+    tvaIntra: tvaIntra || undefined,
+    parentId,
   };
 }
 
