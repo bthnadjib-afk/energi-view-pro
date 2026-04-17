@@ -1104,6 +1104,113 @@ export default function Factures() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Acompte libre dialog */}
+      <Dialog open={acompteOpen} onOpenChange={setAcompteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nouvelle facture d'acompte</DialogTitle>
+            <DialogDescription>Crée une facture d'acompte indépendante d'un devis.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Client</label>
+              <Select value={acompteSocid} onValueChange={setAcompteSocid}>
+                <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
+                <SelectContent>
+                  {clients.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Description</label>
+              <Input value={acompteDescription} onChange={e => setAcompteDescription(e.target.value.slice(0, 200))} placeholder="Acompte chantier..." maxLength={200} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Montant HT (€)</label>
+                <Input type="number" step="0.01" min="0" value={acompteMontant} onChange={e => setAcompteMontant(Math.max(0, Number(e.target.value)))} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">TVA (%)</label>
+                <Select value={String(acompteTva)} onValueChange={v => setAcompteTva(Number(v))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0 %</SelectItem>
+                    <SelectItem value="10">10 %</SelectItem>
+                    <SelectItem value="20">20 %</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button
+              onClick={async () => {
+                if (!acompteSocid || acompteMontant <= 0) { toast.error('Sélectionnez un client et saisissez un montant'); return; }
+                await createAcompteLibreMutation.mutateAsync({ socid: acompteSocid, montant: acompteMontant, description: acompteDescription.trim() || 'Acompte', tva_tx: acompteTva });
+                setAcompteOpen(false);
+              }}
+              disabled={createAcompteLibreMutation.isPending || !acompteSocid || acompteMontant <= 0}
+              className="w-full"
+            >
+              {createAcompteLibreMutation.isPending ? 'Création...' : "Créer la facture d'acompte"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Abandon dialog */}
+      <Dialog open={abandonOpen} onOpenChange={setAbandonOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Classer la facture en abandonnée</DialogTitle>
+            <DialogDescription>
+              {selectedFacture ? `Facture ${selectedFacture.ref} — ${selectedFacture.resteAPayer.toLocaleString('fr-FR')} € restants` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Motif</label>
+              <Select value={abandonCode} onValueChange={(v: any) => setAbandonCode(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="badcustomer">Mauvais payeur</SelectItem>
+                  <SelectItem value="abandon">Litige commercial</SelectItem>
+                  <SelectItem value="other">Autre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">
+                Précision {abandonCode === 'other' ? '(obligatoire)' : '(optionnel)'}
+              </label>
+              <Textarea value={abandonNote} onChange={e => setAbandonNote(e.target.value.slice(0, 500))} placeholder="Détails sur l'abandon..." rows={4} maxLength={500} />
+              <p className="text-xs text-muted-foreground text-right">{abandonNote.length}/500</p>
+            </div>
+            <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
+              Cette action classe définitivement la facture comme abandonnée (statut 3 Dolibarr). Elle reste consultable mais ne sera plus relancée.
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setAbandonOpen(false)} className="flex-1">Annuler</Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={async () => {
+                  if (!selectedFacture) return;
+                  if (abandonCode === 'other' && !abandonNote.trim()) { toast.error('Précisez le motif'); return; }
+                  await classifyAbandoneeMutation.mutateAsync({ factureId: selectedFacture.id, close_code: abandonCode, close_note: abandonNote.trim() });
+                  setAbandonOpen(false);
+                  setSelectedFacture(null);
+                }}
+                disabled={classifyAbandoneeMutation.isPending}
+              >
+                {classifyAbandoneeMutation.isPending ? 'En cours...' : "Confirmer l'abandon"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
