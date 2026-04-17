@@ -3,8 +3,10 @@ import { cn } from '@/lib/utils';
 const statusStyles: Record<string, string> = {
   'brouillon': 'bg-gray-100 text-gray-600 border-gray-200',
   'ouvert': 'bg-blue-100 text-blue-700 border-blue-200',
+  'envoyé': 'bg-blue-100 text-blue-700 border-blue-200',
   'validé': 'bg-blue-100 text-blue-700 border-blue-200',
   'validée': 'bg-blue-100 text-blue-700 border-blue-200',
+  'accepté': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'signé': 'bg-emerald-100 text-emerald-700 border-emerald-200',
   'refusé': 'bg-red-100 text-red-700 border-red-200',
   'facturé': 'bg-violet-100 text-violet-700 border-violet-200',

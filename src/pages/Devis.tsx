@@ -292,7 +292,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
 
   return (
     <tr>
-      <td colSpan={8} className="p-0">
+      <td colSpan={9} className="p-0">
         <div className="bg-muted/50 p-4 mx-2 mb-2 rounded-lg space-y-4 border border-border">
           {isExpired && (
             <div className="bg-red-100 border border-red-200 text-red-700 px-3 py-2 rounded-md text-xs font-medium">
@@ -770,62 +770,124 @@ export default function Devis() {
           <DialogTrigger asChild>
             <Button className="gap-2 h-12 px-6 text-base"><Plus className="h-4 w-4" /> Créer un devis</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Nouveau devis (Brouillon)</DialogTitle></DialogHeader>
-            <div className="space-y-4 pt-2">
-              <Select value={socid} onValueChange={setSocid}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
-                <SelectContent>
-                  {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Nouveau devis — Brouillon</DialogTitle></DialogHeader>
+            <div className="space-y-5 pt-2">
+
+              {/* Client */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground">Client *</label>
+                {socid && (() => { const c = clients.find(x => x.id === socid); return c ? (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-50 border border-emerald-200 text-sm text-emerald-800 font-medium">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" /> {c.nom}{c.email ? ` — ${c.email}` : ''}{c.telephone ? ` — ${c.telephone}` : ''}
+                  </div>
+                ) : null; })()}
+                <Select value={socid} onValueChange={setSocid}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner un client..." /></SelectTrigger>
+                  <SelectContent>
+                    {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.nom}{c.email ? ` — ${c.email}` : ''}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Lignes */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-foreground">Lignes</h3>
-                  <Button variant="outline" size="sm" onClick={addLigne} className="gap-1"><Plus className="h-3 w-3" /> Ajouter</Button>
+                  <h3 className="text-sm font-semibold text-foreground">Lignes du devis</h3>
+                  <Button variant="outline" size="sm" onClick={addLigne} className="gap-1.5"><Plus className="h-3.5 w-3.5" /> Ajouter une ligne</Button>
                 </div>
-                {lignes.map((l, i) => (
-                  <div key={i} className="space-y-2 p-3 rounded-lg bg-muted/50 border border-border">
-                    <Select value={l.productId || '__libre__'} onValueChange={(v) => selectProduct(i, v)}>
-                      <SelectTrigger className="text-xs"><SelectValue placeholder="Sélectionner un article" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__libre__">✏️ Ligne libre</SelectItem>
-                        {produits.map(p => <SelectItem key={p.id} value={p.id}>[{p.ref}] — {p.label} ({p.type === 'main_oeuvre' ? "MO" : 'F'})</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <div className="grid grid-cols-12 gap-2 items-end">
-                      <div className="col-span-6">
-                        <Input placeholder="Désignation" value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} className="text-xs" />
-                      </div>
-                      <div className="col-span-2">
-                        <Input type="number" placeholder="Qté" value={l.qty} onChange={e => updateLigne(i, 'qty', Number(e.target.value))} className="text-xs" />
-                      </div>
-                      <div className="col-span-3">
-                        <Input type="number" placeholder="Prix HT" value={l.subprice} onChange={e => updateLigne(i, 'subprice', Number(e.target.value))} className="text-xs" />
-                      </div>
-                      <div className="col-span-1">
+
+                {lignes.map((l, i) => {
+                  const ligneHT = l.qty * l.subprice;
+                  const ligneAchat = l.qty * l.prixAchat;
+                  const ligneMarge = ligneHT - ligneAchat;
+                  const lignePct = ligneHT > 0 ? (ligneMarge / ligneHT) * 100 : 0;
+                  return (
+                    <div key={i} className="p-4 rounded-lg bg-muted/40 border border-border space-y-3">
+                      {/* Ligne numéro + supprimer */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ligne {i + 1}</span>
                         {lignes.length > 1 && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeLigne(i)}>
-                            <Trash2 className="h-3 w-3 text-destructive" />
+                          <Button variant="ghost" size="sm" className="h-7 gap-1 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => removeLigne(i)}>
+                            <Trash2 className="h-3.5 w-3.5" /> Supprimer
                           </Button>
                         )}
                       </div>
+
+                      {/* Article catalogue */}
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Article du catalogue (optionnel)</label>
+                        <Select value={l.productId || '__libre__'} onValueChange={(v) => selectProduct(i, v)}>
+                          <SelectTrigger className="text-sm"><SelectValue placeholder="Choisir un article..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__libre__">✏️ Ligne libre (saisie manuelle)</SelectItem>
+                            {produits.map(p => <SelectItem key={p.id} value={p.id}>[{p.ref}] {p.label} — {p.prixHT.toLocaleString('fr-FR')} € HT ({p.type === 'main_oeuvre' ? 'Main d\'œuvre' : 'Fourniture'})</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Désignation */}
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Désignation *</label>
+                        <Input placeholder="Description de la prestation ou fourniture..." value={l.desc} onChange={e => updateLigne(i, 'desc', e.target.value)} />
+                      </div>
+
+                      {/* Qté / Prix HT / Prix Achat + totaux */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground font-medium">Quantité</label>
+                          <Input type="number" min="0" step="0.01" value={l.qty} onChange={e => updateLigne(i, 'qty', Number(e.target.value))} />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground font-medium">Prix unitaire HT (€)</label>
+                          <Input type="number" min="0" step="0.01" value={l.subprice} onChange={e => updateLigne(i, 'subprice', Number(e.target.value))} />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground font-medium">Prix achat HT (€)</label>
+                          <Input type="number" min="0" step="0.01" value={l.prixAchat} onChange={e => updateLigne(i, 'prixAchat', Number(e.target.value))} />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground font-medium">Total HT</label>
+                          <div className="h-10 flex items-center px-3 rounded-md bg-background border border-border text-sm font-semibold text-foreground">
+                            {ligneHT.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Marge par ligne */}
+                      {l.prixAchat > 0 && (
+                        <div className="flex items-center gap-3 text-xs">
+                          <span className="text-muted-foreground">Marge ligne :</span>
+                          <span className={cn('font-semibold', ligneMarge >= 0 ? 'text-emerald-600' : 'text-red-500')}>
+                            {ligneMarge.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € ({lignePct.toFixed(1)}%)
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              <div className="rounded-lg bg-muted/50 border border-border p-4 space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total HT</span>
-                  <span className="font-medium">{totals.ht.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</span>
+
+              {/* Récapitulatif */}
+              <div className="rounded-lg bg-muted/50 border border-border p-4 grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Total HT</p>
+                  <p className="text-lg font-bold text-foreground">{totals.ht.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</p>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Marge</span>
-                  <span className="text-emerald-600 font-medium">{totals.marge.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € ({totals.pctMarge.toFixed(0)}%)</span>
+                <div className="text-center border-x border-border">
+                  <p className="text-xs text-muted-foreground mb-1">Total TTC (20%)</p>
+                  <p className="text-lg font-bold text-foreground">{(totals.ht * 1.2).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Marge brute</p>
+                  <p className={cn('text-lg font-bold', totals.marge >= 0 ? 'text-emerald-600' : 'text-red-500')}>
+                    {totals.marge.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € <span className="text-sm">({totals.pctMarge.toFixed(1)}%)</span>
+                  </p>
                 </div>
               </div>
-              <Button onClick={handleCreate} disabled={createDevisMutation.isPending || !socid} className="w-full h-12 text-base">
-                {createDevisMutation.isPending ? 'Création...' : 'Créer le devis (Brouillon)'}
+
+              <Button onClick={handleCreate} disabled={createDevisMutation.isPending || !socid || !lignes[0].desc} className="w-full h-12 text-base">
+                {createDevisMutation.isPending ? 'Création en cours...' : 'Créer le devis (Brouillon)'}
               </Button>
             </div>
           </DialogContent>
@@ -865,6 +927,7 @@ export default function Devis() {
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Date</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden sm:table-cell">Fin validité</th>
                 <th className="text-right py-3 px-2 text-muted-foreground font-medium">Montant HT</th>
+                <th className="text-right py-3 px-2 text-muted-foreground font-medium hidden md:table-cell">Marge</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Statut</th>
                 <th className="w-10"></th>
               </tr>
@@ -905,6 +968,21 @@ export default function Devis() {
                       ) : '—'}
                     </td>
                     <td className="py-3 px-2 text-right font-medium text-foreground">{d.montantHT.toLocaleString('fr-FR')} €</td>
+                    <td className="py-3 px-2 text-right hidden md:table-cell">
+                      {(() => {
+                        const venteHT = d.lignes.reduce((s, l) => s + l.totalHT, 0);
+                        const achatHT = d.lignes.reduce((s, l) => s + (l.prixAchat || 0) * l.quantite, 0);
+                        const marge = venteHT - achatHT;
+                        const pct = venteHT > 0 ? (marge / venteHT) * 100 : 0;
+                        const hasCost = d.lignes.some(l => (l.prixAchat || 0) > 0);
+                        if (!hasCost) return <span className="text-muted-foreground text-xs">—</span>;
+                        return (
+                          <span className={cn('text-xs font-semibold', marge >= 0 ? 'text-emerald-600' : 'text-red-500')}>
+                            {marge.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} € <span className="text-muted-foreground font-normal">({pct.toFixed(0)}%)</span>
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="py-3 px-2"><StatusBadge statut={d.statut} /></td>
                     <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
                       {d.fk_statut === 0 && (
@@ -941,7 +1019,7 @@ export default function Devis() {
                 </Fragment>
               ))}
               {filteredDevis.length === 0 && (
-                <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">Aucun devis trouvé</td></tr>
+                <tr><td colSpan={9} className="py-8 text-center text-muted-foreground">Aucun devis trouvé</td></tr>
               )}
             </tbody>
           </table>

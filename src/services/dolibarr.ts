@@ -213,8 +213,8 @@ async function fetchClientsRaw(): Promise<Client[]> {
 
 export const DEVIS_STATUTS: Record<number, string> = {
   0: 'Brouillon',
-  1: 'Ouvert',
-  2: 'Signé',
+  1: 'Envoyé',
+  2: 'Accepté',
   3: 'Refusé',
   4: 'Facturé',
 };
