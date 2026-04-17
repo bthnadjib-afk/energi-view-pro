@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, Mail, FileText, ClipboardList, Wrench, AlertTriangle,
-  FileDown, MapPin, Phone, AtSign,
+  FileDown, MapPin, Phone, AtSign, Building2, User, Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
