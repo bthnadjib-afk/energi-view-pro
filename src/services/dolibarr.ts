@@ -649,6 +649,24 @@ export async function markDevisAutoExpired(id: string, currentNotePrivate?: stri
   await dolibarrCall(`/proposals/${id}`, 'PUT', { note_private: JSON.stringify(meta) });
 }
 
+/** Marque un devis comme "à relancer" (>= 7 jours sans réponse). Déclenché automatiquement. */
+export async function markDevisRelance1(id: string, currentNotePrivate?: string): Promise<void> {
+  let meta: Record<string, any> = {};
+  try { if (currentNotePrivate) meta = JSON.parse(currentNotePrivate); } catch {}
+  meta.relance_1 = true;
+  meta.relance_1_at = new Date().toISOString();
+  await dolibarrCall(`/proposals/${id}`, 'PUT', { note_private: JSON.stringify(meta) });
+}
+
+/** Marque un devis comme "relancé" manuellement par l'utilisateur. */
+export async function markDevisRelanceDone(id: string, currentNotePrivate?: string): Promise<void> {
+  let meta: Record<string, any> = {};
+  try { if (currentNotePrivate) meta = JSON.parse(currentNotePrivate); } catch {}
+  meta.relance_done = true;
+  meta.relance_done_at = new Date().toISOString();
+  await dolibarrCall(`/proposals/${id}`, 'PUT', { note_private: JSON.stringify(meta) });
+}
+
 // --- Factures ---
 
 export async function createFacture(socid: string, lines: CreateDevisLine[], note_private?: string): Promise<string> {
@@ -1327,9 +1345,15 @@ function mapDolibarrDevis(d: any): Devis {
   const fk_statut = Number(d.fk_statut ?? d.statut ?? d.status) || 0;
   let noteMeta: Record<string, any> = {};
   try { if (d.note_private) noteMeta = JSON.parse(d.note_private); } catch {}
-  const isSent = fk_statut === 1 && noteMeta.sent === true;
+  const isSent        = fk_statut === 1 && noteMeta.sent === true;
+  const isRelance1    = fk_statut === 1 && noteMeta.relance_1 === true && !noteMeta.relance_done;
+  const isRelanceDone = fk_statut === 1 && noteMeta.relance_done === true;
   const isAutoExpired = fk_statut === 3 && noteMeta.auto_expired === true;
-  const statut = isAutoExpired ? 'Annulé' : (isSent ? 'Envoyé' : getDevisStatutLabel(fk_statut));
+  const statut = isAutoExpired  ? 'Annulé'
+    : isRelanceDone             ? 'Relancé'
+    : isRelance1                ? 'Relance devis'
+    : isSent                    ? 'Envoyé'
+    : getDevisStatutLabel(fk_statut);
   return {
     id: String(d.id),
     ref: d.ref || `DE-${d.id}`,

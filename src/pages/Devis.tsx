@@ -9,7 +9,7 @@ import {
 } from '@/hooks/useDolibarr';
 import {
   getAcompteBadge, formatDateFR, replaceEmailVariables, DEVIS_STATUTS,
-  saveDevisSignatureToken, markDevisSent, closeDevis, markDevisAutoExpired, type Devis as DevisType, type Client,
+  saveDevisSignatureToken, markDevisSent, closeDevis, markDevisAutoExpired, markDevisRelance1, markDevisRelanceDone, type Devis as DevisType, type Client,
 } from '@/services/dolibarr';
 import { openDevisPdf, devisPdfToBase64, devisPdfToBlobUrl } from '@/services/devisPdf';
 import { useConfig } from '@/hooks/useConfig';
@@ -1111,6 +1111,28 @@ export default function Devis() {
     return m;
   }, [devisRelances]);
 
+  // Auto-relance : marque les devis validés depuis >= 7 jours sans réponse
+  const autoRelanceRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (devis.length === 0) return;
+    const toRelance = devis.filter(d => {
+      if (d.fk_statut !== 1) return false;
+      let meta: any = {};
+      try { if (d.note_private) meta = JSON.parse(d.note_private); } catch {}
+      if (meta.relance_1 || meta.relance_done) return false; // déjà marqué
+      if (autoRelanceRef.current.has(d.id)) return false;
+      const refDate = d.dateValidation || d.date;
+      if (!refDate) return false;
+      const days = (Date.now() - new Date(refDate).getTime()) / (1000 * 60 * 60 * 24);
+      return days >= 7;
+    });
+    if (toRelance.length === 0) return;
+    toRelance.forEach(d => autoRelanceRef.current.add(d.id));
+    Promise.all(toRelance.map(d => markDevisRelance1(d.id, d.note_private)))
+      .then(() => queryClient.invalidateQueries({ queryKey: ['devis'] }))
+      .catch(e => console.error('Auto-relance error:', e));
+  }, [devis]);
+
   // Auto-expiry : ferme automatiquement les devis validés dont la date de fin de validité est dépassée
   const autoClosedRef = useRef(new Set<string>());
   useEffect(() => {
@@ -1538,14 +1560,7 @@ export default function Devis() {
                       })()}
                     </td>
                     <td className="py-3 px-2">
-                      {(() => {
-                        const rs = getDevisRelanceStatus(devisRelanceMap.get(d.id), d.fk_statut, d.dateValidation || d.date);
-                        const effectiveStatut =
-                          rs.variant === 'a_relancer' ? 'Relance devis' :
-                          rs.variant === 'relance'    ? 'Relancé' :
-                          d.statut;
-                        return <StatusBadge statut={effectiveStatut} />;
-                      })()}
+                      <StatusBadge statut={d.statut} />
                     </td>
                     <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
                       {d.fk_statut === 0 && (
@@ -1577,8 +1592,12 @@ export default function Devis() {
                       convertPending={convertMutation.isPending}
                       acomptePending={acompteMutation.isPending}
                       onCollapse={() => setExpandedId(null)}
-                      relanceVariant={getDevisRelanceStatus(devisRelanceMap.get(d.id), d.fk_statut, d.dateValidation || d.date).variant}
-                      onMarkRelance={() => markRelanceMutation.mutate(d.id)}
+                      relanceVariant={d.statut === 'Relance devis' ? 'a_relancer' : d.statut === 'Relancé' ? 'relance' : 'none'}
+                      onMarkRelance={async () => {
+                        await markDevisRelanceDone(d.id, d.note_private);
+                        markRelanceMutation.mutate(d.id); // Supabase aussi
+                        queryClient.invalidateQueries({ queryKey: ['devis'] });
+                      }}
                     />
                   )}
                 </Fragment>
