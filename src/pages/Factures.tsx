@@ -27,7 +27,16 @@ interface LigneForm {
 
 export default function Factures() {
   const { config } = useConfig();
+  const { role } = useAuthContext();
+  const canRecordPayment = role === 'admin' || role === 'secretaire';
   const { data: factures = [] } = useFactures();
+  const { data: relances = [] } = useFactureRelances();
+  const recordEnvoi = useRecordFactureEnvoi();
+  const relanceByFactureId = useMemo(() => {
+    const map = new Map<string, typeof relances[0]>();
+    relances.forEach(r => map.set(r.facture_id, r));
+    return map;
+  }, [relances]);
   const { data: clients = [] } = useClients();
   const { data: produits = [] } = useProduits();
   const createFactureMutation = useCreateFacture();
