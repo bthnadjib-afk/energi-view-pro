@@ -35,6 +35,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { persistLinesToCatalog } from '@/lib/catalogHelpers';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useProductGroups } from '@/hooks/useProductGroups';
+import { Layers } from 'lucide-react';
 
 interface LigneForm {
   desc: string;
@@ -80,6 +82,8 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const { config } = useConfig();
   const queryClient = useQueryClient();
   const recordEnvoi = useRecordDevisEnvoi();
+  const { data: productGroups = [] } = useProductGroups();
+  const [insertEditLotOpen, setInsertEditLotOpen] = useState(false);
 
   // Tracks if we're editing a previously-validated devis (so we re-validate after save)
   const [editingValidatedDevis, setEditingValidatedDevis] = useState(false);
@@ -395,6 +399,21 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   };
 
   const emptyLigne = (): LigneForm => ({ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '', prixAchat: 0 });
+
+  const insertEditLot = (groupId: string) => {
+    const group = productGroups.find(g => g.id === groupId);
+    if (!group) return;
+    const newLines: LigneForm[] = group.lines.map(l => ({
+      desc: l.desc, qty: l.variable_qty ? 0 : l.qty,
+      subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type,
+      prixAchat: l.prixAchat, productId: '',
+    }));
+    setEditLines(prev => [...prev, ...newLines]);
+    setInsertEditLotOpen(false);
+    const nbVar = group.lines.filter(l => l.variable_qty).length;
+    if (nbVar > 0) toast.info(`${nbVar} ligne${nbVar > 1 ? 's' : ''} avec quantité à définir`);
+    else toast.success(`Lot "${group.nom}" inséré`);
+  };
 
   return (
     <tr>
@@ -872,11 +891,18 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
               <DialogHeader><DialogTitle>Modifier les lignes — {devis.ref}</DialogTitle></DialogHeader>
               <div className="space-y-5 pt-2">
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <h3 className="text-sm font-semibold text-foreground">Lignes du devis</h3>
-                    <Button variant="outline" size="sm" onClick={() => setEditLines([...editLines, emptyLigne()])} className="gap-1.5">
-                      <Plus className="h-3.5 w-3.5" /> Ajouter une ligne
-                    </Button>
+                    <div className="flex gap-2">
+                      {productGroups.length > 0 && (
+                        <Button variant="outline" size="sm" onClick={() => setInsertEditLotOpen(true)} className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10">
+                          <Layers className="h-3.5 w-3.5" /> Insérer un lot
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" onClick={() => setEditLines([...editLines, emptyLigne()])} className="gap-1.5">
+                        <Plus className="h-3.5 w-3.5" /> Ajouter une ligne
+                      </Button>
+                    </div>
                   </div>
                   {editLines.map((l, i) => {
                     const ligneHT = l.qty * l.subprice;
@@ -1004,6 +1030,40 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Dialog — Insérer un lot (modification) */}
+          <Dialog open={insertEditLotOpen} onOpenChange={setInsertEditLotOpen}>
+            <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+              <DialogHeader><DialogTitle className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Insérer un lot</DialogTitle></DialogHeader>
+              <div className="space-y-3 pt-2">
+                {productGroups.map(g => (
+                  <button
+                    key={g.id}
+                    onClick={() => insertEditLot(g.id)}
+                    className="w-full text-left rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 p-4 transition-colors space-y-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-foreground">{g.nom}</span>
+                      <span className="text-xs text-muted-foreground">{g.lines.length} ligne{g.lines.length > 1 ? 's' : ''}</span>
+                    </div>
+                    {g.description && <p className="text-xs text-muted-foreground">{g.description}</p>}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {g.lines.map((l, i) => (
+                        <span key={i} className={cn(
+                          'text-[11px] px-2 py-0.5 rounded-full border',
+                          l.variable_qty
+                            ? 'border-amber-300 bg-amber-50 text-amber-700'
+                            : 'border-border bg-muted text-muted-foreground'
+                        )}>
+                          {l.variable_qty ? '⚠ ' : ''}{l.desc.length > 28 ? l.desc.slice(0, 28) + '…' : l.desc}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </td>
     </tr>
@@ -1017,6 +1077,7 @@ export default function Devis() {
   const { data: devis = [] } = useDevis();
   const { data: clients = [] } = useClients();
   const { data: produits = [] } = useProduits();
+  const { data: productGroups = [] } = useProductGroups();
   const createDevisMutation = useCreateDevis();
   const convertMutation = useConvertDevisToFacture();
   const acompteMutation = useCreateAcompte();
@@ -1028,9 +1089,30 @@ export default function Devis() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatut, setFilterStatut] = useState('all');
   const [filterClient, setFilterClient] = useState('all');
+  const [insertLotOpen, setInsertLotOpen] = useState(false);
 
   const emptyLigne = (): LigneForm => ({ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '', prixAchat: 0 });
   const addLigne = () => setLignes([...lignes, emptyLigne()]);
+
+  const insertLot = (groupId: string) => {
+    const group = productGroups.find(g => g.id === groupId);
+    if (!group) return;
+    const newLines: LigneForm[] = group.lines.map(l => ({
+      desc: l.desc, qty: l.variable_qty ? 0 : l.qty,
+      subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type,
+      prixAchat: l.prixAchat, productId: '',
+    }));
+    // Remove empty placeholder if only one empty line
+    const base = lignes.length === 1 && !lignes[0].desc ? [] : lignes;
+    setLignes([...base, ...newLines]);
+    setInsertLotOpen(false);
+    const nbVariable = group.lines.filter(l => l.variable_qty).length;
+    if (nbVariable > 0) {
+      toast.info(`${nbVariable} ligne${nbVariable > 1 ? 's' : ''} marquée${nbVariable > 1 ? 's' : ''} "Qté à définir" — vérifiez les quantités`);
+    } else {
+      toast.success(`Lot "${group.nom}" inséré (${group.lines.length} lignes)`);
+    }
+  };
   const removeLigne = (i: number) => setLignes(lignes.filter((_, idx) => idx !== i));
 
   const selectProduct = (i: number, productId: string) => {
@@ -1126,9 +1208,16 @@ export default function Devis() {
 
               {/* Lignes */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold text-foreground">Lignes du devis</h3>
-                  <Button variant="outline" size="sm" onClick={addLigne} className="gap-1.5"><Plus className="h-3.5 w-3.5" /> Ajouter une ligne</Button>
+                  <div className="flex gap-2">
+                    {productGroups.length > 0 && (
+                      <Button variant="outline" size="sm" onClick={() => setInsertLotOpen(true)} className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10">
+                        <Layers className="h-3.5 w-3.5" /> Insérer un lot
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={addLigne} className="gap-1.5"><Plus className="h-3.5 w-3.5" /> Ajouter une ligne</Button>
+                  </div>
                 </div>
 
                 {lignes.map((l, i) => {
@@ -1243,6 +1332,40 @@ export default function Devis() {
               <Button onClick={handleCreate} disabled={createDevisMutation.isPending || !socid || !lignes[0].desc} className="w-full h-12 text-base">
                 {createDevisMutation.isPending ? 'Création en cours...' : 'Créer le devis (Brouillon)'}
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog — Insérer un lot (création) */}
+        <Dialog open={insertLotOpen} onOpenChange={setInsertLotOpen}>
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+            <DialogHeader><DialogTitle className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Insérer un lot</DialogTitle></DialogHeader>
+            <div className="space-y-3 pt-2">
+              {productGroups.map(g => (
+                <button
+                  key={g.id}
+                  onClick={() => insertLot(g.id)}
+                  className="w-full text-left rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 p-4 transition-colors space-y-1"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-foreground">{g.nom}</span>
+                    <span className="text-xs text-muted-foreground">{g.lines.length} ligne{g.lines.length > 1 ? 's' : ''}</span>
+                  </div>
+                  {g.description && <p className="text-xs text-muted-foreground">{g.description}</p>}
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {g.lines.map((l, i) => (
+                      <span key={i} className={cn(
+                        'text-[11px] px-2 py-0.5 rounded-full border',
+                        l.variable_qty
+                          ? 'border-amber-300 bg-amber-50 text-amber-700'
+                          : 'border-border bg-muted text-muted-foreground'
+                      )}>
+                        {l.variable_qty ? '⚠ ' : ''}{l.desc.length > 28 ? l.desc.slice(0, 28) + '…' : l.desc}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              ))}
             </div>
           </DialogContent>
         </Dialog>

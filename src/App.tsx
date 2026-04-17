@@ -22,6 +22,7 @@ import Configuration from "./pages/Configuration";
 import Utilisateurs from "./pages/Utilisateurs";
 import Fournisseurs from "./pages/Fournisseurs";
 import Contrats from "./pages/Contrats";
+import Lots from "./pages/Lots";
 import Projets from "./pages/Projets";
 import Banque from "./pages/Banque";
 import Stock from "./pages/Stock";
@@ -116,6 +117,7 @@ function AuthenticatedApp() {
               <Route path="/fournisseurs" element={<RouteGuard feature="clients"><Fournisseurs /></RouteGuard>} />
               {/* Produits */}
               <Route path="/catalogue" element={<RouteGuard feature="factures"><Catalogue /></RouteGuard>} />
+              <Route path="/lots" element={<RouteGuard feature="factures"><Lots /></RouteGuard>} />
               <Route path="/stock" element={<RouteGuard feature="factures"><Stock /></RouteGuard>} />
               {/* Projets */}
               <Route path="/projets" element={<RouteGuard feature="agenda"><Projets /></RouteGuard>} />

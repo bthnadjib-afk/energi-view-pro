@@ -65,7 +65,13 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Produits & Stock',
     items: [
-      { title: 'Catalogue', url: '/catalogue', icon: Package, feature: 'clients' },
+      {
+        title: 'Catalogue', url: '/catalogue', icon: Package, feature: 'clients',
+        children: [
+          { title: 'Articles', url: '/catalogue', icon: Package, feature: 'clients' },
+          { title: 'Lots / Gabarits', url: '/lots', icon: BookOpen, feature: 'clients' },
+        ],
+      },
       { title: 'Stock', url: '/stock', icon: Warehouse, feature: 'factures' },
     ],
   },
