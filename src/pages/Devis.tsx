@@ -1124,7 +1124,7 @@ export default function Devis() {
       const refDate = d.dateValidation || d.date;
       if (!refDate) return false;
       const days = (Date.now() - new Date(refDate).getTime()) / (1000 * 60 * 60 * 24);
-      return days >= 7;
+      return days >= 0; // TEST — remettre à 7 après validation
     });
     if (toRelance.length === 0) return;
     toRelance.forEach(d => autoRelanceRef.current.add(d.id));
