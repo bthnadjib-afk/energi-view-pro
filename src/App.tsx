@@ -15,6 +15,7 @@ import Factures from "./pages/Factures";
 import Devis from "./pages/Devis";
 import Interventions from "./pages/Interventions";
 import Clients from "./pages/Clients";
+import ClientDetail from "./pages/ClientDetail";
 import Catalogue from "./pages/Catalogue";
 import Agenda from "./pages/Agenda";
 import Configuration from "./pages/Configuration";
@@ -111,6 +112,7 @@ function AuthenticatedApp() {
               <Route path="/interventions" element={<RouteGuard feature="interventions"><Interventions /></RouteGuard>} />
               {/* Tiers */}
               <Route path="/clients" element={<RouteGuard feature="clients"><Clients /></RouteGuard>} />
+              <Route path="/clients/:id" element={<RouteGuard feature="clients"><ClientDetail /></RouteGuard>} />
               <Route path="/fournisseurs" element={<RouteGuard feature="clients"><Fournisseurs /></RouteGuard>} />
               {/* Produits */}
               <Route path="/catalogue" element={<RouteGuard feature="factures"><Catalogue /></RouteGuard>} />
