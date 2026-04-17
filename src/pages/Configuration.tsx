@@ -381,6 +381,54 @@ export default function Configuration() {
             </Button>
           </div>
         </TabsContent>
+
+        <TabsContent value="maintenance">
+          <div className="bg-card rounded-lg border border-destructive/50 p-6 shadow-sm space-y-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <h2 className="text-lg font-semibold text-foreground">Zone dangereuse — Tests</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Outils destinés uniquement à la phase de test. Les actions ci-dessous sont <strong>irréversibles</strong> et impactent directement Dolibarr.
+            </p>
+
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Supprimer tous les devis et factures</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Repasse chaque document validé en brouillon puis le supprime de Dolibarr. Vide aussi les tables de relances. Les paiements enregistrés bloqueront la suppression de leur facture.
+                </p>
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={purging} className="gap-2">
+                    {purging ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    Tout supprimer (devis + factures)
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmer la suppression totale ?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Cette action va supprimer <strong>tous les devis et toutes les factures</strong> de Dolibarr, ainsi que leurs relances associées. Les factures avec paiements enregistrés seront ignorées.
+                      <br /><br />
+                      Cette action est <strong>irréversible</strong>.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handlePurgeAll}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Confirmer la suppression
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
+        </TabsContent>
       </Tabs>
     </div>
   );
