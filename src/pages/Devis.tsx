@@ -500,7 +500,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                   variant="outline"
                   className="gap-1.5"
                 >
-                  <ArrowRightLeft className="h-3.5 w-3.5" /> Générer facture
+                  <ArrowRightLeft className="h-3.5 w-3.5" /> Classer facturé (brouillon)
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
