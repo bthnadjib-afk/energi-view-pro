@@ -1998,6 +1998,36 @@ export default function Interventions() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Remplacer une intervention annulée */}
+      <Dialog open={replaceOpen} onOpenChange={setReplaceOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Remplacer {replaceSource?.ref ?? ''}</DialogTitle>
+          </DialogHeader>
+          {replaceSource && (
+            <div className="space-y-4 pt-2">
+              <div className="rounded-md bg-muted/50 border border-border p-3 text-sm space-y-1">
+                <div><span className="text-muted-foreground">Client : </span><span className="text-foreground font-medium">{replaceSource.client}</span></div>
+                <div><span className="text-muted-foreground">Technicien : </span><span className="text-foreground font-medium">{replaceSource.technicien || '—'}</span></div>
+                <div><span className="text-muted-foreground">Date : </span><span className="text-foreground font-medium">{formatDateFR(replaceSource.date)}</span></div>
+                <div><span className="text-muted-foreground">Horaire : </span><span className="text-foreground font-medium">{replaceSource.heureDebut} – {replaceSource.heureFin}</span></div>
+                <div><span className="text-muted-foreground">Type : </span><span className="text-foreground font-medium">{typeLabels[replaceSource.type]}</span></div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Description de la nouvelle intervention *</label>
+                <Textarea value={replaceDescription} onChange={(e) => setReplaceDescription(e.target.value)} placeholder="Décrire l'intervention de remplacement…" className="min-h-[80px]" />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => { setReplaceOpen(false); setReplaceSource(null); }} className="flex-1">Plus tard</Button>
+                <Button onClick={handleCreateReplacement} disabled={createInterventionMutation.isPending} className="flex-1 bg-emerald-600 hover:bg-emerald-700 gap-2">
+                  <Plus className="h-4 w-4" /> {createInterventionMutation.isPending ? 'Création...' : 'Créer le remplacement'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
