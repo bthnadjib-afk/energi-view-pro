@@ -58,9 +58,9 @@ export function useRecordFactureEnvoi() {
 
 /**
  * Calcule l'état d'une relance pour une facture donnée.
- * - envoyée : email envoyé / facture validée, < 10j → "Envoyée"
+ * - envoyée : facture validée/envoyée, < 10j → "Envoyée" (pas affichée comme relance)
  * - relance_1 : ≥ 10j sans paiement → "1ère relance"
- * - mise_en_demeure : ≥ 20j (10j après 1ère relance) → "Mise en demeure"
+ * - mise_en_demeure : ≥ 15j sans paiement → "Mise en demeure"
  *
  * `dateValidation` (Dolibarr) sert de fallback quand la facture a été
  * validée mais pas envoyée par email depuis l'app.
@@ -83,7 +83,7 @@ export function getRelanceStatus(
   const ref = new Date(refDate).getTime();
   const daysSinceRef = Math.floor((now - ref) / (1000 * 60 * 60 * 24));
 
-  if (daysSinceRef >= 20 || relance?.statut_relance === 'mise_en_demeure') {
+  if (daysSinceRef >= 15 || relance?.statut_relance === 'mise_en_demeure') {
     return { label: 'Mise en demeure', variant: 'mise_en_demeure' };
   }
   if (daysSinceRef >= 10 || relance?.statut_relance === 'relance_1') {
