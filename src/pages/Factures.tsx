@@ -69,7 +69,7 @@ export default function Factures() {
     }
   }, [emailOpen]);
   const [socid, setSocid] = useState('');
-  const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '' }]);
+  const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '', prixAchat: 0 }]);
 
   // Payment state
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -109,7 +109,7 @@ export default function Factures() {
   const payees = factures.filter(f => f.paye);
   const nonPayees = factures.filter(f => !f.paye && f.fk_statut >= 1);
 
-  const emptyLigne = (): LigneForm => ({ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '' });
+  const emptyLigne = (): LigneForm => ({ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '', prixAchat: 0 });
   const addLigne = () => setLignes([...lignes, emptyLigne()]);
   const removeLigne = (i: number) => setLignes(lignes.filter((_, idx) => idx !== i));
 
@@ -120,7 +120,7 @@ export default function Factures() {
     } else {
       const p = produits.find(pr => pr.id === productId);
       if (p) {
-        updated[i] = { ...updated[i], productId, desc: `[${p.ref}] ${p.label}`, subprice: p.prixHT, tva_tx: p.tauxTVA || 20, product_type: p.type === 'main_oeuvre' ? 1 : 0 };
+        updated[i] = { ...updated[i], productId, desc: `[${p.ref}] ${p.label}`, subprice: p.prixHT, tva_tx: p.tauxTVA || 20, product_type: p.type === 'main_oeuvre' ? 1 : 0, prixAchat: p.prixAchat || 0 };
       }
     }
     setLignes(updated);
@@ -142,7 +142,7 @@ export default function Factures() {
     if (!socid || lignes.length === 0 || !lignes[0].desc) return;
     await createFactureMutation.mutateAsync({
       socid,
-      lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type })),
+      lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type, pa_ht: l.prixAchat })),
     });
     setDialogOpen(false);
     setSocid('');
@@ -183,9 +183,10 @@ export default function Factures() {
         tva_tx: 20,
         product_type: 1,
         productId: '',
+        prixAchat: l.prixAchat || 0,
       })));
     } else {
-      setEditLines([{ desc: '', qty: 1, subprice: f.montantHT, tva_tx: 20, product_type: 1, productId: '' }]);
+      setEditLines([{ desc: '', qty: 1, subprice: f.montantHT, tva_tx: 20, product_type: 1, productId: '', prixAchat: 0 }]);
     }
     setEditOpen(true);
   };
@@ -196,11 +197,31 @@ export default function Factures() {
       await updateLinesMutation.mutateAsync({
         id: selectedFacture.id,
         socid: selectedFacture.socid || '',
-        lines: editLines.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type })),
+        lines: editLines.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type, pa_ht: l.prixAchat })),
       });
       setEditOpen(false);
       setSelectedFacture(null);
     } catch {}
+  };
+
+  // Totals for edit lines (live preview in edit dialog)
+  const editTotals = useMemo(() => {
+    const ht = editLines.reduce((s, l) => s + l.qty * l.subprice, 0);
+    const tva = editLines.reduce((s, l) => s + l.qty * l.subprice * l.tva_tx / 100, 0);
+    return { ht, tva, ttc: ht + tva };
+  }, [editLines]);
+
+  const selectEditProduct = (i: number, productId: string) => {
+    const updated = [...editLines];
+    if (productId === '__libre__') {
+      updated[i] = { ...updated[i], productId: '', desc: '' };
+    } else {
+      const p = produits.find(pr => pr.id === productId);
+      if (p) {
+        updated[i] = { ...updated[i], productId, desc: `[${p.ref}] ${p.label}`, subprice: p.prixHT, tva_tx: p.tauxTVA || 20, product_type: p.type === 'main_oeuvre' ? 1 : 0, prixAchat: p.prixAchat || 0 };
+      }
+    }
+    setEditLines(updated);
   };
 
   // Unique clients in factures for filter
