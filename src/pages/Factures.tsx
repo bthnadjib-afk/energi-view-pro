@@ -469,7 +469,7 @@ export default function Factures() {
                   <td className="py-3 px-2">
                     {(() => {
                       const r = relanceByFactureId.get(f.id);
-                      const rel = getRelanceStatus(r, f.paye);
+                      const rel = getRelanceStatus(r, f.paye, f.dateValidation);
                       if (rel.variant !== 'none' && f.fk_statut >= 1 && !f.paye) {
                         return (
                           <div className="flex flex-col gap-1">

@@ -84,32 +84,39 @@ export function useMarkDevisRelance() {
 /**
  * Calcule le statut visuel d'une relance devis.
  * Règles :
- *  - Pas d'envoi → rien
- *  - Envoyé < 7j → "Envoyé"
- *  - Envoyé ≥ 7j et pas signé → "À relancer"
- *  - Relance déjà envoyée → "Relancé"
- *  - Date fin validité dépassée → "Expiré"
  *  - fk_statut === 2 (signé) → "Signé"
+ *  - Pas d'envoi (ni email ni validation) → rien
+ *  - Date fin validité dépassée → "Expiré"
+ *  - Relance déjà envoyée → "Relancé"
+ *  - ≥ 7j depuis envoi/validation → "À relancer"
+ *  - < 7j → "Envoyé"
+ *
+ * Le paramètre `dateValidation` (Dolibarr) sert de fallback pour
+ * les devis validés sans tracking d'envoi email.
  */
 export function getDevisRelanceStatus(
   relance: DevisRelance | undefined,
-  fk_statut: number
+  fk_statut: number,
+  dateValidation?: string
 ): { label: string; variant: 'envoye' | 'a_relancer' | 'relance' | 'expire' | 'signe' | 'none' } {
   if (fk_statut === 2) return { label: 'Signé', variant: 'signe' };
-  if (!relance || !relance.date_envoi) return { label: '', variant: 'none' };
+
+  // Date de référence : envoi email > validation Dolibarr
+  const refDate = relance?.date_envoi || (dateValidation || null);
+  if (!refDate) return { label: '', variant: 'none' };
 
   const now = Date.now();
-  if (relance.date_fin_validite && new Date(relance.date_fin_validite).getTime() < now) {
+  if (relance?.date_fin_validite && new Date(relance.date_fin_validite).getTime() < now) {
     return { label: 'Expiré', variant: 'expire' };
   }
 
-  if (relance.statut_relance === 'relance' || relance.date_relance_1) {
+  if (relance?.statut_relance === 'relance' || relance?.date_relance_1) {
     return { label: 'Relancé', variant: 'relance' };
   }
 
-  const daysSinceEnvoi = Math.floor(
-    (now - new Date(relance.date_envoi).getTime()) / (1000 * 60 * 60 * 24)
+  const daysSinceRef = Math.floor(
+    (now - new Date(refDate).getTime()) / (1000 * 60 * 60 * 24)
   );
-  if (daysSinceEnvoi >= 7) return { label: 'À relancer', variant: 'a_relancer' };
+  if (daysSinceRef >= 7) return { label: 'À relancer', variant: 'a_relancer' };
   return { label: 'Envoyé', variant: 'envoye' };
 }
