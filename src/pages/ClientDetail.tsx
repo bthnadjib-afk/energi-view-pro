@@ -209,7 +209,52 @@ export default function ClientDetail() {
           <TabsTrigger value="documents" className="gap-1.5">
             <FileDown className="h-3.5 w-3.5" /> Documents
           </TabsTrigger>
+          {isPro && (
+            <TabsTrigger value="enfants" className="gap-1.5">
+              <Users className="h-3.5 w-3.5" /> Clients gérés ({enfants.length})
+            </TabsTrigger>
+          )}
         </TabsList>
+
+        {/* CLIENTS GÉRÉS (pro uniquement) */}
+        {isPro && (
+          <TabsContent value="enfants">
+            <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-foreground">Clients finaux gérés par {client.nom}</h2>
+                <Button size="sm" onClick={() => navigate('/clients')} className="gap-2">
+                  <Users className="h-4 w-4" /> Gérer depuis la liste
+                </Button>
+              </div>
+              {enfants.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Aucun client géré. Allez dans la liste des clients et cliquez sur l'icône <Users className="inline h-3.5 w-3.5" /> à côté de ce pro pour en ajouter.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-3 px-2 text-muted-foreground font-medium">Nom</th>
+                      <th className="text-left py-3 px-2 text-muted-foreground font-medium">Ville</th>
+                      <th className="text-left py-3 px-2 text-muted-foreground font-medium">Téléphone</th>
+                      <th className="text-left py-3 px-2 text-muted-foreground font-medium">Email</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {enfants.map(e => (
+                      <tr key={e.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate(`/clients/${e.id}`)}>
+                        <td className="py-3 px-2 font-medium text-foreground">{e.nom}</td>
+                        <td className="py-3 px-2 text-muted-foreground">{e.ville}</td>
+                        <td className="py-3 px-2 text-muted-foreground font-mono text-xs">{e.telephone}</td>
+                        <td className="py-3 px-2 text-muted-foreground text-xs">{e.email}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </TabsContent>
+        )}
 
         {/* DEVIS */}
         <TabsContent value="devis">
