@@ -5,6 +5,8 @@ import {
   Landmark, Warehouse, BarChart2, ChevronDown, Building2, BookOpen, SlidersHorizontal,
 } from 'lucide-react';
 import logo from '@/assets/logo.png';
+import logoDark from '@/assets/logo-dark.png';
+import { useTheme } from '@/contexts/ThemeContext';
 import { NavLink } from '@/components/NavLink';
 import { useAuthContext } from '@/contexts/AuthContext';
 import {
@@ -85,6 +87,7 @@ const adminNav: NavItem[] = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
+  const { theme } = useTheme();
   const { canAccess, signOut, profile } = useAuthContext();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
@@ -155,7 +158,7 @@ export function AppSidebar() {
       <SidebarHeader className={cn(collapsed ? "p-2" : "p-3")}>
         <div className="flex items-center justify-center w-full">
           <img
-            src={logo}
+            src={theme === 'dark' ? logoDark : logo}
             alt="Electricien Du Genevois"
             className={cn(
               "object-contain transition-all",
