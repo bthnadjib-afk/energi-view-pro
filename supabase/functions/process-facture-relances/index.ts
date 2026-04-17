@@ -1,7 +1,7 @@
 // Edge function de relance automatique des factures
 // Exécutée quotidiennement par pg_cron
 // - 10 jours après envoi sans paiement → 1ère relance + email auto
-// - 20 jours après envoi (10j après 1ère relance) → mise en demeure + email auto
+// - 15 jours après envoi (5j après 1ère relance) sans paiement → mise en demeure + email auto
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
