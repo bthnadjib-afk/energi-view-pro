@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useInterventions, useClients, useCreateIntervention, useDolibarrUsers } from '@/hooks/useDolibarr';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ChevronLeft, ChevronRight, X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,17 @@ export default function Agenda() {
   const { data: dolibarrUsers = [] } = useDolibarrUsers();
   const createMutation = useCreateIntervention();
   const { role } = useAuth();
+  const { profile } = useAuthContext();
+  const isTechnicien = role === 'technicien';
+  const currentTechName = useMemo(() => {
+    if (!isTechnicien || !profile) return '';
+    if (profile.dolibarr_user_id) {
+      const u = dolibarrUsers.find(d => String(d.id) === String(profile.dolibarr_user_id));
+      if (u?.fullname) return u.fullname;
+    }
+    const u = dolibarrUsers.find(d => (d.email || '').toLowerCase() === (profile.email || '').toLowerCase());
+    return u?.fullname || profile.nom || '';
+  }, [isTechnicien, profile, dolibarrUsers]);
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -96,11 +108,15 @@ export default function Agenda() {
   const filteredInterventions = useMemo(() => {
     // Ne jamais afficher les brouillons sur l'agenda
     let result = interventions.filter(i => i.fk_statut >= 1);
+    // Technicien : ne voit QUE ses propres interventions
+    if (isTechnicien && currentTechName) {
+      result = result.filter(i => i.technicien === currentTechName);
+    }
     if (filterTech !== 'all') {
       result = result.filter(i => i.technicien === filterTech);
     }
     return result;
-  }, [interventions, filterTech]);
+  }, [interventions, filterTech, isTechnicien, currentTechName]);
 
   const interventionsByDate = useMemo(() => {
     const map: Record<string, Intervention[]> = {};
@@ -139,6 +155,8 @@ export default function Agenda() {
     } else if (dayInterventions.length === 1) {
       setSelected(dayInterventions[0]);
     } else {
+      // Technicien ne peut pas créer
+      if (isTechnicien) return;
       setCreateDate(dateStr);
       setNewClientId('');
       setNewDescription('');
