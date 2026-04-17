@@ -89,6 +89,45 @@ export type Database = {
         }
         Relationships: []
       }
+      facture_relances: {
+        Row: {
+          client_email: string | null
+          created_at: string
+          date_envoi: string | null
+          date_mise_en_demeure: string | null
+          date_relance_1: string | null
+          facture_id: string
+          facture_ref: string
+          id: string
+          statut_relance: string
+          updated_at: string
+        }
+        Insert: {
+          client_email?: string | null
+          created_at?: string
+          date_envoi?: string | null
+          date_mise_en_demeure?: string | null
+          date_relance_1?: string | null
+          facture_id: string
+          facture_ref: string
+          id?: string
+          statut_relance?: string
+          updated_at?: string
+        }
+        Update: {
+          client_email?: string | null
+          created_at?: string
+          date_envoi?: string | null
+          date_mise_en_demeure?: string | null
+          date_relance_1?: string | null
+          facture_id?: string
+          facture_ref?: string
+          id?: string
+          statut_relance?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       intervention_signatures: {
         Row: {
           created_at: string
