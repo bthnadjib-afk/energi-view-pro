@@ -904,6 +904,58 @@ export async function bulkDeleteFactures(ids: string[]): Promise<void> {
   await Promise.allSettled(ids.map(id => dolibarrCall(`/invoices/${id}`, 'DELETE')));
 }
 
+/**
+ * Force-delete all proposals + invoices (TEST ONLY).
+ * Repasse chaque document en brouillon avant suppression car Dolibarr
+ * refuse de supprimer un document validé.
+ */
+export async function purgeAllDevisAndFactures(): Promise<{
+  devisDeleted: number;
+  devisFailed: number;
+  facturesDeleted: number;
+  facturesFailed: number;
+}> {
+  const [propRes, invRes] = await Promise.all([
+    dolibarrCall<any[]>('/proposals?limit=500', 'GET'),
+    dolibarrCall<any[]>('/invoices?limit=500', 'GET'),
+  ]);
+  const proposals = Array.isArray(propRes) ? propRes : [];
+  const invoices = Array.isArray(invRes) ? invRes : [];
+
+  let devisDeleted = 0;
+  let devisFailed = 0;
+  let facturesDeleted = 0;
+  let facturesFailed = 0;
+
+  await Promise.allSettled(
+    invoices.map(async (f: any) => {
+      const id = String(f.id);
+      try {
+        await dolibarrCall(`/invoices/${id}/settodraft`, 'POST', { idwarehouse: -1 }).catch(() => null);
+        await dolibarrCall(`/invoices/${id}`, 'DELETE');
+        facturesDeleted++;
+      } catch {
+        facturesFailed++;
+      }
+    })
+  );
+
+  await Promise.allSettled(
+    proposals.map(async (p: any) => {
+      const id = String(p.id);
+      try {
+        await dolibarrCall(`/proposals/${id}/settodraft`, 'POST').catch(() => null);
+        await dolibarrCall(`/proposals/${id}`, 'DELETE');
+        devisDeleted++;
+      } catch {
+        devisFailed++;
+      }
+    })
+  );
+
+  return { devisDeleted, devisFailed, facturesDeleted, facturesFailed };
+}
+
 // --- Update lines (draft only) ---
 // Dolibarr's PUT /proposals/{id} ignores the `lines` array. The supported way to
 // fully refresh lines is: GET /proposals/{id}/lines → DELETE each existing line →
