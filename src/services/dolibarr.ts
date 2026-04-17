@@ -556,11 +556,12 @@ export async function setDevisToDraft(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/proposals/${id}/settodraft`, 'POST');
 }
 
-// Swagger-confirmed: POST /proposals/{id}/reopen
-// Used to reopen a closed proposal (status 2 = signed, 3 = not signed, 4 = billed)
-// After reopen, proposal returns to status 1 (validated/open).
+// Dolibarr's /proposals API does NOT expose a /reopen route (verified via official
+// api_proposals.class.php). To "reopen" a closed proposal (status 2 signed, 3 refused,
+// 4 billed) we use the only available route: POST /proposals/{id}/settodraft, which
+// brings it back to status 0 (Brouillon) and lets the user freely edit / re-validate.
 export async function reopenDevis(id: string): Promise<string | null> {
-  return dolibarrCall<string>(`/proposals/${id}/reopen`, 'POST');
+  return dolibarrCall<string>(`/proposals/${id}/settodraft`, 'POST');
 }
 
 export async function convertDevisToFacture(devisId: string): Promise<string | null> {
