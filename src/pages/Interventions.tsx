@@ -329,13 +329,25 @@ export default function Interventions() {
     }
   }, [selectedIntervention?.id, detailOpen]);
 
-  // Auto-pré-remplissage des défauts chantier quand on choisit le type "chantier"
+  // Auto-pré-remplissage des durées par défaut selon le type d'intervention
+  // devis: 1h • panne: 2h • panne_urgence: 2h • sav: 10h • chantier: 10h (08→18)
   useEffect(() => {
+    if (!newType) return;
+    const addHours = (time: string, h: number): string => {
+      const [hh, mm] = time.split(':').map(Number);
+      const total = (hh + h) % 24;
+      return `${String(total).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    };
     if (newType === 'chantier') {
-      setNewHeureDebut(config.defaults.chantierHeureDebut || '08:00');
-      setNewHeureFin(config.defaults.chantierHeureFin || '18:00');
+      const debut = config.defaults.chantierHeureDebut || '08:00';
+      setNewHeureDebut(debut);
+      setNewHeureFin(config.defaults.chantierHeureFin || addHours(debut, 10));
       const defaultJours = (config.defaults.chantierJours || '1,2,3,4,5').split(',').filter(Boolean);
       if (chantierJoursActifs.length === 0) setChantierJoursActifs(defaultJours);
+    } else {
+      const dureeParType: Record<string, number> = { devis: 1, panne: 2, panne_urgence: 2, sav: 10 };
+      const h = dureeParType[newType] ?? 2;
+      setNewHeureFin(addHours(newHeureDebut || '08:00', h));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newType]);
