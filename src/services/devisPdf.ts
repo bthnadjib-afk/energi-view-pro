@@ -25,6 +25,10 @@ function fmt(n: number | null | undefined): string {
   return num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function toText(value: unknown): string {
+  return value == null ? '' : String(value);
+}
+
 function formatDateFR(dateStr: string): string {
   if (!dateStr) return '';
   const d = new Date(dateStr.includes('T') ? dateStr : dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
@@ -34,21 +38,16 @@ function formatDateFR(dateStr: string): string {
 
 /** Dessine le logo ELECTRICIEN DU GENEVOIS avec un éclair stylisé */
 function drawLogo(doc: jsPDF, x: number, y: number): void {
-  // Éclair (polygone jaune)
   const boltX = x;
   const boltY = y;
   doc.setFillColor(...JAUNE);
-  // Triangle haut
   doc.triangle(boltX + 7, boltY, boltX, boltY + 10, boltX + 5, boltY + 10, 'F');
-  // Triangle bas
   doc.triangle(boltX + 3, boltY + 8, boltX + 10, boltY + 8, boltX + 3, boltY + 18, 'F');
 
-  // Texte "ELECTRICIEN"
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...BLEU);
   doc.text('ELECTRICIEN', boltX + 13, boltY + 7);
-  // Texte "DU GENEVOIS"
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text('DU GENEVOIS', boltX + 13, boltY + 14);
@@ -72,12 +71,8 @@ function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): jsPDF {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   let y = MARGIN;
 
-  // ══════════════════════════════════════════════
-  // HEADER : Logo (gauche) + Titre DEVIS (droite)
-  // ══════════════════════════════════════════════
   drawLogo(doc, MARGIN, y);
 
-  // Titre DEVIS
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(26);
   doc.setTextColor(...NOIR);
@@ -86,16 +81,11 @@ function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): jsPDF {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...GRIS_TEXTE);
-  doc.text(`NUMÉRO DE DEVIS : ${devis.ref}`, COL_R, y + 15, { align: 'right' });
+  doc.text(`NUMÉRO DE DEVIS : ${toText(devis.ref)}`, COL_R, y + 15, { align: 'right' });
 
   y += 26;
-
-  // ══════════════════════════════════════════════
-  // BLOC ADRESSES : Client (gauche) / Entreprise (droite)
-  // ══════════════════════════════════════════════
   const colMid = PAGE_W / 2 + 5;
 
-  // ─ Client gauche ─
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
   doc.setTextColor(...GRIS_TEXTE);
@@ -105,7 +95,7 @@ function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): jsPDF {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(...NOIR);
-  const clientNom = client?.nom || devis.client || '';
+  const clientNom = toText(client?.nom || devis.client || '');
   doc.text(clientNom, MARGIN, y);
   y += 5;
 
@@ -113,14 +103,13 @@ function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): jsPDF {
   doc.setFontSize(9);
   doc.setTextColor(50, 50, 50);
   const clientLines: string[] = [];
-  if (client?.adresse) clientLines.push(client.adresse);
-  const cityLine = [client?.codePostal, client?.ville].filter(Boolean).join(' ');
+  if (client?.adresse) clientLines.push(toText(client.adresse));
+  const cityLine = [client?.codePostal, client?.ville].filter(Boolean).map(toText).join(' ');
   if (cityLine) clientLines.push(cityLine);
-  if (client?.email) clientLines.push(client.email);
-  if (client?.telephone) clientLines.push(client.telephone);
-  clientLines.forEach(line => { doc.text(line, MARGIN, y); y += 4.5; });
+  if (client?.email) clientLines.push(toText(client.email));
+  if (client?.telephone) clientLines.push(toText(client.telephone));
+  clientLines.forEach(line => { doc.text(toText(line), MARGIN, y); y += 4.5; });
 
-  // ─ Entreprise droite ─
   const ent = entreprise;
   const entY0 = y - (clientLines.length * 4.5) - 5;
   doc.setFont('helvetica', 'bold');
@@ -131,7 +120,7 @@ function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): jsPDF {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(...NOIR);
-  const entNom = (ent?.nom || 'EURL ELECTRICIEN DU GENEVOIS').toUpperCase();
+  const entNom = toText(ent?.nom || 'EURL ELECTRICIEN DU GENEVOIS').toUpperCase();
   doc.text(entNom, colMid, entY0 + 5);
 
   doc.setFont('helvetica', 'normal');
@@ -139,11 +128,11 @@ function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): jsPDF {
   doc.setTextColor(50, 50, 50);
   let ey = entY0 + 10;
   doc.text('AU CAPITAL DE 1 000 €', colMid, ey); ey += 4;
-  if (ent?.adresse) { doc.text(ent.adresse.toUpperCase(), colMid, ey); ey += 4; }
-  if (ent?.codePostal || ent?.ville) { doc.text(`${ent?.codePostal || ''} ${ent?.ville || ''}`.trim().toUpperCase(), colMid, ey); ey += 4; }
-  if (ent?.siret) { doc.text(`SIRET : ${ent.siret} — RCS ANNECY`, colMid, ey); ey += 4; }
-  if (ent?.email) { doc.text(ent.email.toUpperCase(), colMid, ey); ey += 4; }
-  if (ent?.telephone) { doc.text(ent.telephone, colMid, ey); ey += 4; }
+  if (ent?.adresse) { doc.text(toText(ent.adresse).toUpperCase(), colMid, ey); ey += 4; }
+  if (ent?.codePostal || ent?.ville) { doc.text(`${toText(ent?.codePostal)} ${toText(ent?.ville)}`.trim().toUpperCase(), colMid, ey); ey += 4; }
+  if (ent?.siret) { doc.text(`SIRET : ${toText(ent.siret)} — RCS ANNECY`, colMid, ey); ey += 4; }
+  if (ent?.email) { doc.text(toText(ent.email).toUpperCase(), colMid, ey); ey += 4; }
+  if (ent?.telephone) { doc.text(toText(ent.telephone), colMid, ey); ey += 4; }
 
   // Séparateur horizontal
   y = Math.max(y, ey) + 6;
