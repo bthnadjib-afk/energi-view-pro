@@ -707,6 +707,82 @@ export default function Interventions() {
                   Aujourd'hui
                 </Button>
               </div>
+
+              {newType === 'chantier' && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 dark:bg-emerald-950/20 dark:border-emerald-900 p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-foreground">Chantier multi-jours</h4>
+                    <span className="text-xs text-muted-foreground">{chantierDates.length} jour(s) planifié(s)</span>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Date de fin (vide = 1 seul jour)</label>
+                    <Input type="date" value={chantierDateFin} onChange={(e) => setChantierDateFin(e.target.value)} min={newDate} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Jours travaillés</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { v: '1', l: 'Lun' }, { v: '2', l: 'Mar' }, { v: '3', l: 'Mer' },
+                        { v: '4', l: 'Jeu' }, { v: '5', l: 'Ven' }, { v: '6', l: 'Sam' }, { v: '7', l: 'Dim' },
+                      ].map(d => {
+                        const active = chantierJoursActifs.includes(d.v);
+                        return (
+                          <button
+                            key={d.v}
+                            type="button"
+                            onClick={() => setChantierJoursActifs(prev => active ? prev.filter(x => x !== d.v) : [...prev, d.v].sort())}
+                            className={
+                              active
+                                ? 'px-2.5 py-1 rounded-md border text-xs font-medium bg-primary text-primary-foreground border-primary'
+                                : 'px-2.5 py-1 rounded-md border text-xs font-medium bg-card text-muted-foreground border-border hover:bg-muted'
+                            }
+                          >
+                            {d.l}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {chantierDates.length > 0 && (
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Dates générées (cliquer pour retirer)</label>
+                      <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto p-1 rounded border border-border bg-background">
+                        {chantierDates.map(d => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => {
+                              if (chantierDatesExtra.includes(d)) {
+                                setChantierDatesExtra(prev => prev.filter(x => x !== d));
+                              } else {
+                                setChantierDatesExclues(prev => [...prev, d]);
+                              }
+                            }}
+                            className="px-2 py-0.5 rounded text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 hover:line-through"
+                            title="Cliquer pour retirer ce jour"
+                          >
+                            {formatDateFR(d)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Ajouter une date hors plage</label>
+                    <Input
+                      type="date"
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v && !chantierDatesExtra.includes(v)) {
+                          setChantierDatesExtra(prev => [...prev, v]);
+                          setChantierDatesExclues(prev => prev.filter(x => x !== v));
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
               {(() => {
                 return (
                   <div className="grid grid-cols-2 gap-3">
