@@ -440,7 +440,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Annuler le devis {devis.ref} ?</AlertDialogTitle>
-                      <AlertDialogDescription>Le devis sera repassé en brouillon puis supprimé.</AlertDialogDescription>
+                      <AlertDialogDescription>Le devis sera marqué comme abandonné dans Dolibarr (statut "Non signé"). Il ne sera pas supprimé.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Retour</AlertDialogCancel>
