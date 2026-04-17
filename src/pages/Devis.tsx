@@ -710,9 +710,13 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
               <DialogHeader>
                 <DialogTitle>Aperçu du devis {devis.ref}</DialogTitle>
               </DialogHeader>
-              {pdfPreviewUrl && (
-                <iframe src={pdfPreviewUrl} className="w-full flex-1 rounded border border-border" title={`Devis ${devis.ref}`} />
-              )}
+              <div className="flex-1 min-h-0">
+                {pdfPreviewUrl ? (
+                  <iframe src={pdfPreviewUrl} className="w-full h-full rounded-md border border-border" title={`Devis ${devis.ref}`} />
+                ) : (
+                  <p className="text-muted-foreground text-center py-8">Chargement...</p>
+                )}
+              </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => pdfPreviewUrl && window.open(pdfPreviewUrl, '_blank')}>
                   Ouvrir dans un nouvel onglet
