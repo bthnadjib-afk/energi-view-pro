@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { getInterventionStatusKey, STATUS_DOT_BG, STATUS_LABEL, STATUS_BADGE } from '@/lib/interventionStatus';
+import { DatePickerWithStatus } from '@/components/DatePickerWithStatus';
 
 const typeLabels: Record<InterventionType, string> = {
   devis: 'Devis', panne: 'Panne', panne_urgence: 'Panne urgence', sav: 'SAV', chantier: 'Chantier',
