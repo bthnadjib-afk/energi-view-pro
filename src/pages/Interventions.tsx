@@ -1845,34 +1845,24 @@ export default function Interventions() {
             {/* Ajouter de nouveaux jours */}
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-foreground">Ajouter un jour au chantier</h3>
-              <div className="flex gap-2">
-                <Input
-                  type="date"
-                  value={editChantierNewDate}
-                  onChange={(e) => setEditChantierNewDate(e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (!editChantierNewDate) return;
-                    if (chantierJours.some(j => j.date === editChantierNewDate)) {
-                      toast.error('Ce jour existe déjà dans le chantier');
-                      return;
-                    }
-                    if (editChantierDatesToAdd.includes(editChantierNewDate)) {
-                      toast.error('Ce jour est déjà dans la liste à ajouter');
-                      return;
-                    }
-                    setEditChantierDatesToAdd(prev => [...prev, editChantierNewDate].sort());
-                    setEditChantierNewDate('');
-                  }}
-                  className="gap-2"
-                >
-                  <Plus className="h-4 w-4" /> Ajouter
-                </Button>
-              </div>
+              <DatePickerWithStatus
+                label="📅 Sélectionner un jour à ajouter"
+                excludedDates={[...chantierJours.map(j => j.date), ...editChantierDatesToAdd]}
+                techInterventions={resolvedInterventions.filter(i => i.technicien === editChantierTech)}
+                onPick={(v) => {
+                  if (!v) return;
+                  if (chantierJours.some(j => j.date === v)) { toast.error('Ce jour existe déjà dans le chantier'); return; }
+                  if (editChantierDatesToAdd.includes(v)) { toast.error('Ce jour est déjà dans la liste à ajouter'); return; }
+                  setEditChantierDatesToAdd(prev => [...prev, v].sort());
+                }}
+              />
+            </div>
+            <div className="hidden">
+              {/* legacy hidden state used by validation flow */}
+              <Input value={editChantierNewDate} onChange={(e) => setEditChantierNewDate(e.target.value)} />
+            </div>
+            <div>
+              {editChantierDatesToAdd.length === 0 ? null : null}
               {editChantierDatesToAdd.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {editChantierDatesToAdd.map(d => (
