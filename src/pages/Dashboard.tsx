@@ -69,7 +69,7 @@ export default function Dashboard() {
         facture: f,
         status: getRelanceStatus(factureRelanceById.get(f.id), f.paye, f.dateValidation),
       }))
-      .filter(({ status }) => status.variant !== 'none');
+      .filter(({ status }) => status.variant === 'relance_1' || status.variant === 'mise_en_demeure');
   }, [factures, factureRelanceById]);
 
   // 2) Devis signés sans intervention liée → à créer

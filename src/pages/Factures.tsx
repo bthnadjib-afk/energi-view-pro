@@ -470,13 +470,11 @@ export default function Factures() {
                     {(() => {
                       const r = relanceByFactureId.get(f.id);
                       const rel = getRelanceStatus(r, f.paye, f.dateValidation);
-                      if (rel.variant !== 'none' && f.fk_statut >= 1 && !f.paye) {
-                        return (
-                          <div className="flex flex-col gap-1">
-                            <StatusBadge statut={f.statut} />
-                            <StatusBadge statut={rel.label} />
-                          </div>
-                        );
+                      if (f.fk_statut >= 1 && !f.paye && (rel.variant === 'relance_1' || rel.variant === 'mise_en_demeure')) {
+                        const combined = rel.variant === 'mise_en_demeure'
+                          ? 'Non payée — Mise en demeure'
+                          : 'Non payée — 1ère relance';
+                        return <StatusBadge statut={combined} />;
                       }
                       return <StatusBadge statut={f.statut} />;
                     })()}
