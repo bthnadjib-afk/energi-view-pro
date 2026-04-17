@@ -862,15 +862,16 @@ export default function Interventions() {
                   )}
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Ajouter une date hors plage</label>
-                    <Input
-                      type="date"
-                      onChange={(e) => {
-                        const v = e.target.value;
+                    <DatePickerWithStatus
+                      label="📅 Choisir un jour (couleurs = occupations du tech)"
+                      minDate={newDate || undefined}
+                      excludedDates={chantierDates}
+                      techInterventions={resolvedInterventions.filter(i => i.technicien === newTech)}
+                      onPick={(v) => {
                         if (v && !chantierDatesExtra.includes(v)) {
                           setChantierDatesExtra(prev => [...prev, v]);
                           setChantierDatesExclues(prev => prev.filter(x => x !== v));
                         }
-                        e.target.value = '';
                       }}
                     />
                   </div>
