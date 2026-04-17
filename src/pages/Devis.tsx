@@ -68,10 +68,14 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const deleteMutation = useDeleteDevis();
   const updateLinesMutation = useUpdateDevisLines();
   const setToDraftMutation = useSetDevisToDraft();
+  const reopenMutation = useReopenDevis();
   const cloneMutation = useCloneDevis();
   const updateSocidMutation = useUpdateDevisSocid();
   const { config } = useConfig();
   const queryClient = useQueryClient();
+
+  // Tracks if we're editing a previously-validated devis (so we re-validate after save)
+  const [editingValidatedDevis, setEditingValidatedDevis] = useState(false);
 
   const [showSignature, setShowSignature] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
