@@ -1862,7 +1862,6 @@ export default function Interventions() {
               <Input value={editChantierNewDate} onChange={(e) => setEditChantierNewDate(e.target.value)} />
             </div>
             <div>
-              {editChantierDatesToAdd.length === 0 ? null : null}
               {editChantierDatesToAdd.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {editChantierDatesToAdd.map(d => (
