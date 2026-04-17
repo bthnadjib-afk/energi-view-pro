@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useClients, useCreateClient, useDeleteClient, useUpdateClient, useDevis, useInterventions, useFactures } from '@/hooks/useDolibarr';
-import { UserPlus, Search, Mail, History, Trash2, Pencil } from 'lucide-react';
+import { UserPlus, Search, Mail, History, Trash2, Pencil, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -31,6 +32,7 @@ interface HistoryEntry {
 }
 
 export default function Clients() {
+  const navigate = useNavigate();
   const { data: clients = [] } = useClients();
   const { data: allDevis = [] } = useDevis();
   const { data: allInterventions = [] } = useInterventions();
@@ -188,7 +190,7 @@ export default function Clients() {
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden md:table-cell">Téléphone</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium hidden lg:table-cell">Email</th>
                 <th className="text-left py-3 px-2 text-muted-foreground font-medium">Projets</th>
-                <th className="text-left py-3 px-2 text-muted-foreground font-medium w-10"></th>
+                <th className="text-right py-3 px-2 text-muted-foreground font-medium w-20">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -205,22 +207,35 @@ export default function Clients() {
                         {nbProjets} en cours
                       </span>
                     </td>
-                    <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Supprimer ce client ?</AlertDialogTitle>
-                            <AlertDialogDescription>Le client "{c.nom}" sera définitivement supprimé de Dolibarr.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(c.id)} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                    <td className="py-3 px-2 text-right" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          title="Voir le dossier"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/clients/${c.id}`); }}
+                        >
+                          <FolderOpen className="h-3.5 w-3.5 text-primary" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Supprimer">
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Supprimer ce client ?</AlertDialogTitle>
+                              <AlertDialogDescription>Le client "{c.nom}" sera définitivement supprimé de Dolibarr.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(c.id)} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </td>
                   </tr>
                 );
