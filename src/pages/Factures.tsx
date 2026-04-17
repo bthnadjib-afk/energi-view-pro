@@ -5,7 +5,8 @@ import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid } from '@/hooks/useDolibarr';
 import { useFactureRelances, useRecordFactureEnvoi, useSetFactureEnvoiDate, getRelanceStatus } from '@/hooks/useFactureRelances';
-import { formatDateFR, sendFactureByEmail, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
+import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
+import { useQuery } from '@tanstack/react-query';
 import { openFacturePdf, facturePdfToBase64, facturePdfToBlobUrl } from '@/services/facturePdf';
 import { useConfig } from '@/hooks/useConfig';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -83,6 +84,15 @@ export default function Factures() {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMode, setPaymentMode] = useState(4);
+  const [paymentAccountId, setPaymentAccountId] = useState<string>('');
+  const { data: comptesBancaires = [] } = useQuery({ queryKey: ['comptes-bancaires'], queryFn: fetchComptesBancaires });
+
+  // Auto-select first bank account when accounts load
+  useEffect(() => {
+    if (!paymentAccountId && comptesBancaires.length > 0) {
+      setPaymentAccountId(comptesBancaires[0].id);
+    }
+  }, [comptesBancaires, paymentAccountId]);
 
   // Edit draft state
   const [editOpen, setEditOpen] = useState(false);
@@ -173,6 +183,10 @@ export default function Factures() {
 
   const handlePayment = async () => {
     if (!selectedFacture || paymentAmount <= 0) return;
+    if (!paymentAccountId) {
+      toast.error('Veuillez sélectionner un compte bancaire');
+      return;
+    }
     const reste = selectedFacture.resteAPayer;
     try {
       await addPaymentMutation.mutateAsync({
@@ -181,6 +195,7 @@ export default function Factures() {
         paymentid: paymentMode,
         closepaidinvoices: (reste - paymentAmount) <= 0.01 ? 'yes' : 'no',
         amount: paymentAmount,
+        accountid: Number(paymentAccountId),
       });
       setPaymentOpen(false);
       setSelectedFacture(null);
@@ -734,7 +749,24 @@ export default function Factures() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handlePayment} disabled={addPaymentMutation.isPending || paymentAmount <= 0} className="w-full">
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Compte bancaire</label>
+              {comptesBancaires.length === 0 ? (
+                <div className="text-xs text-destructive p-2 border border-destructive/50 rounded-md bg-destructive/10">
+                  Aucun compte bancaire trouvé dans Dolibarr. Créez-en un dans Banque & Caisse.
+                </div>
+              ) : (
+                <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner un compte" /></SelectTrigger>
+                  <SelectContent>
+                    {comptesBancaires.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.label} {c.number ? `(${c.number})` : ''}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <Button onClick={handlePayment} disabled={addPaymentMutation.isPending || paymentAmount <= 0 || !paymentAccountId} className="w-full">
               {addPaymentMutation.isPending ? 'Enregistrement...' : 'Enregistrer le paiement'}
             </Button>
           </div>
