@@ -109,6 +109,10 @@ export default function ClientDetail() {
     return 'text-blue-600';
   };
 
+  const isPro = client.clientType === 'professionnel';
+  const parentClient = client.parentId ? clients.find(c => c.id === client.parentId) : null;
+  const enfants = clients.filter(c => c.parentId === client.id);
+
   return (
     <div className="space-y-6">
       <div>
@@ -117,8 +121,31 @@ export default function ClientDetail() {
         </Button>
         <div className="bg-card rounded-lg border border-border p-6 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            <div className="space-y-1">
-              <h1 className="text-2xl font-bold text-foreground">{client.nom}</h1>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {isPro ? <Building2 className="h-5 w-5 text-primary" /> : <User className="h-5 w-5 text-muted-foreground" />}
+                <h1 className="text-2xl font-bold text-foreground">{client.nom}</h1>
+                <span className={cn(
+                  'text-xs font-medium px-2 py-0.5 rounded-full border',
+                  isPro ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-muted text-muted-foreground'
+                )}>
+                  {isPro ? 'Professionnel' : 'Particulier'}
+                </span>
+                {parentClient && (
+                  <button
+                    onClick={() => navigate(`/clients/${parentClient.id}`)}
+                    className="text-xs text-muted-foreground italic hover:text-primary underline-offset-2 hover:underline"
+                  >
+                    géré par {parentClient.nom}
+                  </button>
+                )}
+              </div>
+              {isPro && (client.siret || client.tvaIntra) && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  {client.siret && <span>SIRET : <span className="font-mono text-foreground">{client.siret}</span></span>}
+                  {client.tvaIntra && <span>TVA intracom. : <span className="font-mono text-foreground">{client.tvaIntra}</span></span>}
+                </div>
+              )}
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 {client.adresse && (
                   <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{client.adresse}, {client.codePostal} {client.ville}</span>
