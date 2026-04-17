@@ -32,15 +32,18 @@ import {
 import { SignaturePad } from '@/components/SignaturePad';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { persistLinesToCatalog } from '@/lib/catalogHelpers';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface LigneForm {
   desc: string;
   qty: number;
   subprice: number;
   tva_tx: number;
-  product_type: number;
+  product_type: number; // 0 fourniture, 1 main d'œuvre
   productId: string;
   prixAchat: number;
+  saveToCatalog?: boolean;
 }
 
 function AcompteBadge({ montantHT }: { montantHT: number }) {
