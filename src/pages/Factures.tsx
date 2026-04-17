@@ -15,20 +15,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import { persistLinesToCatalog } from '@/lib/catalogHelpers';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface LigneForm {
   desc: string;
   qty: number;
   subprice: number;
   tva_tx: number;
-  product_type: number;
+  product_type: number; // 0 fourniture, 1 main d'œuvre
   productId: string;
   prixAchat: number;
+  saveToCatalog?: boolean;
 }
 
 export default function Factures() {
   const { config } = useConfig();
   const { role } = useAuthContext();
+  const queryClient = useQueryClient();
   const canRecordPayment = role === 'admin' || role === 'secretaire';
   const { data: factures = [] } = useFactures();
   const { data: relances = [] } = useFactureRelances();
@@ -144,6 +149,13 @@ export default function Factures() {
       socid,
       lines: lignes.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type, pa_ht: l.prixAchat })),
     });
+    try {
+      const created = await persistLinesToCatalog(lignes, produits as any);
+      if (created > 0) {
+        toast.success(`${created} article(s) ajouté(s) au catalogue`);
+        queryClient.invalidateQueries({ queryKey: ['produits'] });
+      }
+    } catch {}
     setDialogOpen(false);
     setSocid('');
     setLignes([emptyLigne()]);
@@ -199,6 +211,13 @@ export default function Factures() {
         socid: selectedFacture.socid || '',
         lines: editLines.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx, product_type: l.product_type, pa_ht: l.prixAchat })),
       });
+      try {
+        const created = await persistLinesToCatalog(editLines, produits as any);
+        if (created > 0) {
+          toast.success(`${created} article(s) ajouté(s) au catalogue`);
+          queryClient.invalidateQueries({ queryKey: ['produits'] });
+        }
+      } catch {}
       setEditOpen(false);
       setSelectedFacture(null);
     } catch {}
@@ -311,6 +330,26 @@ export default function Factures() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Type + Sauver dans catalogue (lignes libres uniquement) */}
+                      {!l.productId && (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2 border-t border-border/50">
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-muted-foreground font-medium whitespace-nowrap">Type :</label>
+                            <Select value={String(l.product_type)} onValueChange={(v) => updateLigne(i, 'product_type', Number(v))}>
+                              <SelectTrigger className="h-8 text-xs w-40"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">🔧 Main d'œuvre</SelectItem>
+                                <SelectItem value="0">📦 Fourniture</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
+                            <Checkbox checked={!!l.saveToCatalog} onCheckedChange={(v) => { const u = [...lignes]; u[i].saveToCatalog = !!v; setLignes(u); }} />
+                            <span>Ajouter au catalogue</span>
+                          </label>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -724,6 +763,26 @@ export default function Factures() {
                         </div>
                       </div>
                     </div>
+
+                    {/* Type + Sauver dans catalogue (lignes libres uniquement) */}
+                    {!l.productId && (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2 border-t border-border/50">
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-muted-foreground font-medium whitespace-nowrap">Type :</label>
+                          <Select value={String(l.product_type)} onValueChange={(v) => { const u = [...editLines]; u[i] = { ...u[i], product_type: Number(v) }; setEditLines(u); }}>
+                            <SelectTrigger className="h-8 text-xs w-40"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">🔧 Main d'œuvre</SelectItem>
+                              <SelectItem value="0">📦 Fourniture</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
+                          <Checkbox checked={!!l.saveToCatalog} onCheckedChange={(v) => { const u = [...editLines]; u[i] = { ...u[i], saveToCatalog: !!v }; setEditLines(u); }} />
+                          <span>Ajouter au catalogue</span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                 );
               })}
