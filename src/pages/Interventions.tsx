@@ -703,7 +703,7 @@ export default function Interventions() {
             </div>
           </DialogContent>
         </Dialog>
-        </div>
+        </div>}
       </div>
 
       {/* Filters */}
