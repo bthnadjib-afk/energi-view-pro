@@ -260,7 +260,7 @@ export function getFactureStatutLabel(fk_statut: number, paye: boolean, totalPay
   if (fk_statut === 3) return 'Abandonnée';
   if (fk_statut === 0) return 'Brouillon';
   if (fk_statut >= 1 && !paye && (totalPaye || 0) > 0) return 'Partiellement payée';
-  if (fk_statut >= 1) return 'Non payée';
+   if (fk_statut >= 1) return 'Validée';
   return `Statut ${fk_statut}`;
 }
 
