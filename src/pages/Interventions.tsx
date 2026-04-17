@@ -1230,6 +1230,22 @@ export default function Interventions() {
                                 await closeMutation.mutateAsync(selectedIntervention.id);
                                 setConfirmTerminerOpen(false);
                                 setDetailOpen(false);
+                                // Envoi automatique du bon d'intervention par email
+                                const clientEmail = clients.find(cl => cl.id === selectedIntervention.socid)?.email;
+                                if (!config.smtp.user || !config.smtp.pass) {
+                                  toast.info('Intervention terminée — SMTP non configuré, email non envoyé');
+                                } else if (!clientEmail) {
+                                  toast.info('Intervention terminée — aucun email pour ce client');
+                                } else {
+                                  try {
+                                    const subject = `Électricien du Genevois - Bon d'intervention ${selectedIntervention.ref}`;
+                                    const message = `Bonjour,\n\nVous trouverez ci-joint votre bon d'intervention ${selectedIntervention.ref} terminé.\n\nCordialement,\nÉlectricien du Genevois`;
+                                    await sendInterventionByEmail(selectedIntervention.id, clientEmail, subject, message);
+                                    toast.success(`Bon d'intervention envoyé à ${clientEmail}`);
+                                  } catch (e: any) {
+                                    toast.error(`Intervention terminée — échec envoi email : ${e.message || e}`);
+                                  }
+                                }
                               }}
                             >
                               Oui, terminer
