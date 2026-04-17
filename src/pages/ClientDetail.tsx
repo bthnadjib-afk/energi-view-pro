@@ -195,7 +195,7 @@ export default function ClientDetail() {
                       <td className="py-3 px-2 text-foreground">{d.montantHT.toLocaleString('fr-FR')} €</td>
                       <td className="py-3 px-2"><StatusBadge statut={d.statut as any} /></td>
                       <td className="py-3 px-2 text-right">
-                        <Button variant="ghost" size="sm" onClick={() => openDevisPdf(d, client, config)}>
+                        <Button variant="ghost" size="sm" onClick={() => openDevisPdf({ devis: d, client, entreprise: config.entreprise })}>
                           <FileDown className="h-4 w-4" />
                         </Button>
                       </td>
@@ -235,7 +235,7 @@ export default function ClientDetail() {
                       </td>
                       <td className="py-3 px-2"><StatusBadge statut={f.statut as any} /></td>
                       <td className="py-3 px-2 text-right">
-                        <Button variant="ghost" size="sm" onClick={() => openFacturePdf(f, client, config)}>
+                        <Button variant="ghost" size="sm" onClick={() => openFacturePdf({ facture: f, client, entreprise: config.entreprise })}>
                           <FileDown className="h-4 w-4" />
                         </Button>
                       </td>
