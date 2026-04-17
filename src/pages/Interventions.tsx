@@ -627,8 +627,8 @@ export default function Interventions() {
           dateIntervention: jour.date, notePrivee: jour.compteRendu || '',
           chantierId: selectedIntervention.chantierId,
         });
-        await updateIntervention({
-          id: jour.id, description: editChantierDescription,
+        await updateIntervention(jour.id, {
+          description: editChantierDescription,
           fk_user_assign: selectedUser?.id, dateo: dateTimestamp, datee: dateTimestamp,
           note_private: metadata,
         });
