@@ -80,6 +80,8 @@ export interface Intervention {
   descriptionClient?: string;
   compteRendu?: string;
   lines?: InterventionLine[];
+  /** Identifiant partagé entre toutes les interventions d'un même chantier multi-jours */
+  chantierId?: string;
 }
 
 export type TypeLogement = 'maison' | 'immeuble' | '';
