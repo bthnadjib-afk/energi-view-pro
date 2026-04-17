@@ -32,6 +32,45 @@ export type Database = {
         }
         Relationships: []
       }
+      devis_relances: {
+        Row: {
+          client_email: string | null
+          created_at: string
+          date_envoi: string | null
+          date_fin_validite: string | null
+          date_relance_1: string | null
+          devis_id: string
+          devis_ref: string
+          id: string
+          statut_relance: string
+          updated_at: string
+        }
+        Insert: {
+          client_email?: string | null
+          created_at?: string
+          date_envoi?: string | null
+          date_fin_validite?: string | null
+          date_relance_1?: string | null
+          devis_id: string
+          devis_ref: string
+          id?: string
+          statut_relance?: string
+          updated_at?: string
+        }
+        Update: {
+          client_email?: string | null
+          created_at?: string
+          date_envoi?: string | null
+          date_fin_validite?: string | null
+          date_relance_1?: string | null
+          devis_id?: string
+          devis_ref?: string
+          id?: string
+          statut_relance?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       email_history: {
         Row: {
           client_id: string
