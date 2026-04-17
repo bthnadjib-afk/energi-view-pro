@@ -13,6 +13,7 @@ import {
 } from '@/services/dolibarr';
 import { openDevisPdf, devisPdfToBase64, devisPdfToBlobUrl } from '@/services/devisPdf';
 import { useConfig } from '@/hooks/useConfig';
+import { useRecordDevisEnvoi } from '@/hooks/useDevisRelances';
 import { cn } from '@/lib/utils';
 import {
   ChevronDown, ChevronUp, Plus, Trash2, ArrowRightLeft, Receipt, CheckCircle2,
@@ -78,6 +79,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
   const updateSocidMutation = useUpdateDevisSocid();
   const { config } = useConfig();
   const queryClient = useQueryClient();
+  const recordEnvoi = useRecordDevisEnvoi();
 
   // Tracks if we're editing a previously-validated devis (so we re-validate after save)
   const [editingValidatedDevis, setEditingValidatedDevis] = useState(false);
@@ -197,6 +199,15 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
       try {
         await markDevisSent(devis.id, devis.note_private);
         queryClient.invalidateQueries({ queryKey: ['devis'] });
+      } catch { /* non-bloquant */ }
+      // Tracker l'envoi pour le système de relance (validité 30j, à relancer après 7j)
+      try {
+        await recordEnvoi.mutateAsync({
+          devis_id: devis.id,
+          devis_ref: devis.ref,
+          client_email: emailDest,
+          date_fin_validite: devis.finValidite || null,
+        });
       } catch { /* non-bloquant */ }
     } catch (e: any) {
       toast.error(`Erreur envoi : ${e.message || e}`);

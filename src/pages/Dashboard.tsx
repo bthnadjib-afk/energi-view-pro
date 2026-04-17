@@ -1,16 +1,25 @@
 import { useState, useMemo } from 'react';
-import { Euro, FileText, ClipboardList, TrendingUp, Users, AlertTriangle, Clock, Receipt, Wallet, CalendarDays } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Euro, FileText, ClipboardList, TrendingUp, Users, AlertTriangle,
+  Receipt, CalendarDays, Wrench, ChevronRight,
+} from 'lucide-react';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PeriodSelector, type Period } from '@/components/PeriodSelector';
 import { UrgencyWidget } from '@/components/UrgencyWidget';
 import { useFactures, useDevis, useInterventions } from '@/hooks/useDolibarr';
+import { useFactureRelances, getRelanceStatus } from '@/hooks/useFactureRelances';
+import { useDevisRelances, getDevisRelanceStatus } from '@/hooks/useDevisRelances';
 import { formatDateFR } from '@/services/dolibarr';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { data: factures = [] } = useFactures();
   const { data: devis = [] } = useDevis();
   const { data: interventions = [] } = useInterventions();
+  const { data: factureRelances = [] } = useFactureRelances();
+  const { data: devisRelancesData = [] } = useDevisRelances();
   const [period, setPeriod] = useState<Period>('annuel');
 
   const now = new Date();
@@ -45,17 +54,54 @@ export default function Dashboard() {
     interventions: todayInterventions.filter(i => i.technicien === t),
   }));
 
-  const sevenDaysAgo = new Date(now);
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const devisRelances = devis.filter(d => d.fk_statut === 1 && new Date(d.date) <= sevenDaysAgo);
-  const facturesImpayees = factures.filter(f => f.fk_statut >= 1 && !f.paye);
-  const interventionsAValider = interventions.filter(i => i.fk_statut === 0);
+  // === PRIORITIES ===
 
-  const totalImpaye = facturesImpayees.reduce((s, f) => s + f.montantHT, 0);
-  const interventionsTerminees = interventions.filter(i => i.fk_statut === 3);
-  const aFacturer = interventionsTerminees.length;
+  // 1) Factures impayées avec relances (envoyées/relancées/mise en demeure)
+  const factureRelanceById = useMemo(() => {
+    const m = new Map<string, typeof factureRelances[0]>();
+    factureRelances.forEach(r => m.set(r.facture_id, r));
+    return m;
+  }, [factureRelances]);
+  const facturesARelancer = useMemo(() => {
+    return factures
+      .filter(f => f.fk_statut >= 1 && !f.paye)
+      .map(f => ({ facture: f, status: getRelanceStatus(factureRelanceById.get(f.id), f.paye) }))
+      .filter(({ status }) => status.variant !== 'none');
+  }, [factures, factureRelanceById]);
 
-  const hasPriorities = devisRelances.length > 0 || facturesImpayees.length > 0 || interventionsAValider.length > 0;
+  // 2) Devis signés sans intervention liée → à créer
+  const devisSignesSansIntervention = useMemo(() => {
+    return devis.filter(d => {
+      if (d.fk_statut !== 2) return false; // signé
+      // Pas d'intervention associée à ce client/projet récent : heuristique simple = aucune intervention récente avec ce socid
+      const linked = interventions.some(i => i.socid === d.socid && new Date(i.date) >= new Date(d.date));
+      return !linked;
+    });
+  }, [devis, interventions]);
+
+  // 3) Devis à relancer (envoyés depuis ≥7j sans signature)
+  const devisRelanceById = useMemo(() => {
+    const m = new Map<string, typeof devisRelancesData[0]>();
+    devisRelancesData.forEach(r => m.set(r.devis_id, r));
+    return m;
+  }, [devisRelancesData]);
+  const devisARelancer = useMemo(() => {
+    return devis
+      .filter(d => d.fk_statut === 1) // envoyé/validé, pas signé
+      .map(d => ({ devis: d, status: getDevisRelanceStatus(devisRelanceById.get(d.id), d.fk_statut) }))
+      .filter(({ status }) => status.variant === 'a_relancer' || status.variant === 'expire');
+  }, [devis, devisRelanceById]);
+
+  const hasPriorities =
+    facturesARelancer.length > 0 || devisSignesSansIntervention.length > 0 || devisARelancer.length > 0;
+
+  const relanceColor = (variant: string) => {
+    if (variant === 'mise_en_demeure') return 'text-red-600';
+    if (variant === 'relance_1') return 'text-orange-600';
+    if (variant === 'a_relancer') return 'text-orange-600';
+    if (variant === 'expire') return 'text-red-600';
+    return 'text-blue-600';
+  };
 
   return (
     <div className="space-y-6">
@@ -74,52 +120,29 @@ export default function Dashboard() {
         <StatCard title="Taux conversion" value={`${tauxConversion}%`} subtitle="Devis → Factures" icon={TrendingUp} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-orange-500" /> CASH
-          </h2>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center p-3 rounded-lg bg-red-50 border border-red-200">
-              <div>
-                <p className="text-sm font-medium text-foreground">Impayés</p>
-                <p className="text-xs text-muted-foreground">{facturesImpayees.length} facture(s)</p>
-              </div>
-              <p className="text-xl font-bold text-red-600">{totalImpaye.toLocaleString('fr-FR')} €</p>
-            </div>
-            <div className="flex justify-between items-center p-3 rounded-lg bg-amber-50 border border-amber-200">
-              <div>
-                <p className="text-sm font-medium text-foreground">À facturer</p>
-                <p className="text-xs text-muted-foreground">{aFacturer} intervention(s) terminée(s)</p>
-              </div>
-              <Receipt className="h-6 w-6 text-amber-500" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-primary" /> AGENDA — Aujourd'hui
-          </h2>
-          {todayInterventions.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Aucune intervention aujourd'hui</p>
-          ) : (
-            <div className="space-y-2">
-              {todayInterventions.map(i => (
-                <div key={i.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-xs">
-                  <div className="flex items-center gap-2 truncate mr-2">
-                    <span className="font-mono text-muted-foreground">{i.heureDebut}–{i.heureFin}</span>
-                    <span className="text-foreground truncate">{i.description}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{i.technicien || '—'}</span>
-                    <StatusBadge statut={i.statut} />
-                  </div>
+      {/* AGENDA jour seul (CASH retiré) */}
+      <div className="bg-card rounded-lg border border-border p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+          <CalendarDays className="h-5 w-5 text-primary" /> AGENDA — Aujourd'hui
+        </h2>
+        {todayInterventions.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Aucune intervention aujourd'hui</p>
+        ) : (
+          <div className="space-y-2">
+            {todayInterventions.map(i => (
+              <div key={i.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 text-xs">
+                <div className="flex items-center gap-2 truncate mr-2">
+                  <span className="font-mono text-muted-foreground">{i.heureDebut}–{i.heureFin}</span>
+                  <span className="text-foreground truncate">{i.description}</span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">{i.technicien || '—'}</span>
+                  <StatusBadge statut={i.statut} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {hasPriorities && (
@@ -128,50 +151,79 @@ export default function Dashboard() {
             <AlertTriangle className="h-5 w-5 text-orange-500" /> À faire en priorité
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {devisRelances.length > 0 && (
-              <div className="rounded-lg p-4 border border-border border-l-4 border-l-blue-500">
-                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                  <ClipboardList className="h-4 w-4 text-blue-500" /> Relances devis ({devisRelances.length})
+            {facturesARelancer.length > 0 && (
+              <button
+                onClick={() => navigate('/factures')}
+                className="text-left rounded-lg p-4 border border-border border-l-4 border-l-red-500 hover:bg-muted/50 transition-colors group"
+              >
+                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-red-500" />
+                    Relances factures ({facturesARelancer.length})
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </h3>
                 <div className="space-y-2">
-                  {devisRelances.slice(0, 5).map(d => (
+                  {facturesARelancer.slice(0, 5).map(({ facture, status }) => (
+                    <div key={facture.id} className="flex items-center justify-between text-xs">
+                      <span className="text-foreground truncate mr-2">{facture.ref} — {facture.client}</span>
+                      <span className={`whitespace-nowrap font-medium ${relanceColor(status.variant)}`}>
+                        {status.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </button>
+            )}
+
+            {devisSignesSansIntervention.length > 0 && (
+              <button
+                onClick={() => navigate('/interventions')}
+                className="text-left rounded-lg p-4 border border-border border-l-4 border-l-emerald-500 hover:bg-muted/50 transition-colors group"
+              >
+                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Wrench className="h-4 w-4 text-emerald-500" />
+                    Interventions à créer ({devisSignesSansIntervention.length})
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </h3>
+                <div className="space-y-2">
+                  {devisSignesSansIntervention.slice(0, 5).map(d => (
                     <div key={d.id} className="flex items-center justify-between text-xs">
                       <span className="text-foreground truncate mr-2">{d.ref} — {d.client}</span>
-                      <span className="text-muted-foreground whitespace-nowrap">{d.montantHT.toLocaleString('fr-FR')} € HT</span>
+                      <span className="text-muted-foreground whitespace-nowrap">
+                        {d.montantHT.toLocaleString('fr-FR')} € HT
+                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
+              </button>
             )}
-            {facturesImpayees.length > 0 && (
-              <div className="rounded-lg p-4 border border-border border-l-4 border-l-red-500">
-                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                  <Receipt className="h-4 w-4 text-red-500" /> Factures impayées ({facturesImpayees.length})
+
+            {devisARelancer.length > 0 && (
+              <button
+                onClick={() => navigate('/devis')}
+                className="text-left rounded-lg p-4 border border-border border-l-4 border-l-orange-500 hover:bg-muted/50 transition-colors group"
+              >
+                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4 text-orange-500" />
+                    Relances devis ({devisARelancer.length})
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </h3>
                 <div className="space-y-2">
-                  {facturesImpayees.slice(0, 5).map(f => (
-                    <div key={f.id} className="flex items-center justify-between text-xs">
-                      <span className="text-foreground truncate mr-2">{f.ref} — {f.client}</span>
-                      <StatusBadge statut={f.statut} />
+                  {devisARelancer.slice(0, 5).map(({ devis: d, status }) => (
+                    <div key={d.id} className="flex items-center justify-between text-xs">
+                      <span className="text-foreground truncate mr-2">{d.ref} — {d.client}</span>
+                      <span className={`whitespace-nowrap font-medium ${relanceColor(status.variant)}`}>
+                        {status.label}
+                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-            {interventionsAValider.length > 0 && (
-              <div className="rounded-lg p-4 border border-border border-l-4 border-l-amber-500">
-                <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-amber-500" /> Interventions brouillon ({interventionsAValider.length})
-                </h3>
-                <div className="space-y-2">
-                  {interventionsAValider.slice(0, 5).map(i => (
-                    <div key={i.id} className="flex items-center justify-between text-xs">
-                      <span className="text-foreground truncate mr-2">{i.ref} — {i.description}</span>
-                      <span className="text-muted-foreground whitespace-nowrap">{formatDateFR(i.date)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </button>
             )}
           </div>
         </div>

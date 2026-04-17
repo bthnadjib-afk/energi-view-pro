@@ -39,7 +39,6 @@ const navGroups: { label: string; items: NavItem[] }[] = [
         title: 'Devis', url: '/devis', icon: ClipboardList, feature: 'devis',
         children: [
           { title: 'Liste des devis', url: '/devis', icon: ClipboardList, feature: 'devis' },
-          { title: 'Commandes clients', url: '/commandes', icon: ShoppingCart, feature: 'devis' },
           { title: 'Contrats', url: '/contrats', icon: FileCheck, feature: 'devis' },
         ],
       },
