@@ -1099,7 +1099,8 @@ export function resolveTechnicianName(userAuthorId: string | undefined, dolibarr
 // --- Mapping Dolibarr → App types ---
 
 function mapDolibarrFacture(d: any): Facture {
-  const fk_statut = Number(d.fk_statut) || 0;
+  // Dolibarr /invoices returns the status as `statut` / `status` (no `fk_statut` field).
+  const fk_statut = Number(d.fk_statut ?? d.statut ?? d.status) || 0;
   const paye = d.paye === '1' || d.paye === 1;
   const totalPaye = parseFloat(d.sumpayed) || 0;
   const resteAPayer = parseFloat(d.remaintopay) || (parseFloat(d.total_ttc) || 0) - totalPaye;
