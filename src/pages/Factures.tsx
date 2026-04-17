@@ -367,12 +367,39 @@ export default function Factures() {
                     </div>
                   </td>
                   <td className="py-3 px-2 text-foreground">{f.client}</td>
-                  <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(f.date)}</td>
+                  <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">
+                    {(() => {
+                      const r = relanceByFactureId.get(f.id);
+                      if (r?.date_envoi) {
+                        return (
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-muted-foreground/70">Envoyée le</span>
+                            <span>{formatDateFR(r.date_envoi)}</span>
+                          </div>
+                        );
+                      }
+                      return formatDateFR(f.date);
+                    })()}
+                  </td>
                   <td className="py-3 px-2 text-right font-medium text-foreground">{f.montantTTC.toLocaleString('fr-FR')} €</td>
                   <td className="py-3 px-2 text-right text-muted-foreground hidden md:table-cell">
                     {f.fk_statut >= 1 && !f.paye ? `${f.resteAPayer.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €` : '—'}
                   </td>
-                  <td className="py-3 px-2"><StatusBadge statut={f.statut} /></td>
+                  <td className="py-3 px-2">
+                    {(() => {
+                      const r = relanceByFactureId.get(f.id);
+                      const rel = getRelanceStatus(r, f.paye);
+                      if (rel.variant !== 'none' && f.fk_statut >= 1 && !f.paye) {
+                        return (
+                          <div className="flex flex-col gap-1">
+                            <StatusBadge statut={f.statut} />
+                            <StatusBadge statut={rel.label} />
+                          </div>
+                        );
+                      }
+                      return <StatusBadge statut={f.statut} />;
+                    })()}
+                  </td>
                   <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
                     {f.fk_statut === 0 && (
                       <AlertDialog>
