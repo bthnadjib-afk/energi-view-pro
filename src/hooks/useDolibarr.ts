@@ -46,7 +46,7 @@ export function useDolibarrUsers() {
 export function useCreateClient() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }) => createClient(data),
+    mutationFn: (data: import('@/services/dolibarr').ClientMutationData) => createClient(data),
     onSuccess: () => { toast.success('Client créé'); qc.invalidateQueries({ queryKey: ['clients'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
@@ -55,7 +55,7 @@ export function useCreateClient() {
 export function useUpdateClient() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { id: string; nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }) => updateClient(data.id, data),
+    mutationFn: (data: import('@/services/dolibarr').ClientMutationData & { id: string }) => updateClient(data.id, data),
     onSuccess: () => { toast.success('Client modifié'); qc.invalidateQueries({ queryKey: ['clients'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
