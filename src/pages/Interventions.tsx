@@ -29,6 +29,7 @@ import { Plus, FileText, Receipt, Clock, ArrowRightLeft, Lock, FileDown, FileChe
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 const typeLabels: Record<InterventionType, string> = {
   devis: 'Devis', panne: 'Panne', panne_urgence: 'Panne urgence', sav: 'SAV', chantier: 'Chantier',
