@@ -261,22 +261,20 @@ export default function ClientDetail() {
                     <th className="text-left py-3 px-2 text-muted-foreground font-medium">Technicien</th>
                     <th className="text-left py-3 px-2 text-muted-foreground font-medium">Description</th>
                     <th className="text-left py-3 px-2 text-muted-foreground font-medium">Statut</th>
-                    <th className="text-right py-3 px-2 text-muted-foreground font-medium">PDF</th>
                   </tr>
                 </thead>
                 <tbody>
                   {interventions.map(i => (
-                    <tr key={i.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                    <tr
+                      key={i.id}
+                      onClick={() => navigate('/interventions')}
+                      className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer"
+                    >
                       <td className="py-3 px-2 font-mono text-xs text-foreground">{i.ref}</td>
                       <td className="py-3 px-2 text-muted-foreground">{formatDateFR(i.date)}</td>
                       <td className="py-3 px-2 text-muted-foreground">{i.technicien || '—'}</td>
                       <td className="py-3 px-2 text-foreground truncate max-w-md">{i.description}</td>
                       <td className="py-3 px-2"><StatusBadge statut={i.statut as any} /></td>
-                      <td className="py-3 px-2 text-right">
-                        <Button variant="ghost" size="sm" onClick={() => openInterventionPdf(i, client, config)}>
-                          <FileDown className="h-4 w-4" />
-                        </Button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
