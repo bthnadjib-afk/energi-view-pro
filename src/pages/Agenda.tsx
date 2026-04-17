@@ -388,19 +388,21 @@ export default function Agenda() {
               </div>
             ))}
           </div>
-          <Button variant="outline" className="w-full mt-2" onClick={() => {
-            setDayListOpen(false);
-            setCreateDate(dayListDate);
-            setNewClientId('');
-            setNewDescription('');
-            setNewType('devis');
-            setNewTech('');
-            setNewHeureDebut('08:00');
-            setNewHeureFin('10:00');
-            setCreateOpen(true);
-          }}>
-            <Plus className="h-4 w-4 mr-2" /> Ajouter une intervention
-          </Button>
+          {!isTechnicien && (
+            <Button variant="outline" className="w-full mt-2" onClick={() => {
+              setDayListOpen(false);
+              setCreateDate(dayListDate);
+              setNewClientId('');
+              setNewDescription('');
+              setNewType('devis');
+              setNewTech('');
+              setNewHeureDebut('08:00');
+              setNewHeureFin('10:00');
+              setCreateOpen(true);
+            }}>
+              <Plus className="h-4 w-4 mr-2" /> Ajouter une intervention
+            </Button>
+          )}
         </DialogContent>
       </Dialog>
 
