@@ -224,8 +224,8 @@ export function AppSidebar() {
             <SidebarMenuButton asChild>
               <NavLink
                 to="/preferences"
-                className="hover:bg-sidebar-accent text-muted-foreground"
-                activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-muted-foreground"
+                activeClassName="bg-primary/15 text-primary font-medium [&_svg]:text-primary"
               >
                 <SlidersHorizontal className="mr-2 h-4 w-4" />
                 {!collapsed && <span>Préférences</span>}
