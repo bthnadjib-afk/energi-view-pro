@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil, Search, XCircle, Zap } from 'lucide-react';
+import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send, CreditCard, Pencil, Search, XCircle, Zap, RotateCcw, Ban } from 'lucide-react';
 import { HelpTooltip } from '@/components/HelpTooltip';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid } from '@/hooks/useDolibarr';
+import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid, useCreateAvoir, useCreateAcompteLibre, useClassifyFactureAbandonee } from '@/hooks/useDolibarr';
 import { useFactureRelances, useRecordFactureEnvoi, useSetFactureEnvoiDate, getRelanceStatus } from '@/hooks/useFactureRelances';
-import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
+import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, getFactureCloseCodeLabel, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
 import { useQuery } from '@tanstack/react-query';
 import { openFacturePdf, facturePdfToBase64, facturePdfToBlobUrl } from '@/services/facturePdf';
 import { useConfig } from '@/hooks/useConfig';
@@ -55,6 +55,9 @@ export default function Factures() {
   const updateLinesMutation = useUpdateFactureLines();
   const setToDraftMutation = useSetFactureToDraft();
   const setToUnpaidMutation = useSetFactureToUnpaid();
+  const createAvoirMutation = useCreateAvoir();
+  const createAcompteLibreMutation = useCreateAcompteLibre();
+  const classifyAbandoneeMutation = useClassifyFactureAbandonee();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedFacture, setSelectedFacture] = useState<Facture | null>(null);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -97,6 +100,18 @@ export default function Factures() {
   // Edit draft state
   const [editOpen, setEditOpen] = useState(false);
   const [editLines, setEditLines] = useState<LigneForm[]>([]);
+
+  // Acompte libre
+  const [acompteOpen, setAcompteOpen] = useState(false);
+  const [acompteSocid, setAcompteSocid] = useState('');
+  const [acompteMontant, setAcompteMontant] = useState(0);
+  const [acompteDescription, setAcompteDescription] = useState('Acompte');
+  const [acompteTva, setAcompteTva] = useState(20);
+
+  // Abandon
+  const [abandonOpen, setAbandonOpen] = useState(false);
+  const [abandonCode, setAbandonCode] = useState<'badcustomer' | 'abandon' | 'other'>('badcustomer');
+  const [abandonNote, setAbandonNote] = useState('');
 
   // Filters
   const [filterStatut, setFilterStatut] = useState('all');
