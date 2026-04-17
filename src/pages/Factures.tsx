@@ -478,7 +478,7 @@ export default function Factures() {
                       if (f.fk_statut >= 1 && !f.paye && (rel.variant === 'relance_1' || rel.variant === 'mise_en_demeure')) {
                         const combined = rel.variant === 'mise_en_demeure'
                           ? 'Non payée — Mise en demeure'
-                          : 'Non payée — 1ère relance';
+                          : 'Non payée — Relance';
                         return <StatusBadge statut={combined} />;
                       }
                       if (f.fk_statut >= 1 && !f.paye && r?.date_envoi) {
@@ -565,7 +565,7 @@ export default function Factures() {
                         return 'Non payée — Mise en demeure';
                       }
                       if (selectedFacture.fk_statut >= 1 && !selectedFacture.paye && rel.variant === 'relance_1') {
-                        return 'Non payée — 1ère relance';
+                        return 'Non payée — Relance';
                       }
                       if (selectedFacture.fk_statut >= 1 && !selectedFacture.paye && r?.date_envoi) {
                         return 'Non payée';

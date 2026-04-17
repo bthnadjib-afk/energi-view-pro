@@ -123,7 +123,7 @@ export function getRelanceStatus(
     return { label: 'Mise en demeure', variant: 'mise_en_demeure' };
   }
   if (daysSinceRef >= 10 || relance?.statut_relance === 'relance_1') {
-    return { label: '1ère relance', variant: 'relance_1' };
+    return { label: 'Relance', variant: 'relance_1' };
   }
   return { label: 'Envoyée', variant: 'envoyee' };
 }
