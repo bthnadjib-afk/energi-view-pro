@@ -1253,7 +1253,18 @@ export default function Interventions() {
                         size="icon"
                         title={`Maintenant (${liveTime})`}
                         disabled={appEnCours}
-                        onClick={() => { const t = currentTime(); setHeureArrivee(t); autoSaveTimes(t, heureDepart); }}
+                        onClick={() => {
+                          const today = todayStr();
+                          if (selectedIntervention.date > today) {
+                            toast.error(`Intervention prévue le ${formatDateFR(selectedIntervention.date)} — pas d'arrivée possible avant`);
+                            return;
+                          }
+                          if (selectedIntervention.date === today && selectedIntervention.heureDebut && currentTime() < selectedIntervention.heureDebut) {
+                            toast.error(`Il est ${currentTime()} — intervention prévue à ${selectedIntervention.heureDebut}, arrivée impossible avant`);
+                            return;
+                          }
+                          const t = currentTime(); setHeureArrivee(t); autoSaveTimes(t, heureDepart);
+                        }}
                       >
                         <Clock className="h-4 w-4" />
                       </Button>
