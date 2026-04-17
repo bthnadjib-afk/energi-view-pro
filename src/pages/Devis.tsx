@@ -308,6 +308,16 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
         socid: devis.socid,
         lines: editLines.map(l => ({ desc: l.desc, qty: l.qty, subprice: l.subprice, tva_tx: l.tva_tx || 20, product_type: l.product_type, pa_ht: l.prixAchat })),
       });
+      // If we were editing a previously validated devis, re-validate so it
+      // returns to "Open" in Dolibarr / "Validé" in the app — never stays in draft.
+      if (editingValidatedDevis) {
+        try {
+          await validateMutation.mutateAsync(devis.id);
+        } catch (e: any) {
+          toast.error(`Erreur revalidation : ${e?.message || e}`);
+        }
+        setEditingValidatedDevis(false);
+      }
       setEditOpen(false);
     } catch {}
   };
