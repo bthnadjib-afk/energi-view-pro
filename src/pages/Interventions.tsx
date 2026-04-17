@@ -974,12 +974,9 @@ export default function Interventions() {
                       ) : (
                         <>
                           <div className="flex gap-2">
-                            <Input
-                              type="time"
-                              value={heureDepart}
-                              max={currentTime()}
-                              onChange={(e) => {
-                                const v = e.target.value;
+                            <Select
+                              value={heureDepart || undefined}
+                              onValueChange={(v) => {
                                 if (v && v > currentTime()) {
                                   toast.error(`Il est ${currentTime()} — impossible de saisir une heure de départ future (${v})`);
                                   return;
@@ -991,8 +988,18 @@ export default function Interventions() {
                                 setHeureDepart(v);
                                 if (v) autoSaveTimes(heureArrivee, v);
                               }}
-                              className="flex-1"
-                            />
+                            >
+                              <SelectTrigger className="flex-1">
+                                <SelectValue placeholder="Sélectionner l'heure de départ" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-72">
+                                {timeSlots
+                                  .filter((t) => t <= currentTime() && (!heureArrivee || t >= heureArrivee))
+                                  .map((t) => (
+                                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
                             <Button
                               type="button"
                               variant="outline"
