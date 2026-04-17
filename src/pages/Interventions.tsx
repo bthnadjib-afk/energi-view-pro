@@ -993,11 +993,9 @@ export default function Interventions() {
                                 <SelectValue placeholder="Sélectionner l'heure de départ" />
                               </SelectTrigger>
                               <SelectContent className="max-h-72">
-                                {timeSlots
-                                  .filter((t) => t <= currentTime() && (!heureArrivee || t >= heureArrivee))
-                                  .map((t) => (
-                                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                                  ))}
+                                {timeSlots.map((t) => (
+                                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <Button
