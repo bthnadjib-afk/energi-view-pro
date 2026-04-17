@@ -5,6 +5,7 @@ import {
   useDevis, useClients, useProduits, useCreateDevis, useConvertDevisToFacture,
   useCreateAcompte, useValidateDevis, useCloseDevis, useDeleteDevis,
   useUpdateDevisLines, useSetDevisToDraft, useCloneDevis, useUpdateDevisSocid,
+  useReopenDevis,
 } from '@/hooks/useDolibarr';
 import {
   getAcompteBadge, formatDateFR, replaceEmailVariables, DEVIS_STATUTS,
