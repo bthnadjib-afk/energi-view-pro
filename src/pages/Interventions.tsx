@@ -180,10 +180,16 @@ export default function Interventions() {
   const [collisionInfo, setCollisionInfo] = useState({ technicien: '', creneauExistant: '' });
   const [confirmTerminerOpen, setConfirmTerminerOpen] = useState(false);
 
-  // Horloge live — mise à jour toutes les secondes pour les boutons de capture
-  const [liveTime, setLiveTime] = useState(currentTime);
+  // Horloge live — définie après currentTime, mise à jour toutes les secondes
+  const [liveTime, setLiveTime] = useState(() => {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  });
   useEffect(() => {
-    const id = setInterval(() => setLiveTime(currentTime()), 1000);
+    const id = setInterval(() => {
+      const now = new Date();
+      setLiveTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+    }, 1000);
     return () => clearInterval(id);
   }, []);
 
