@@ -481,6 +481,9 @@ export default function Factures() {
                           : 'Non payée — 1ère relance';
                         return <StatusBadge statut={combined} />;
                       }
+                      if (f.fk_statut >= 1 && !f.paye && r?.date_envoi) {
+                        return <StatusBadge statut="Non payée" />;
+                      }
                       return <StatusBadge statut={f.statut} />;
                     })()}
                   </td>
@@ -554,7 +557,22 @@ export default function Factures() {
 
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Statut :</span>
-                  <StatusBadge statut={selectedFacture.statut} />
+                  <StatusBadge
+                    statut={(() => {
+                      const r = relanceByFactureId.get(selectedFacture.id);
+                      const rel = getRelanceStatus(r, selectedFacture.paye, selectedFacture.dateValidation);
+                      if (selectedFacture.fk_statut >= 1 && !selectedFacture.paye && rel.variant === 'mise_en_demeure') {
+                        return 'Non payée — Mise en demeure';
+                      }
+                      if (selectedFacture.fk_statut >= 1 && !selectedFacture.paye && rel.variant === 'relance_1') {
+                        return 'Non payée — 1ère relance';
+                      }
+                      if (selectedFacture.fk_statut >= 1 && !selectedFacture.paye && r?.date_envoi) {
+                        return 'Non payée';
+                      }
+                      return selectedFacture.statut;
+                    })()}
+                  />
                 </div>
                 <div className="flex flex-wrap gap-3 pt-2">
                   {/* Brouillon actions */}
