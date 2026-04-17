@@ -30,6 +30,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { getInterventionStatusKey, STATUS_DOT_BG, STATUS_LABEL, STATUS_BADGE } from '@/lib/interventionStatus';
 
 const typeLabels: Record<InterventionType, string> = {
   devis: 'Devis', panne: 'Panne', panne_urgence: 'Panne urgence', sav: 'SAV', chantier: 'Chantier',
@@ -1004,10 +1005,13 @@ export default function Interventions() {
                     </td>
                     <td className="py-3 px-2 text-muted-foreground">{formatDateFR(i.date)}</td>
                     <td className="py-3 px-2">{(() => {
-                      if (i.fk_statut === 1 && i.descriptionClient) {
-                        try { if (JSON.parse(i.descriptionClient).appStatus === 'en_cours') return <StatusBadge statut="En cours" />; } catch {}
-                      }
-                      return <StatusBadge statut={i.statut} />;
+                      const k = getInterventionStatusKey(i);
+                      return (
+                        <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', STATUS_BADGE[k])}>
+                          <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5', STATUS_DOT_BG[k])} />
+                          {STATUS_LABEL[k]}
+                        </span>
+                      );
                     })()}</td>
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -1059,7 +1063,15 @@ export default function Interventions() {
                   <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs ml-2', typeColors[selectedIntervention.type])}>
                     {typeLabels[selectedIntervention.type]}
                   </span>
-                  <StatusBadge statut={selectedIntervention.fk_statut === 1 && appEnCours ? 'En cours' : selectedIntervention.statut} />
+                  {(() => {
+                    const k = getInterventionStatusKey(selectedIntervention);
+                    return (
+                      <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', STATUS_BADGE[k])}>
+                        <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5', STATUS_DOT_BG[k])} />
+                        {STATUS_LABEL[k]}
+                      </span>
+                    );
+                  })()}
                 </DialogTitle>
               </DialogHeader>
 
