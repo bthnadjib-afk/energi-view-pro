@@ -256,6 +256,8 @@ export default function Interventions() {
   const technicienNames = dolibarrUsers.map(u => u.fullname).filter(Boolean);
 
   const filtered = resolvedInterventions.filter((i) => {
+    // Technicien : ne voit QUE ses propres interventions
+    if (isTechnicien && currentTechName && i.technicien !== currentTechName) return false;
     if (techFilter !== 'all' && i.technicien !== techFilter) return false;
     if (statutFilter !== 'all' && i.statut !== statutFilter) return false;
     if (typeFilter !== 'all' && i.type !== typeFilter) return false;
