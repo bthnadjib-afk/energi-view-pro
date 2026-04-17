@@ -556,6 +556,13 @@ export async function setDevisToDraft(id: string): Promise<string | null> {
   return dolibarrCall<string>(`/proposals/${id}/settodraft`, 'POST');
 }
 
+// Swagger-confirmed: POST /proposals/{id}/reopen
+// Used to reopen a closed proposal (status 2 = signed, 3 = not signed, 4 = billed)
+// After reopen, proposal returns to status 1 (validated/open).
+export async function reopenDevis(id: string): Promise<string | null> {
+  return dolibarrCall<string>(`/proposals/${id}/reopen`, 'POST');
+}
+
 export async function convertDevisToFacture(devisId: string): Promise<string | null> {
   // Swagger-compliant: GET devis lines, POST /invoices, then mark devis as invoiced
   const devis = await dolibarrCall<any>(`/proposals/${devisId}`, 'GET');
