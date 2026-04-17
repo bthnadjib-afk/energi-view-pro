@@ -1358,7 +1358,7 @@ function mapDolibarrDevis(d: any): Devis {
         prixAchat: parseFloat(l.pa_ht) || 0,
       };
     }),
-    finValidite: parseDolibarrDate(d.fin_validite || d.duree_validite || ''),
+    finValidite: parseDolibarrDate(d.fin_validite || ''),
     note_private: d.note_private || undefined,
     dateValidation: parseDolibarrDate(d.date_validation || d.datev || ''),
   };

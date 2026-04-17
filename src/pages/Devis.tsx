@@ -1538,29 +1538,14 @@ export default function Devis() {
                       })()}
                     </td>
                     <td className="py-3 px-2">
-                      <div className="flex flex-col gap-1">
-                        <StatusBadge statut={d.statut} />
-                        {(() => {
-                          // Utilise dateValidation OU date du devis comme fallback (toujours remplie)
-                          const rs = getDevisRelanceStatus(devisRelanceMap.get(d.id), d.fk_statut, d.dateValidation || d.date);
-                          if (rs.variant === 'a_relancer') return (
-                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium bg-orange-100 text-orange-700 border-orange-300">
-                              ⏰ À relancer
-                            </span>
-                          );
-                          if (rs.variant === 'expire') return (
-                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium bg-red-100 text-red-700 border-red-300">
-                              ⚠ Expiré
-                            </span>
-                          );
-                          if (rs.variant === 'relance') return (
-                            <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium bg-blue-100 text-blue-700 border-blue-300">
-                              ✓ Relancé
-                            </span>
-                          );
-                          return null;
-                        })()}
-                      </div>
+                      {(() => {
+                        const rs = getDevisRelanceStatus(devisRelanceMap.get(d.id), d.fk_statut, d.dateValidation || d.date);
+                        const effectiveStatut =
+                          rs.variant === 'a_relancer' ? 'Relance devis' :
+                          rs.variant === 'relance'    ? 'Relancé' :
+                          d.statut;
+                        return <StatusBadge statut={effectiveStatut} />;
+                      })()}
                     </td>
                     <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
                       {d.fk_statut === 0 && (

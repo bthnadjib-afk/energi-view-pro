@@ -99,7 +99,8 @@ export function getDevisRelanceStatus(
   fk_statut: number,
   dateValidation?: string
 ): { label: string; variant: 'envoye' | 'a_relancer' | 'relance' | 'expire' | 'signe' | 'none' } {
-  if (fk_statut === 2) return { label: 'Signé', variant: 'signe' };
+  // Uniquement pertinent pour les devis validés/envoyés en attente de signature
+  if (fk_statut !== 1) return { label: '', variant: 'none' };
 
   // Date de référence : envoi email > validation Dolibarr
   const refDate = relance?.date_envoi || (dateValidation || null);
