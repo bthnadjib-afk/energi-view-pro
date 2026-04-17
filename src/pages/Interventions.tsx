@@ -180,6 +180,13 @@ export default function Interventions() {
   const [collisionInfo, setCollisionInfo] = useState({ technicien: '', creneauExistant: '' });
   const [confirmTerminerOpen, setConfirmTerminerOpen] = useState(false);
 
+  // Horloge live — mise à jour toutes les secondes pour les boutons de capture
+  const [liveTime, setLiveTime] = useState(currentTime);
+  useEffect(() => {
+    const id = setInterval(() => setLiveTime(currentTime()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailDest, setEmailDest] = useState('');
   const [emailObjet, setEmailObjet] = useState('');
@@ -873,7 +880,7 @@ export default function Interventions() {
                         disabled={appEnCours}
                         onClick={() => { const t = currentTime(); setHeureArrivee(t); autoSaveTimes(t, heureDepart); }}
                       >
-                        <Clock className="h-4 w-4" /> Enregistrer mon arrivée ({currentTime()})
+                        <Clock className="h-4 w-4" /> Enregistrer mon arrivée ({liveTime})
                       </Button>
                     ) : (
                       <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-50 border border-emerald-200">
@@ -902,7 +909,7 @@ export default function Interventions() {
                           className="w-full gap-2"
                           onClick={() => { const t = currentTime(); setHeureDepart(t); autoSaveTimes(heureArrivee, t); }}
                         >
-                          <Clock className="h-4 w-4" /> Enregistrer mon départ ({currentTime()})
+                          <Clock className="h-4 w-4" /> Enregistrer mon départ ({liveTime})
                         </Button>
                       ) : (
                         <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-50 border border-emerald-200">
@@ -1025,8 +1032,8 @@ export default function Interventions() {
                     </>
                   )}
 
-                  {/* Supprimer — brouillon (0) ou validée (1) */}
-                  {(selectedIntervention.fk_statut === 0 || selectedIntervention.fk_statut === 1) && (
+                  {/* Supprimer — brouillon (0) ou validée (1), admin/secrétaire uniquement */}
+                  {(selectedIntervention.fk_statut === 0 || selectedIntervention.fk_statut === 1) && role !== 'technicien' && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="outline" className="gap-2 border-destructive/30 text-destructive" disabled={deleteMutation.isPending}>
@@ -1097,6 +1104,11 @@ export default function Interventions() {
                           if (!heureArrivee) { toast.error('Enregistrez d\'abord votre heure d\'arrivée'); return; }
                           if (!heureDepart) { toast.error('Enregistrez d\'abord votre heure de départ en cliquant sur le bouton ci-dessus'); return; }
                           if (heureArrivee >= heureDepart) { toast.error('L\'heure d\'arrivée doit être avant l\'heure de départ'); return; }
+                          // Sécurité finale : heure de départ ne peut pas être dans le futur
+                          if (heureDepart > currentTime()) {
+                            toast.error(`Il est ${currentTime()} sur votre appareil — impossible de terminer à ${heureDepart}`);
+                            return;
+                          }
                           if (!techNote.trim()) { toast.error('La note du technicien est obligatoire'); return; }
                           if (!signatureData) { toast.error('Signature client manquante'); return; }
                           if (!signatureTechData) { toast.error('Signature technicien manquante'); return; }
