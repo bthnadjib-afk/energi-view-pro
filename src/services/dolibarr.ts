@@ -83,6 +83,7 @@ export interface Intervention {
 }
 
 export type TypeLogement = 'maison' | 'immeuble' | '';
+export type ClientType = 'particulier' | 'professionnel';
 
 export interface Client {
   id: string;
@@ -95,6 +96,12 @@ export interface Client {
   etage?: string;
   codePorte?: string;
   typeLogement?: TypeLogement;
+  // Champs pro
+  clientType?: ClientType;
+  siret?: string;
+  tvaIntra?: string;
+  // Hiérarchie : parent = pro qui gère ce client final
+  parentId?: string;
 }
 
 export interface Produit {
