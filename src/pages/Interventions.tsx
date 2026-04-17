@@ -1723,6 +1723,165 @@ export default function Interventions() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit chantier multi-jours dialog */}
+      <Dialog open={editChantierOpen} onOpenChange={setEditChantierOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-emerald-600" />
+              Modifier le chantier complet
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-xs text-muted-foreground">
+              Les modifications (technicien, horaires, description) s'appliquent à <strong>tous les jours du chantier</strong>.
+              Vous pouvez aussi ajouter ou supprimer des jours.
+            </p>
+
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Technicien (appliqué à tous les jours)</label>
+              <Select value={editChantierTech} onValueChange={setEditChantierTech}>
+                <SelectTrigger><SelectValue placeholder="Technicien" /></SelectTrigger>
+                <SelectContent>
+                  {technicienNames.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Heure début</label>
+                <Input type="time" value={editChantierHeureDebut} onChange={(e) => setEditChantierHeureDebut(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Heure fin</label>
+                <Input type="time" value={editChantierHeureFin} onChange={(e) => setEditChantierHeureFin(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Description (appliquée à tous les jours)</label>
+              <Textarea
+                placeholder="Description du chantier"
+                value={editChantierDescription}
+                onChange={(e) => setEditChantierDescription(e.target.value)}
+                className="min-h-[60px]"
+              />
+            </div>
+
+            {/* Liste des jours existants */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-foreground">Jours du chantier ({chantierJours.length})</h3>
+              <div className="space-y-1 max-h-48 overflow-y-auto rounded-md border border-border p-2 bg-muted/30">
+                {chantierJours.map(jour => {
+                  const isMarkedDelete = editChantierDatesToDelete.includes(jour.id);
+                  const isLocked = jour.fk_statut >= 3;
+                  return (
+                    <div
+                      key={jour.id}
+                      className={cn(
+                        "flex items-center justify-between gap-2 rounded px-2 py-1 text-sm",
+                        isMarkedDelete ? "bg-destructive/10 line-through text-muted-foreground" : "bg-background"
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs">{jour.ref}</span>
+                        <span>{formatDateFR(jour.date)}</span>
+                        {isLocked && <span className="text-xs text-amber-600">(clôturé)</span>}
+                      </div>
+                      {!isLocked && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => {
+                            setEditChantierDatesToDelete(prev =>
+                              isMarkedDelete ? prev.filter(x => x !== jour.id) : [...prev, jour.id]
+                            );
+                          }}
+                        >
+                          {isMarkedDelete ? <RotateCcw className="h-3.5 w-3.5" /> : <Trash2 className="h-3.5 w-3.5 text-destructive" />}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Ajouter de nouveaux jours */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-foreground">Ajouter un jour au chantier</h3>
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  value={editChantierNewDate}
+                  onChange={(e) => setEditChantierNewDate(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (!editChantierNewDate) return;
+                    if (chantierJours.some(j => j.date === editChantierNewDate)) {
+                      toast.error('Ce jour existe déjà dans le chantier');
+                      return;
+                    }
+                    if (editChantierDatesToAdd.includes(editChantierNewDate)) {
+                      toast.error('Ce jour est déjà dans la liste à ajouter');
+                      return;
+                    }
+                    setEditChantierDatesToAdd(prev => [...prev, editChantierNewDate].sort());
+                    setEditChantierNewDate('');
+                  }}
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" /> Ajouter
+                </Button>
+              </div>
+              {editChantierDatesToAdd.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {editChantierDatesToAdd.map(d => (
+                    <span
+                      key={d}
+                      className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                    >
+                      + {formatDateFR(d)}
+                      <button
+                        type="button"
+                        onClick={() => setEditChantierDatesToAdd(prev => prev.filter(x => x !== d))}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-400">
+              Récapitulatif : {chantierJours.length - editChantierDatesToDelete.length} jour(s) conservé(s)
+              {editChantierDatesToDelete.length > 0 && `, ${editChantierDatesToDelete.length} supprimé(s)`}
+              {editChantierDatesToAdd.length > 0 && `, ${editChantierDatesToAdd.length} nouveau(x)`}
+              <br />
+              <strong>Total après modifications : {chantierJours.length - editChantierDatesToDelete.length + editChantierDatesToAdd.length} jour(s)</strong>
+            </div>
+
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setEditChantierOpen(false)} className="flex-1">
+                Annuler
+              </Button>
+              <Button onClick={handleEditChantierSave} className="flex-1 bg-emerald-600 hover:bg-emerald-700 gap-2">
+                <CheckCircle2 className="h-4 w-4" /> Appliquer les modifications
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <CollisionAlert open={collisionOpen} onClose={() => setCollisionOpen(false)} technicien={collisionInfo.technicien} creneauExistant={collisionInfo.creneauExistant} />
 
       {/* PDF Preview */}
