@@ -10,6 +10,7 @@ export interface Profile {
   email: string;
   actif: boolean;
   created_at: string;
+  dolibarr_user_id?: string | null;
 }
 
 export function useAuth() {
@@ -83,7 +84,7 @@ export function useAuth() {
       factures: ['admin', 'secretaire'],
       clients: ['admin', 'secretaire'],
       devis: ['admin', 'secretaire'],
-      agenda: ['admin', 'secretaire'],
+      agenda: ['admin', 'secretaire', 'technicien'],
       interventions: ['admin', 'secretaire', 'technicien'],
       upload: ['admin', 'secretaire', 'technicien'],
       utilisateurs: ['admin'],
