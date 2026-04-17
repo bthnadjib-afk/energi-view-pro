@@ -165,6 +165,7 @@ export default function Configuration() {
           <TabsTrigger value="emails" className="gap-1.5"><Mail className="h-3.5 w-3.5" /> Modèles emails</TabsTrigger>
           <TabsTrigger value="smtp" className="gap-1.5"><Mail className="h-3.5 w-3.5" /> Serveur mail</TabsTrigger>
           <TabsTrigger value="dolibarr" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Dolibarr</TabsTrigger>
+          <TabsTrigger value="maintenance" className="gap-1.5"><AlertTriangle className="h-3.5 w-3.5" /> Maintenance</TabsTrigger>
         </TabsList>
 
         <TabsContent value="entreprise">
