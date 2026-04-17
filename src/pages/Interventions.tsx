@@ -2013,23 +2013,74 @@ export default function Interventions() {
 
       {/* Remplacer une intervention annulée */}
       <Dialog open={replaceOpen} onOpenChange={setReplaceOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Remplacer {replaceSource?.ref ?? ''}</DialogTitle>
           </DialogHeader>
           {replaceSource && (
             <div className="space-y-4 pt-2">
-              <div className="rounded-md bg-muted/50 border border-border p-3 text-sm space-y-1">
-                <div><span className="text-muted-foreground">Client : </span><span className="text-foreground font-medium">{replaceSource.client}</span></div>
-                <div><span className="text-muted-foreground">Technicien : </span><span className="text-foreground font-medium">{replaceSource.technicien || '—'}</span></div>
-                <div><span className="text-muted-foreground">Date : </span><span className="text-foreground font-medium">{formatDateFR(replaceSource.date)}</span></div>
-                <div><span className="text-muted-foreground">Horaire : </span><span className="text-foreground font-medium">{replaceSource.heureDebut} – {replaceSource.heureFin}</span></div>
-                <div><span className="text-muted-foreground">Type : </span><span className="text-foreground font-medium">{typeLabels[replaceSource.type]}</span></div>
+              <div className="rounded-md bg-muted/50 border border-border p-3 text-sm">
+                <span className="text-muted-foreground">Client : </span>
+                <span className="text-foreground font-medium">{replaceSource.client}</span>
+                <span className="text-muted-foreground ml-2 text-xs">(non modifiable)</span>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Type d'intervention *</label>
+                  <Select value={replaceType} onValueChange={(v) => setReplaceType(v as InterventionType)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(typeLabels) as InterventionType[]).map(t => (
+                        <SelectItem key={t} value={t}>{typeLabels[t]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Technicien</label>
+                  <Select value={replaceTech || '__none__'} onValueChange={(v) => setReplaceTech(v === '__none__' ? '' : v)}>
+                    <SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— Aucun —</SelectItem>
+                      {dolibarrUsers.map(u => (
+                        <SelectItem key={u.id} value={u.fullname}>{u.fullname}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Date *</label>
+                  <Input type="date" value={replaceDate} onChange={(e) => setReplaceDate(e.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Heure début *</label>
+                  <Select value={replaceHeureDebut} onValueChange={setReplaceHeureDebut}>
+                    <SelectTrigger><SelectValue placeholder="--:--" /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {timeSlots.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Heure fin *</label>
+                  <Select value={replaceHeureFin} onValueChange={setReplaceHeureFin}>
+                    <SelectTrigger><SelectValue placeholder="--:--" /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {timeSlots.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Description de la nouvelle intervention *</label>
+                <label className="text-xs text-muted-foreground">Description *</label>
                 <Textarea value={replaceDescription} onChange={(e) => setReplaceDescription(e.target.value)} placeholder="Décrire l'intervention de remplacement…" className="min-h-[80px]" />
               </div>
+
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => { setReplaceOpen(false); setReplaceSource(null); }} className="flex-1">Plus tard</Button>
                 <Button onClick={handleCreateReplacement} disabled={createInterventionMutation.isPending} className="flex-1 bg-emerald-600 hover:bg-emerald-700 gap-2">
