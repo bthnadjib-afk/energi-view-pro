@@ -115,8 +115,8 @@ Deno.serve(async (req) => {
           email = client?.email || null;
         }
 
-        // 20 jours → mise en demeure (si pas déjà envoyée)
-        if (days >= 20 && !r.date_mise_en_demeure) {
+        // 15 jours (5j après la 1ère relance) → mise en demeure
+        if (days >= 15 && !r.date_mise_en_demeure) {
           if (email) {
             const sent = await sendRelanceEmail(email, r.facture_ref, montant, 'mise_en_demeure');
             if (sent) {
