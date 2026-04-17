@@ -520,7 +520,7 @@ export default function Interventions() {
           <h1 className="text-2xl font-bold text-foreground">Interventions</h1>
           <p className="text-muted-foreground text-sm">Planning et suivi — statuts natifs Dolibarr</p>
         </div>
-        <div className="flex gap-2">
+        {!isTechnicien && <div className="flex gap-2">
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
