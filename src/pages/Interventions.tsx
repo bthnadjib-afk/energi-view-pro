@@ -1368,8 +1368,26 @@ export default function Interventions() {
                   )}
                   {/* Brouillon (0) — Valider (admin/secrétaire) */}
                   {selectedIntervention.fk_statut === 0 && !isTechnicien && (
-                    <Button onClick={async () => { await validateMutation.mutateAsync(selectedIntervention.id); setDetailOpen(false); }} disabled={validateMutation.isPending} className="gap-2">
-                      <Play className="h-4 w-4" /> {validateMutation.isPending ? 'Validation...' : 'Valider'}
+                    <Button
+                      onClick={async () => {
+                        if (selectedIntervention.chantierId) {
+                          // Valider tous les jours brouillon du chantier
+                          const joursBrouillon = chantierJours.filter(j => j.fk_statut === 0);
+                          let ok = 0;
+                          for (const j of joursBrouillon) {
+                            try { await validateMutation.mutateAsync(j.id); ok++; } catch (e) { console.error('Validation jour échouée', j.id, e); }
+                          }
+                          toast.success(`Chantier validé : ${ok}/${joursBrouillon.length} jour(s)`);
+                        } else {
+                          await validateMutation.mutateAsync(selectedIntervention.id);
+                        }
+                        setDetailOpen(false);
+                      }}
+                      disabled={validateMutation.isPending}
+                      className="gap-2"
+                    >
+                      <Play className="h-4 w-4" />
+                      {validateMutation.isPending ? 'Validation...' : (selectedIntervention.chantierId ? 'Valider le chantier' : 'Valider')}
                     </Button>
                   )}
 
