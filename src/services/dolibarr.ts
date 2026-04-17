@@ -902,14 +902,54 @@ export async function bulkDeleteFactures(ids: string[]): Promise<void> {
   await Promise.allSettled(ids.map(id => dolibarrCall(`/invoices/${id}`, 'DELETE')));
 }
 
-// --- Update lines (PUT, draft only) ---
-
+// --- Update lines (draft only) ---
+// Dolibarr's PUT /proposals/{id} ignores the `lines` array. The supported way to
+// fully refresh lines is: GET /proposals/{id}/lines → DELETE each existing line →
+// POST /proposals/{id}/line for each new line (singular endpoint, per Swagger).
 export async function updateDevisLines(id: string, socid: string, lines: CreateDevisLine[]): Promise<string> {
-  const result = await dolibarrCall<string>(`/proposals/${id}`, 'PUT', {
-    socid: parseInt(socid, 10) || socid,
-    lines,
-  });
-  return result || '';
+  // 1) Optionally update header (socid) — keeps client change in sync.
+  try {
+    await dolibarrCall<string>(`/proposals/${id}`, 'PUT', {
+      socid: parseInt(socid, 10) || socid,
+    });
+  } catch (e) {
+    console.warn('[updateDevisLines] header PUT failed (non-fatal)', e);
+  }
+
+  // 2) Fetch existing lines and delete them all.
+  const existing = await dolibarrGet<any[]>(`/proposals/${id}/lines`);
+  if (Array.isArray(existing)) {
+    for (const line of existing) {
+      const lineId = String(line.id || line.rowid);
+      if (!lineId) continue;
+      try {
+        await dolibarrCall<string>(`/proposals/${id}/lines/${lineId}`, 'DELETE');
+      } catch (e) {
+        console.error(`[updateDevisLines] delete line ${lineId} failed`, e);
+        throw new Error(`Suppression ligne ${lineId} impossible : ${(e as any)?.message || e}`);
+      }
+    }
+  }
+
+  // 3) Re-create all lines via POST /proposals/{id}/line (singular).
+  for (const l of lines) {
+    try {
+      await dolibarrCall<string>(`/proposals/${id}/line`, 'POST', {
+        desc: l.desc,
+        qty: l.qty,
+        subprice: l.subprice,
+        tva_tx: l.tva_tx ?? 20,
+        product_type: l.product_type ?? 0,
+        pa_ht: l.pa_ht ?? 0,
+        ...(((l as any).fk_product) ? { fk_product: (l as any).fk_product } : {}),
+      });
+    } catch (e) {
+      console.error('[updateDevisLines] add line failed', l, e);
+      throw new Error(`Ajout ligne impossible : ${(e as any)?.message || e}`);
+    }
+  }
+
+  return id;
 }
 
 export async function updateFactureLines(id: string, socid: string, lines: CreateDevisLine[]): Promise<string> {
