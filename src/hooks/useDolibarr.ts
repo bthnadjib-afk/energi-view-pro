@@ -298,9 +298,7 @@ export function useReopenDevis() {
     onError: (e: any) => toast.error(`Erreur réouverture : ${e.message || e}`),
   });
 }
-    onError: (e: any) => toast.error(`Erreur réouverture : ${e.message || e}`),
-  });
-}
+
 
 export function useCloneDevis() {
   const qc = useQueryClient();
