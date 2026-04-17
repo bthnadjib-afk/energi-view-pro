@@ -3,9 +3,11 @@ import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid } from '@/hooks/useDolibarr';
+import { useFactureRelances, useRecordFactureEnvoi, getRelanceStatus } from '@/hooks/useFactureRelances';
 import { formatDateFR, sendFactureByEmail, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
 import { openFacturePdf, facturePdfToBase64, facturePdfToBlobUrl } from '@/services/facturePdf';
 import { useConfig } from '@/hooks/useConfig';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
@@ -25,7 +27,16 @@ interface LigneForm {
 
 export default function Factures() {
   const { config } = useConfig();
+  const { role } = useAuthContext();
+  const canRecordPayment = role === 'admin' || role === 'secretaire';
   const { data: factures = [] } = useFactures();
+  const { data: relances = [] } = useFactureRelances();
+  const recordEnvoi = useRecordFactureEnvoi();
+  const relanceByFactureId = useMemo(() => {
+    const map = new Map<string, typeof relances[0]>();
+    relances.forEach(r => map.set(r.facture_id, r));
+    return map;
+  }, [relances]);
   const { data: clients = [] } = useClients();
   const { data: produits = [] } = useProduits();
   const createFactureMutation = useCreateFacture();
@@ -356,12 +367,39 @@ export default function Factures() {
                     </div>
                   </td>
                   <td className="py-3 px-2 text-foreground">{f.client}</td>
-                  <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{formatDateFR(f.date)}</td>
+                  <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">
+                    {(() => {
+                      const r = relanceByFactureId.get(f.id);
+                      if (r?.date_envoi) {
+                        return (
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-muted-foreground/70">Envoyée le</span>
+                            <span>{formatDateFR(r.date_envoi)}</span>
+                          </div>
+                        );
+                      }
+                      return formatDateFR(f.date);
+                    })()}
+                  </td>
                   <td className="py-3 px-2 text-right font-medium text-foreground">{f.montantTTC.toLocaleString('fr-FR')} €</td>
                   <td className="py-3 px-2 text-right text-muted-foreground hidden md:table-cell">
                     {f.fk_statut >= 1 && !f.paye ? `${f.resteAPayer.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €` : '—'}
                   </td>
-                  <td className="py-3 px-2"><StatusBadge statut={f.statut} /></td>
+                  <td className="py-3 px-2">
+                    {(() => {
+                      const r = relanceByFactureId.get(f.id);
+                      const rel = getRelanceStatus(r, f.paye);
+                      if (rel.variant !== 'none' && f.fk_statut >= 1 && !f.paye) {
+                        return (
+                          <div className="flex flex-col gap-1">
+                            <StatusBadge statut={f.statut} />
+                            <StatusBadge statut={rel.label} />
+                          </div>
+                        );
+                      }
+                      return <StatusBadge statut={f.statut} />;
+                    })()}
+                  </td>
                   <td className="py-3 px-2" onClick={e => e.stopPropagation()}>
                     {f.fk_statut === 0 && (
                       <AlertDialog>
@@ -486,7 +524,7 @@ export default function Factures() {
                     </Button>
                   )}
 
-                  {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && selectedFacture.fk_statut !== 3 && (
+                  {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && selectedFacture.fk_statut !== 3 && canRecordPayment && (
                     <Button
                       variant="outline"
                       className="gap-2"
@@ -698,6 +736,16 @@ export default function Factures() {
                   });
                   if (error) throw new Error(error.message);
                   if (data && !data.ok) throw new Error(data.error || 'Erreur SMTP');
+                  // Enregistrer la date d'envoi pour le suivi des relances
+                  try {
+                    await recordEnvoi.mutateAsync({
+                      facture_id: selectedFacture.id,
+                      facture_ref: selectedFacture.ref,
+                      client_email: emailDest,
+                    });
+                  } catch (e) {
+                    console.error('Erreur enregistrement date envoi:', e);
+                  }
                   toast.success(`Facture ${selectedFacture.ref} envoyée à ${emailDest}`);
                   setEmailOpen(false);
                 } catch (e: any) {

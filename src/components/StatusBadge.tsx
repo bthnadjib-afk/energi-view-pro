@@ -24,6 +24,9 @@ const statusStyles: Record<string, string> = {
   'en attente': 'bg-blue-100 text-blue-700 border-blue-200',
   'en retard': 'bg-red-100 text-red-700 border-red-200',
   'planifié': 'bg-blue-100 text-blue-700 border-blue-200',
+  'envoyée': 'bg-blue-100 text-blue-700 border-blue-200',
+  '1ère relance': 'bg-orange-100 text-orange-700 border-orange-200',
+  'mise en demeure': 'bg-red-100 text-red-700 border-red-200',
 };
 
 export function StatusBadge({ statut }: { statut: string }) {
