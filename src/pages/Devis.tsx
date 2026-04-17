@@ -272,6 +272,38 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
     } catch {}
   };
 
+  const openCreateIntervention = () => {
+    const today = new Date();
+    setInterDate(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`);
+    setInterTechId('');
+    setInterHeureDebut('08:00');
+    setInterHeureFin('10:00');
+    setCreateInterOpen(true);
+  };
+
+  const handleCreateIntervention = async () => {
+    if (!devis.socid || !interDate) {
+      toast.error('Date requise');
+      return;
+    }
+    try {
+      await createInterventionMutation.mutateAsync({
+        socid: devis.socid,
+        description: `Chantier issu du devis ${devis.ref}`,
+        date: interDate,
+        heureDebut: interHeureDebut,
+        heureFin: interHeureFin,
+        fk_user_assign: interTechId || undefined,
+        type: 'chantier',
+        note_private: `Devis source : ${devis.ref}`,
+      });
+      setCreateInterOpen(false);
+      toast.success('Intervention "Chantier" créée depuis le devis');
+    } catch (e: any) {
+      toast.error(`Erreur création intervention : ${e?.message || e}`);
+    }
+  };
+
   const handleGenerateSignatureLink = async () => {
     try {
       const token = crypto.randomUUID();
