@@ -570,6 +570,7 @@ export default function Interventions() {
       type: editType || 'devis', technicien: selectedUser?.id || editTech || '',
       heureDebut: editHeureDebut || '08:00', heureFin: editHeureFin || '10:00',
       dateIntervention: editDate || '', notePrivee: editNotePrivee || '',
+      ...(selectedIntervention.chantierId ? { chantierId: selectedIntervention.chantierId } : {}),
     });
     await updateMutation.mutateAsync({
       id: selectedIntervention.id, description: editDescription || ' ',
@@ -578,6 +579,96 @@ export default function Interventions() {
     setEditOpen(false);
     setDetailOpen(false);
   };
+
+  // ===== Édition chantier multi-jours =====
+  const [editChantierOpen, setEditChantierOpen] = useState(false);
+  const [editChantierTech, setEditChantierTech] = useState('');
+  const [editChantierHeureDebut, setEditChantierHeureDebut] = useState('08:00');
+  const [editChantierHeureFin, setEditChantierHeureFin] = useState('18:00');
+  const [editChantierDescription, setEditChantierDescription] = useState('');
+  const [editChantierDatesToDelete, setEditChantierDatesToDelete] = useState<string[]>([]); // ids interventions à supprimer
+  const [editChantierDatesToAdd, setEditChantierDatesToAdd] = useState<string[]>([]); // nouvelles dates YYYY-MM-DD
+  const [editChantierNewDate, setEditChantierNewDate] = useState('');
+
+  // Toutes les interventions du chantier sélectionné, triées par date
+  const chantierJours = useMemo(() => {
+    if (!selectedIntervention?.chantierId) return [];
+    return resolvedInterventions
+      .filter(i => i.chantierId === selectedIntervention.chantierId)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [selectedIntervention, resolvedInterventions]);
+
+  const openEditChantier = () => {
+    if (!selectedIntervention) return;
+    setEditChantierTech(selectedIntervention.technicien || '');
+    setEditChantierHeureDebut(selectedIntervention.heureDebut || '08:00');
+    setEditChantierHeureFin(selectedIntervention.heureFin || '18:00');
+    setEditChantierDescription(selectedIntervention.description || '');
+    setEditChantierDatesToDelete([]);
+    setEditChantierDatesToAdd([]);
+    setEditChantierNewDate('');
+    setEditChantierOpen(true);
+  };
+
+  const handleEditChantierSave = async () => {
+    if (!selectedIntervention?.chantierId) return;
+    if (!editChantierDescription.trim()) { toast.error('La description est obligatoire'); return; }
+    const selectedUser = dolibarrUsers.find(u => u.fullname === editChantierTech);
+    const techId = selectedUser?.id || editChantierTech || '';
+
+    try {
+      // 1. Mise à jour des jours existants non supprimés (tech, horaires, description)
+      const joursAGarder = chantierJours.filter(j => !editChantierDatesToDelete.includes(j.id));
+      for (const jour of joursAGarder) {
+        const dateTimestamp = jour.date ? Math.floor(new Date(`${jour.date}T12:00:00`).getTime() / 1000) : undefined;
+        const metadata = JSON.stringify({
+          type: 'chantier', technicien: techId,
+          heureDebut: editChantierHeureDebut, heureFin: editChantierHeureFin,
+          dateIntervention: jour.date, notePrivee: jour.compteRendu || '',
+          chantierId: selectedIntervention.chantierId,
+        });
+        await updateIntervention({
+          id: jour.id, description: editChantierDescription,
+          fk_user_assign: selectedUser?.id, dateo: dateTimestamp, datee: dateTimestamp,
+          note_private: metadata,
+        });
+      }
+
+      // 2. Suppression des jours marqués
+      for (const id of editChantierDatesToDelete) {
+        const j = chantierJours.find(x => x.id === id);
+        if (j && j.fk_statut !== 0) {
+          await setInterventionStatus(id, 0);
+        }
+        await deleteIntervention(id);
+      }
+
+      // 3. Ajout des nouvelles dates via createChantierMultiJours (mais en réutilisant le chantierId existant)
+      if (editChantierDatesToAdd.length > 0) {
+        for (const date of editChantierDatesToAdd) {
+          await import('@/services/dolibarr').then(m => m.createIntervention({
+            socid: selectedIntervention.socid || '',
+            description: editChantierDescription,
+            date,
+            heureDebut: editChantierHeureDebut,
+            heureFin: editChantierHeureFin,
+            fk_user_assign: selectedUser?.id,
+            type: 'chantier',
+            note_private: '',
+            chantierId: selectedIntervention.chantierId,
+          }));
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['interventions'] });
+      toast.success('Chantier mis à jour');
+      setEditChantierOpen(false);
+      setDetailOpen(false);
+    } catch (e: any) {
+      toast.error(`Erreur : ${e.message || e}`);
+    }
+  };
+
 
 
   return (
