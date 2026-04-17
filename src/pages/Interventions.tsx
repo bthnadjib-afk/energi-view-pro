@@ -621,28 +621,49 @@ export default function Interventions() {
                 </Button>
               </div>
               {(() => {
-                const slots = newType === 'panne_urgence'
-                  ? Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 === 0 ? '00' : '30'}`)
-                  : Array.from({ length: 25 }, (_, i) => `${String(8 + Math.floor(i / 2)).padStart(2, '0')}:${i % 2 === 0 ? '00' : '30'}`);
                 return (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs text-muted-foreground">Début</label>
-                      <Select value={newHeureDebut} onValueChange={(v) => { setNewHeureDebut(v); setNewHeureFin(addTwoHours(v)); }}>
-                        <SelectTrigger><SelectValue placeholder="Heure de début" /></SelectTrigger>
-                        <SelectContent>
-                          {slots.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-1">
+                        <Input
+                          type="time"
+                          value={newHeureDebut}
+                          onChange={e => { setNewHeureDebut(e.target.value); setNewHeureFin(addTwoHours(e.target.value)); }}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0 h-10 w-10"
+                          title="Heure actuelle"
+                          onClick={() => { const t = currentTime(); setNewHeureDebut(t); setNewHeureFin(addTwoHours(t)); }}
+                        >
+                          <Clock className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs text-muted-foreground">Fin</label>
-                      <Select value={newHeureFin} onValueChange={setNewHeureFin}>
-                        <SelectTrigger><SelectValue placeholder="Heure de fin" /></SelectTrigger>
-                        <SelectContent>
-                          {slots.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-1">
+                        <Input
+                          type="time"
+                          value={newHeureFin}
+                          onChange={e => setNewHeureFin(e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0 h-10 w-10"
+                          title="Heure actuelle"
+                          onClick={() => setNewHeureFin(currentTime())}
+                        >
+                          <Clock className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 );
