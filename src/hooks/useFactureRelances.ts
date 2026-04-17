@@ -56,6 +56,42 @@ export function useRecordFactureEnvoi() {
   });
 }
 
+export function useSetFactureEnvoiDate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      facture_id: string;
+      facture_ref: string;
+      client_email: string | null;
+      date_envoi: string;
+    }) => {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
+        .from('facture_relances')
+        .upsert(
+          {
+            facture_id: params.facture_id,
+            facture_ref: params.facture_ref,
+            client_email: params.client_email,
+            date_envoi: params.date_envoi,
+            date_relance_1: null,
+            date_mise_en_demeure: null,
+            statut_relance: 'envoyee',
+            updated_at: now,
+          },
+          { onConflict: 'facture_id' }
+        )
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['facture_relances'] });
+    },
+  });
+}
+
 /**
  * Calcule l'état d'une relance pour une facture donnée.
  * - envoyée : facture validée/envoyée, < 10j → "Envoyée" (pas affichée comme relance)
