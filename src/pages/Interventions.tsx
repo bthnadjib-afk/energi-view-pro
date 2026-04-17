@@ -13,7 +13,7 @@ import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import {
   statutsIntervention, typesIntervention, formatDateFR, openPDFInNewTab,
   sendInterventionByEmail, resolveTechnicianName, getInterventionSignatures,
-  updateIntervention,
+  updateIntervention, deleteIntervention, setInterventionStatus,
   type InterventionType, type Intervention, type InterventionLine,
 } from '@/services/dolibarr';
 import { generateInterventionPdfLocal, generateInterventionPdfBlobUrl } from '@/services/interventionPdf';
@@ -72,6 +72,28 @@ export default function Interventions() {
   
   const reopenMutation = useReopenIntervention();
   const { role } = useAuth();
+
+  const [deleteAllPending, setDeleteAllPending] = useState(false);
+
+  const handleDeleteAll = async () => {
+    setDeleteAllPending(true);
+    let count = 0;
+    try {
+      for (const intervention of interventions) {
+        if (intervention.fk_statut !== 0) {
+          await setInterventionStatus(intervention.id, 0);
+        }
+        await deleteIntervention(intervention.id);
+        count++;
+      }
+      queryClient.invalidateQueries({ queryKey: ['interventions'] });
+      toast.success(`${count} intervention(s) supprimée(s)`);
+    } catch (e: any) {
+      toast.error(`Erreur suppression : ${e.message || e}`);
+      queryClient.invalidateQueries({ queryKey: ['interventions'] });
+    }
+    setDeleteAllPending(false);
+  };
 
   // New client inline form state
   const [showNewClientForm, setShowNewClientForm] = useState(false);
@@ -448,7 +470,35 @@ export default function Interventions() {
           <h1 className="text-2xl font-bold text-foreground">Interventions</h1>
           <p className="text-muted-foreground text-sm">Planning et suivi — statuts natifs Dolibarr</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setShowClientSuggestions(false); setNewClientSearch(''); setNewClientId(''); } }}>
+        <div className="flex gap-2">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                className="gap-2 h-12 px-4"
+                disabled={deleteAllPending || interventions.length === 0}
+              >
+                <Trash2 className="h-4 w-4" />
+                {deleteAllPending ? 'Suppression...' : 'Tout supprimer'}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Supprimer toutes les interventions ?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Cette action supprimera définitivement les <strong>{interventions.length}</strong> intervention(s). Cette opération est irréversible.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteAll} className="bg-destructive text-destructive-foreground">
+                  Tout supprimer
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setShowClientSuggestions(false); setNewClientSearch(''); setNewClientId(''); } }}>
           <DialogTrigger asChild>
             <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 h-12 px-6 text-base">
               <Plus className="h-4 w-4" /> Nouvelle intervention
@@ -582,6 +632,7 @@ export default function Interventions() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Filters */}
