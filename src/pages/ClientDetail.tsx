@@ -373,7 +373,7 @@ export default function ClientDetail() {
                     {devis.map(d => (
                       <button
                         key={d.id}
-                        onClick={() => openDevisPdf(d, client, config)}
+                        onClick={() => openDevisPdf({ devis: d, client, entreprise: config.entreprise })}
                         className="w-full flex items-center justify-between text-xs p-2 rounded hover:bg-muted/50 transition-colors text-left"
                       >
                         <span className="font-mono text-foreground truncate">{d.ref}</span>
@@ -395,7 +395,7 @@ export default function ClientDetail() {
                     {factures.map(f => (
                       <button
                         key={f.id}
-                        onClick={() => openFacturePdf(f, client, config)}
+                        onClick={() => openFacturePdf({ facture: f, client, entreprise: config.entreprise })}
                         className="w-full flex items-center justify-between text-xs p-2 rounded hover:bg-muted/50 transition-colors text-left"
                       >
                         <span className="font-mono text-foreground truncate">{f.ref}</span>
@@ -417,11 +417,11 @@ export default function ClientDetail() {
                     {interventions.map(i => (
                       <button
                         key={i.id}
-                        onClick={() => openInterventionPdf(i, client, config)}
+                        onClick={() => navigate('/interventions')}
                         className="w-full flex items-center justify-between text-xs p-2 rounded hover:bg-muted/50 transition-colors text-left"
                       >
                         <span className="font-mono text-foreground truncate">{i.ref}</span>
-                        <FileDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-2" />
+                        <span className="text-muted-foreground text-[10px] shrink-0 ml-2">→</span>
                       </button>
                     ))}
                   </div>
