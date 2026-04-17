@@ -23,6 +23,7 @@ interface LigneForm {
   tva_tx: number;
   product_type: number;
   productId: string;
+  prixAchat: number;
 }
 
 export default function Factures() {
