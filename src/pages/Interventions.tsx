@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useConfig } from '@/hooks/useConfig';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
-  useInterventions, useClients, useCreateIntervention, useCreateDevis, useCreateFacture,
+  useInterventions, useClients, useCreateIntervention, useCreateChantierMultiJours, useCreateDevis, useCreateFacture,
   useValidateIntervention, useDeleteIntervention, useCloseIntervention, useSetInterventionStatus,
   useDolibarrUsers, useSaveSignatures, useUpdateIntervention, useDevis, useFactures,
   useCreateClient, useReopenIntervention, useProduits,
@@ -61,6 +61,7 @@ export default function Interventions() {
   const { data: produits = [] } = useProduits();
   const queryClient = useQueryClient();
   const createInterventionMutation = useCreateIntervention();
+  const createChantierMutation = useCreateChantierMultiJours();
   const createDevisMutation = useCreateDevis();
   const createFactureMutation = useCreateFacture();
   const createClientMutation = useCreateClient();
