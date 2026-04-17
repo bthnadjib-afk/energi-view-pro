@@ -516,7 +516,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Annuler le devis {devis.ref} ?</AlertDialogTitle>
-                      <AlertDialogDescription>Le devis sera marqué comme abandonné dans Dolibarr (statut "Non signé"). Il ne sera pas supprimé.</AlertDialogDescription>
+                      <AlertDialogDescription>Le devis sera marqué comme abandonné (statut "Non signé"). Il ne sera pas supprimé.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Retour</AlertDialogCancel>
@@ -597,15 +597,24 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
               <Button onClick={handleViewPDF} disabled={generatingPDF} size="sm" variant="outline" className="gap-1.5">
                 <FileDown className="h-3.5 w-3.5" /> {generatingPDF ? 'PDF...' : 'Voir PDF'}
               </Button>
-              {!isDraft && !isInvoiced && dolibarrSignUrl && (
+              {!isDraft && !isInvoiced && signUrl && (
                 <Button
-                  onClick={handleGenerateSignatureLink}
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(signUrl);
+                      setSigLinkCopied(true);
+                      toast.success('Lien de signature copié', { description: 'Envoyez ce lien au client pour qu\'il puisse signer en ligne.' });
+                      setTimeout(() => setSigLinkCopied(false), 3000);
+                    } catch (e: any) {
+                      toast.error(`Erreur : ${e?.message || e}`);
+                    }
+                  }}
                   size="sm"
                   variant="outline"
                   className={cn('gap-1.5', sigLinkCopied && 'border-green-400 text-green-700')}
                 >
                   <Link2 className="h-3.5 w-3.5" />
-                  {sigLinkCopied ? 'Lien copié !' : 'Lien signature Dolibarr'}
+                  {sigLinkCopied ? 'Lien copié !' : 'Lien signature en ligne'}
                 </Button>
               )}
               {!isInvoiced && (
@@ -658,13 +667,13 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                   <label className="text-sm text-muted-foreground">Message</label>
                   <Textarea value={emailMessage} onChange={e => setEmailMessage(e.target.value)} className="min-h-[160px]" placeholder="Bonjour, veuillez trouver ci-joint votre devis..." />
                 </div>
-                {dolibarrSignUrl && (
+                {signUrl && (
                   <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-900 space-y-1.5">
                     <div className="flex items-start gap-2">
                       <Link2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium">Lien signature en ligne Dolibarr inclus dans le message</p>
-                        <p className="text-blue-700 truncate" title={dolibarrSignUrl}>{dolibarrSignUrl}</p>
+                        <p className="font-medium">Lien de signature en ligne inclus dans le message</p>
+                        <p className="text-blue-700 truncate" title={signUrl}>{signUrl}</p>
                       </div>
                       <Button
                         type="button"
@@ -672,8 +681,8 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                         variant="outline"
                         className="h-7 text-xs"
                         onClick={() => {
-                          navigator.clipboard.writeText(dolibarrSignUrl);
-                          toast.success('Lien Dolibarr copié');
+                          navigator.clipboard.writeText(signUrl);
+                          toast.success('Lien copié');
                         }}
                       >
                         <Copy className="h-3 w-3 mr-1" /> Copier
