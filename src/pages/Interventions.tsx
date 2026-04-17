@@ -907,27 +907,39 @@ export default function Interventions() {
                   </div>
                 )}
 
-                {/* Heure d'arrivée — capture automatique, non modifiable */}
+                {/* Heure d'arrivée — saisie libre ou bouton "maintenant" */}
                 {selectedIntervention.fk_statut === 1 && (
                   <div className="p-3 rounded-lg bg-muted/30 border border-border space-y-2">
                     <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                       <Clock className="h-4 w-4" /> Heure d'arrivée
                     </h3>
-                    {!heureArrivee ? (
+                    <div className="flex gap-2">
+                      <Input
+                        type="time"
+                        value={heureArrivee}
+                        disabled={appEnCours}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setHeureArrivee(v);
+                          if (v) autoSaveTimes(v, heureDepart);
+                        }}
+                        className="flex-1"
+                      />
                       <Button
                         type="button"
                         variant="outline"
-                        className="w-full gap-2"
+                        size="icon"
+                        title={`Maintenant (${liveTime})`}
                         disabled={appEnCours}
                         onClick={() => { const t = currentTime(); setHeureArrivee(t); autoSaveTimes(t, heureDepart); }}
                       >
-                        <Clock className="h-4 w-4" /> Enregistrer mon arrivée ({liveTime})
+                        <Clock className="h-4 w-4" />
                       </Button>
-                    ) : (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-50 border border-emerald-200">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                        <span className="text-sm font-semibold text-emerald-700">Arrivée enregistrée à {heureArrivee}</span>
-                        <span className="text-xs text-emerald-600 ml-auto">🔒 non modifiable</span>
+                    </div>
+                    {heureArrivee && (
+                      <div className="flex items-center gap-2 text-xs text-emerald-600">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span>Arrivée enregistrée à {heureArrivee}</span>
                       </div>
                     )}
                   </div>
