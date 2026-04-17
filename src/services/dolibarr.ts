@@ -20,6 +20,14 @@ export interface Facture {
   lignes: DevisLigne[];
   note_private?: string;
   dateValidation?: string;
+  /** Dolibarr type: 0=standard, 1=remplacement, 2=avoir, 3=acompte, 5=situation */
+  type: number;
+  /** ID de la facture source (pour avoir/remplacement) */
+  fk_facture_source?: string;
+  /** Code de classement à la fermeture: 'badcustomer', 'abandon', 'replaced'... */
+  close_code?: string;
+  /** Note libre saisie au moment de l'abandon */
+  close_note?: string;
 }
 
 export interface DevisLigne {
