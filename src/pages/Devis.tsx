@@ -9,7 +9,7 @@ import {
 } from '@/hooks/useDolibarr';
 import {
   getAcompteBadge, formatDateFR, replaceEmailVariables, DEVIS_STATUTS,
-  saveDevisSignatureToken, markDevisSent, closeDevis, type Devis as DevisType, type Client,
+  saveDevisSignatureToken, markDevisSent, closeDevis, markDevisAutoExpired, type Devis as DevisType, type Client,
 } from '@/services/dolibarr';
 import { openDevisPdf, devisPdfToBase64, devisPdfToBlobUrl } from '@/services/devisPdf';
 import { useConfig } from '@/hooks/useConfig';
@@ -1124,7 +1124,9 @@ export default function Devis() {
     );
     if (toClose.length === 0) return;
     toClose.forEach(d => autoClosedRef.current.add(d.id));
-    Promise.all(toClose.map(d => closeDevis(d.id, 3)))
+    Promise.all(toClose.map(d =>
+      closeDevis(d.id, 3).then(() => markDevisAutoExpired(d.id, d.note_private))
+    ))
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ['devis'] });
         toast.info(

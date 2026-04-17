@@ -639,6 +639,16 @@ export async function markDevisSent(id: string, currentNotePrivate?: string): Pr
   await dolibarrCall(`/proposals/${id}`, 'PUT', { note_private: JSON.stringify(meta) });
 }
 
+/** Marque un devis comme "annulé automatiquement" (expiration). Permet de distinguer
+ *  le statut 3 "Refusé" (client) du statut 3 "Annulé" (expiration automatique). */
+export async function markDevisAutoExpired(id: string, currentNotePrivate?: string): Promise<void> {
+  let meta: Record<string, any> = {};
+  try { if (currentNotePrivate) meta = JSON.parse(currentNotePrivate); } catch {}
+  meta.auto_expired = true;
+  meta.auto_expired_at = new Date().toISOString();
+  await dolibarrCall(`/proposals/${id}`, 'PUT', { note_private: JSON.stringify(meta) });
+}
+
 // --- Factures ---
 
 export async function createFacture(socid: string, lines: CreateDevisLine[], note_private?: string): Promise<string> {
@@ -1318,7 +1328,8 @@ function mapDolibarrDevis(d: any): Devis {
   let noteMeta: Record<string, any> = {};
   try { if (d.note_private) noteMeta = JSON.parse(d.note_private); } catch {}
   const isSent = fk_statut === 1 && noteMeta.sent === true;
-  const statut = isSent ? 'Envoyé' : getDevisStatutLabel(fk_statut);
+  const isAutoExpired = fk_statut === 3 && noteMeta.auto_expired === true;
+  const statut = isAutoExpired ? 'Annulé' : (isSent ? 'Envoyé' : getDevisStatutLabel(fk_statut));
   return {
     id: String(d.id),
     ref: d.ref || `DE-${d.id}`,
