@@ -526,8 +526,11 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
             {isSigned && (
               <div className="flex flex-wrap gap-2">
                 <span className="text-xs font-semibold text-emerald-600 self-center mr-1">Accepté :</span>
-                <Button onClick={handleConvert} disabled={convertPending} size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700">
-                  <ArrowRightLeft className="h-3.5 w-3.5" /> Générer facture
+                <Button onClick={openCreateIntervention} size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700">
+                  <Wrench className="h-3.5 w-3.5" /> Créer intervention
+                </Button>
+                <Button onClick={handleConvert} disabled={convertPending} size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700">
+                  <ArrowRightLeft className="h-3.5 w-3.5" /> Classer facturé (brouillon)
                 </Button>
                 <Button onClick={onAcompte} disabled={acomptePending} size="sm" variant="outline" className="gap-1.5">
                   <Receipt className="h-3.5 w-3.5" /> Saisir un acompte
