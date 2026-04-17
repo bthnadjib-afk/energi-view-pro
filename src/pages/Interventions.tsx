@@ -1159,16 +1159,23 @@ export default function Interventions() {
                 )}
 
                 {/* Signatures - only when En cours (app) or already finished */}
-                {(appEnCours || selectedIntervention.fk_statut >= 3) && (
+                {(appEnCours || selectedIntervention.fk_statut >= 3) && (() => {
+                  const isChantier = selectedIntervention.type === 'chantier';
+                  // Pour un chantier : seul le technicien signe (pas de signature client requise)
+                  const clientSigRequired = !isChantier;
+                  const missingSigs = isChantier
+                    ? !signatureTechData
+                    : (!signatureData || !signatureTechData);
+                  return (
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-foreground">
-                      ✅ Signatures {selectedIntervention.fk_statut < 3 && !signatureData && !signatureTechData && <span className="text-xs text-destructive font-normal ml-2">* obligatoires pour terminer</span>}
+                      ✅ Signatures {selectedIntervention.fk_statut < 3 && missingSigs && <span className="text-xs text-destructive font-normal ml-2">* {isChantier ? 'signature technicien obligatoire' : 'obligatoires pour terminer'}</span>}
                     </h3>
 
                     {/* Saved signatures — always shown when available */}
                     {(signatureData || signatureTechData) && (
                       <div className="grid grid-cols-2 gap-4">
-                        {signatureData && (
+                        {signatureData && !isChantier && (
                           <div>
                             <p className="text-xs text-muted-foreground mb-1">Signature client ✓</p>
                             <img src={signatureData} alt="Signature client" className="border border-border rounded max-h-20" />
@@ -1183,11 +1190,11 @@ export default function Interventions() {
                       </div>
                     )}
 
-                    {/* Signature pads — only shown when at least one is missing AND not finished */}
-                    {selectedIntervention.fk_statut < 3 && (!signatureData || !signatureTechData) && (
+                    {/* Signature pads — only shown when at least one required is missing AND not finished */}
+                    {selectedIntervention.fk_statut < 3 && missingSigs && (
                       <div className="space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {!signatureData && (
+                        <div className={cn("grid gap-4", isChantier ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2")}>
+                          {!signatureData && clientSigRequired && (
                             <div>
                               <p className="text-xs text-muted-foreground mb-2">Signature du client <span className="text-destructive">*</span></p>
                               <SignaturePad ref={sigClientRef} onSave={(data) => setSignatureData(data)} />
@@ -1195,7 +1202,10 @@ export default function Interventions() {
                           )}
                           {!signatureTechData && (
                             <div>
-                              <p className="text-xs text-muted-foreground mb-2">Signature du technicien <span className="text-destructive">*</span></p>
+                              <p className="text-xs text-muted-foreground mb-2">
+                                Signature du technicien <span className="text-destructive">*</span>
+                                {isChantier && <span className="ml-2 text-xs text-muted-foreground">(chantier — signature client non requise)</span>}
+                              </p>
                               <SignaturePad ref={sigTechRef} onSave={(data) => setSignatureTechData(data)} />
                             </div>
                           )}
@@ -1208,7 +1218,7 @@ export default function Interventions() {
                             onClick={() => {
                               sigClientRef.current?.clear();
                               sigTechRef.current?.clear();
-                              setSignatureData(null);
+                              if (!isChantier) setSignatureData(null);
                               setSignatureTechData(null);
                             }}
                           >
@@ -1217,15 +1227,19 @@ export default function Interventions() {
                           <Button
                             type="button"
                             className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700"
-                            disabled={!signatureData || !signatureTechData || saveSignaturesMutation.isPending}
+                            disabled={(isChantier ? !signatureTechData : (!signatureData || !signatureTechData)) || saveSignaturesMutation.isPending}
                             onClick={async () => {
-                              if (!signatureData || !signatureTechData) {
-                                toast.error(!signatureData ? 'Signature client manquante' : 'Signature technicien manquante');
+                              if (!signatureTechData) {
+                                toast.error('Signature technicien manquante');
+                                return;
+                              }
+                              if (!isChantier && !signatureData) {
+                                toast.error('Signature client manquante');
                                 return;
                               }
                               await saveSignaturesMutation.mutateAsync({
                                 id: selectedIntervention.id,
-                                signatureClient: signatureData,
+                                signatureClient: isChantier ? null : signatureData,
                                 signatureTech: signatureTechData,
                                 ref: selectedIntervention.ref,
                               });
@@ -1237,12 +1251,15 @@ export default function Interventions() {
                           </Button>
                         </div>
                         <p className="text-xs text-center text-amber-600">
-                          {!signatureData && !signatureTechData ? 'Signez les 2 cases ci-dessus' : !signatureData ? 'Signature client manquante' : 'Signature technicien manquante'}
+                          {isChantier
+                            ? (!signatureTechData ? 'Signature technicien manquante' : '')
+                            : (!signatureData && !signatureTechData ? 'Signez les 2 cases ci-dessus' : !signatureData ? 'Signature client manquante' : 'Signature technicien manquante')}
                         </p>
                       </div>
                     )}
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-3 pt-2">
