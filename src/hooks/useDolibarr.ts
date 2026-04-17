@@ -442,7 +442,7 @@ export function useCreateDolibarrUser() {
 export function useAddPayment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { invoiceId: string; datepaye: string; paymentid: number; closepaidinvoices: string; amount: number }) =>
+    mutationFn: (data: { invoiceId: string; datepaye: string; paymentid: number; closepaidinvoices: string; amount: number; accountid?: number }) =>
       addPayment(data.invoiceId, data),
     onSuccess: () => { toast.success('Paiement enregistré'); qc.invalidateQueries({ queryKey: ['factures'] }); },
     onError: (e: any) => toast.error(`Erreur paiement : ${e.message || e}`),

@@ -749,7 +749,24 @@ export default function Factures() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handlePayment} disabled={addPaymentMutation.isPending || paymentAmount <= 0} className="w-full">
+            <div className="space-y-2">
+              <label className="text-sm text-muted-foreground">Compte bancaire</label>
+              {comptesBancaires.length === 0 ? (
+                <div className="text-xs text-destructive p-2 border border-destructive/50 rounded-md bg-destructive/10">
+                  Aucun compte bancaire trouvé dans Dolibarr. Créez-en un dans Banque & Caisse.
+                </div>
+              ) : (
+                <Select value={paymentAccountId} onValueChange={setPaymentAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner un compte" /></SelectTrigger>
+                  <SelectContent>
+                    {comptesBancaires.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.label} {c.number ? `(${c.number})` : ''}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <Button onClick={handlePayment} disabled={addPaymentMutation.isPending || paymentAmount <= 0 || !paymentAccountId} className="w-full">
               {addPaymentMutation.isPending ? 'Enregistrement...' : 'Enregistrer le paiement'}
             </Button>
           </div>
