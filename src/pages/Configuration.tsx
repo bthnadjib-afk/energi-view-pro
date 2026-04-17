@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useConfig } from '@/hooks/useConfig';
-import { testDolibarrConnection } from '@/services/dolibarr';
+import { testDolibarrConnection, purgeAllDevisAndFactures } from '@/services/dolibarr';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2, Save, Mail, Plus, Trash2, Edit2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2, Save, Mail, Plus, Trash2, Edit2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface EmailTemplate {
   id: string;
@@ -20,6 +22,7 @@ interface EmailTemplate {
 
 export default function Configuration() {
   const { config, saving, updateEntreprise, updateDefaults, updateNotifications, updateDolibarr, updateSmtp, saveToSupabase } = useConfig();
+  const queryClient = useQueryClient();
   const [testing, setTesting] = useState(false);
   const [testingSmtp, setTestingSmtp] = useState(false);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -28,6 +31,30 @@ export default function Configuration() {
   const [editNom, setEditNom] = useState('');
   const [editObjet, setEditObjet] = useState('');
   const [editCorps, setEditCorps] = useState('');
+  const [purging, setPurging] = useState(false);
+
+  const handlePurgeAll = async () => {
+    setPurging(true);
+    try {
+      const result = await purgeAllDevisAndFactures();
+      // Nettoie aussi les tables de relances
+      await Promise.all([
+        supabase.from('devis_relances').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('facture_relances').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      ]);
+      queryClient.invalidateQueries();
+      toast.success(
+        `Purge terminée : ${result.devisDeleted} devis et ${result.facturesDeleted} factures supprimés` +
+          (result.devisFailed + result.facturesFailed > 0
+            ? ` (${result.devisFailed + result.facturesFailed} échecs)`
+            : '')
+      );
+    } catch (e: any) {
+      toast.error(`Échec de la purge : ${e.message || e}`);
+    } finally {
+      setPurging(false);
+    }
+  };
 
   const handleTestSmtp = async () => {
     if (!config.smtp.host || !config.smtp.user || !config.smtp.pass) {
