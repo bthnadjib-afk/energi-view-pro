@@ -120,8 +120,8 @@ export function AppSidebar() {
                       <NavLink
                         to={child.url}
                         end={child.url === '/'}
-                        className="hover:bg-sidebar-accent"
-                        activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                        className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        activeClassName="bg-primary/15 text-primary font-medium [&_svg]:text-primary"
                       >
                         <child.icon className="mr-2 h-3 w-3" />
                         <span className="text-xs">{child.title}</span>
