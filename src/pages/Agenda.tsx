@@ -12,6 +12,7 @@ import { typesIntervention, formatDateFR, type InterventionType, resolveTechnici
 import type { Intervention } from '@/services/dolibarr';
 import { CollisionAlert, checkCollision, type InterventionSlot } from '@/components/CollisionAlert';
 import { toast } from 'sonner';
+import { getInterventionStatusKey, STATUS_DOT_BG, STATUS_BADGE, STATUS_LABEL } from '@/lib/interventionStatus';
 
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -45,13 +46,6 @@ const TYPE_COLORS: Record<InterventionType, string> = {
   chantier: 'bg-emerald-500',
 };
 
-const statusColor: Record<string, string> = {
-  'Brouillon': 'bg-muted-foreground',
-  'Validée': 'bg-blue-500',
-  'En cours': 'bg-amber-500',
-  'Terminée': 'bg-emerald-500',
-  'Annulée': 'bg-red-500',
-};
 
 export default function Agenda() {
   const { data: interventions = [] } = useInterventions();
@@ -288,12 +282,12 @@ export default function Agenda() {
                 </span>
                 <div className="flex-1 flex flex-col gap-0.5 mt-0.5 overflow-hidden">
                   {dayInterventions.slice(0, 3).map((inter) => {
-                    const statusBg = inter.fk_statut >= 3 ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/20 border-amber-500/40 text-amber-700 dark:text-amber-400';
+                    const statusBg = STATUS_BADGE[getInterventionStatusKey(inter)];
                     return (
                       <div
                         key={inter.id}
                         className={`rounded px-1 py-0.5 text-[10px] leading-tight truncate border ${statusBg}`}
-                        title={`${inter.ref} - ${inter.client} (${TYPE_LABELS[inter.type] || inter.type})`}
+                        title={`${inter.ref} - ${inter.client} (${TYPE_LABELS[inter.type] || inter.type}) — ${STATUS_LABEL[getInterventionStatusKey(inter)]}`}
                         onClick={(e) => { e.stopPropagation(); setSelected(inter); }}
                       >
                         <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${TYPE_COLORS[inter.type] || 'bg-muted-foreground'}`} />
@@ -351,7 +345,7 @@ export default function Agenda() {
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Statut</p>
-              <StatusBadge statut={selected.statut} />
+              <StatusBadge statut={STATUS_LABEL[getInterventionStatusKey(selected)]} />
             </div>
             <div className="sm:col-span-2">
               <p className="text-muted-foreground text-xs">Description</p>
@@ -377,14 +371,14 @@ export default function Agenda() {
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`inline-block w-2 h-2 rounded-full ${statusColor[inter.statut] || 'bg-muted-foreground'}`} />
+                    <span className={`inline-block w-2 h-2 rounded-full ${STATUS_DOT_BG[getInterventionStatusKey(inter)]}`} />
                     <span className="font-mono text-xs text-muted-foreground">{inter.ref}</span>
                     <span className="text-xs text-muted-foreground">{inter.heureDebut}–{inter.heureFin}</span>
                   </div>
                   <p className="text-sm font-medium text-foreground truncate mt-0.5">{inter.client}</p>
                   <p className="text-xs text-muted-foreground">{inter.technicien || '—'} · {TYPE_LABELS[inter.type] || inter.type}</p>
                 </div>
-                <StatusBadge statut={inter.statut} />
+                <StatusBadge statut={STATUS_LABEL[getInterventionStatusKey(inter)]} />
               </div>
             ))}
           </div>

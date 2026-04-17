@@ -30,6 +30,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { getInterventionStatusKey, STATUS_DOT_BG, STATUS_LABEL, STATUS_BADGE } from '@/lib/interventionStatus';
+import { DatePickerWithStatus } from '@/components/DatePickerWithStatus';
 
 const typeLabels: Record<InterventionType, string> = {
   devis: 'Devis', panne: 'Panne', panne_urgence: 'Panne urgence', sav: 'SAV', chantier: 'Chantier',
@@ -226,6 +228,59 @@ export default function Interventions() {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
+
+  // Annulation + remplacement
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replaceSource, setReplaceSource] = useState<Intervention | null>(null);
+  const [replaceDescription, setReplaceDescription] = useState('');
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  const handleCancelIntervention = async (inter: Intervention) => {
+    setCancellingId(inter.id);
+    try {
+      // Tag note_public avec appStatus: annule (préserve les autres champs)
+      let existing: any = {};
+      try { existing = JSON.parse(inter.descriptionClient || '{}'); } catch { existing = {}; }
+      existing.appStatus = 'annule';
+      existing.cancelledAt = new Date().toISOString();
+      await updateIntervention(inter.id, { note_public: JSON.stringify(existing) });
+      queryClient.invalidateQueries({ queryKey: ['interventions'] });
+      toast.success(`${inter.ref} annulée`);
+      // Proposer le remplacement avec mêmes tech / date / horaires
+      setReplaceSource(inter);
+      setReplaceDescription('');
+      setReplaceOpen(true);
+      setDetailOpen(false);
+    } catch (e: any) {
+      toast.error(`Échec annulation : ${e.message || e}`);
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const handleCreateReplacement = async () => {
+    if (!replaceSource) return;
+    if (!replaceDescription.trim()) { toast.error('Description requise pour le remplacement'); return; }
+    const selectedUser = dolibarrUsers.find(u => u.fullname === replaceSource.technicien);
+    try {
+      await createInterventionMutation.mutateAsync({
+        socid: replaceSource.socid || '',
+        description: replaceDescription,
+        date: replaceSource.date,
+        heureDebut: replaceSource.heureDebut,
+        heureFin: replaceSource.heureFin,
+        fk_user_assign: selectedUser?.id,
+        type: replaceSource.type,
+      });
+      toast.success('Intervention de remplacement créée');
+      setReplaceOpen(false);
+      setReplaceSource(null);
+      setReplaceDescription('');
+    } catch (e: any) {
+      toast.error(`Échec création : ${e.message || e}`);
+    }
+  };
+
 
   // Tech note & arrival/departure (internal, not on PDF)
   const [techNote, setTechNote] = useState('');
@@ -860,15 +915,16 @@ export default function Interventions() {
                   )}
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Ajouter une date hors plage</label>
-                    <Input
-                      type="date"
-                      onChange={(e) => {
-                        const v = e.target.value;
+                    <DatePickerWithStatus
+                      label="📅 Choisir un jour (couleurs = occupations du tech)"
+                      minDate={newDate || undefined}
+                      excludedDates={chantierDates}
+                      techInterventions={resolvedInterventions.filter(i => i.technicien === newTech)}
+                      onPick={(v) => {
                         if (v && !chantierDatesExtra.includes(v)) {
                           setChantierDatesExtra(prev => [...prev, v]);
                           setChantierDatesExclues(prev => prev.filter(x => x !== v));
                         }
-                        e.target.value = '';
                       }}
                     />
                   </div>
@@ -1004,10 +1060,13 @@ export default function Interventions() {
                     </td>
                     <td className="py-3 px-2 text-muted-foreground">{formatDateFR(i.date)}</td>
                     <td className="py-3 px-2">{(() => {
-                      if (i.fk_statut === 1 && i.descriptionClient) {
-                        try { if (JSON.parse(i.descriptionClient).appStatus === 'en_cours') return <StatusBadge statut="En cours" />; } catch {}
-                      }
-                      return <StatusBadge statut={i.statut} />;
+                      const k = getInterventionStatusKey(i);
+                      return (
+                        <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', STATUS_BADGE[k])}>
+                          <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5', STATUS_DOT_BG[k])} />
+                          {STATUS_LABEL[k]}
+                        </span>
+                      );
                     })()}</td>
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -1059,7 +1118,15 @@ export default function Interventions() {
                   <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-xs ml-2', typeColors[selectedIntervention.type])}>
                     {typeLabels[selectedIntervention.type]}
                   </span>
-                  <StatusBadge statut={selectedIntervention.fk_statut === 1 && appEnCours ? 'En cours' : selectedIntervention.statut} />
+                  {(() => {
+                    const k = getInterventionStatusKey(selectedIntervention);
+                    return (
+                      <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', STATUS_BADGE[k])}>
+                        <span className={cn('inline-block w-1.5 h-1.5 rounded-full mr-1.5', STATUS_DOT_BG[k])} />
+                        {STATUS_LABEL[k]}
+                      </span>
+                    );
+                  })()}
                 </DialogTitle>
               </DialogHeader>
 
@@ -1419,7 +1486,34 @@ export default function Interventions() {
                     </AlertDialog>
                   )}
 
-                  {/* Validée (1) + pas encore démarrée → Démarrer (app-side only) */}
+                  {/* Annuler — validée (1) ou en cours (2) non démarrée app, admin/secrétaire — exclut déjà annulée */}
+                  {(selectedIntervention.fk_statut === 1 || selectedIntervention.fk_statut === 2) && role !== 'technicien' && getInterventionStatusKey(selectedIntervention) !== 'annulee' && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" className="gap-2 border-red-500/40 text-red-700 dark:text-red-400" disabled={cancellingId === selectedIntervention.id}>
+                          <XCircle className="h-4 w-4" /> {cancellingId === selectedIntervention.id ? 'Annulation...' : 'Annuler'}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Annuler {selectedIntervention.ref} ?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            L'intervention sera marquée <strong>Annulée</strong> (rouge) et restera visible dans l'historique. Vous pourrez ensuite créer une intervention de remplacement avec le même technicien sur le même créneau.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Retour</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleCancelIntervention(selectedIntervention)}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                          >
+                            Confirmer l'annulation
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+
                   {selectedIntervention.fk_statut === 1 && !appEnCours && (
                     <Button
                       onClick={async () => {
@@ -1831,34 +1925,23 @@ export default function Interventions() {
             {/* Ajouter de nouveaux jours */}
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-foreground">Ajouter un jour au chantier</h3>
-              <div className="flex gap-2">
-                <Input
-                  type="date"
-                  value={editChantierNewDate}
-                  onChange={(e) => setEditChantierNewDate(e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (!editChantierNewDate) return;
-                    if (chantierJours.some(j => j.date === editChantierNewDate)) {
-                      toast.error('Ce jour existe déjà dans le chantier');
-                      return;
-                    }
-                    if (editChantierDatesToAdd.includes(editChantierNewDate)) {
-                      toast.error('Ce jour est déjà dans la liste à ajouter');
-                      return;
-                    }
-                    setEditChantierDatesToAdd(prev => [...prev, editChantierNewDate].sort());
-                    setEditChantierNewDate('');
-                  }}
-                  className="gap-2"
-                >
-                  <Plus className="h-4 w-4" /> Ajouter
-                </Button>
-              </div>
+              <DatePickerWithStatus
+                label="📅 Sélectionner un jour à ajouter"
+                excludedDates={[...chantierJours.map(j => j.date), ...editChantierDatesToAdd]}
+                techInterventions={resolvedInterventions.filter(i => i.technicien === editChantierTech)}
+                onPick={(v) => {
+                  if (!v) return;
+                  if (chantierJours.some(j => j.date === v)) { toast.error('Ce jour existe déjà dans le chantier'); return; }
+                  if (editChantierDatesToAdd.includes(v)) { toast.error('Ce jour est déjà dans la liste à ajouter'); return; }
+                  setEditChantierDatesToAdd(prev => [...prev, v].sort());
+                }}
+              />
+            </div>
+            <div className="hidden">
+              {/* legacy hidden state used by validation flow */}
+              <Input value={editChantierNewDate} onChange={(e) => setEditChantierNewDate(e.target.value)} />
+            </div>
+            <div>
               {editChantierDatesToAdd.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {editChantierDatesToAdd.map(d => (
@@ -1913,6 +1996,36 @@ export default function Interventions() {
               <p className="text-muted-foreground text-center py-8">Chargement...</p>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remplacer une intervention annulée */}
+      <Dialog open={replaceOpen} onOpenChange={setReplaceOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Remplacer {replaceSource?.ref ?? ''}</DialogTitle>
+          </DialogHeader>
+          {replaceSource && (
+            <div className="space-y-4 pt-2">
+              <div className="rounded-md bg-muted/50 border border-border p-3 text-sm space-y-1">
+                <div><span className="text-muted-foreground">Client : </span><span className="text-foreground font-medium">{replaceSource.client}</span></div>
+                <div><span className="text-muted-foreground">Technicien : </span><span className="text-foreground font-medium">{replaceSource.technicien || '—'}</span></div>
+                <div><span className="text-muted-foreground">Date : </span><span className="text-foreground font-medium">{formatDateFR(replaceSource.date)}</span></div>
+                <div><span className="text-muted-foreground">Horaire : </span><span className="text-foreground font-medium">{replaceSource.heureDebut} – {replaceSource.heureFin}</span></div>
+                <div><span className="text-muted-foreground">Type : </span><span className="text-foreground font-medium">{typeLabels[replaceSource.type]}</span></div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Description de la nouvelle intervention *</label>
+                <Textarea value={replaceDescription} onChange={(e) => setReplaceDescription(e.target.value)} placeholder="Décrire l'intervention de remplacement…" className="min-h-[80px]" />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => { setReplaceOpen(false); setReplaceSource(null); }} className="flex-1">Plus tard</Button>
+                <Button onClick={handleCreateReplacement} disabled={createInterventionMutation.isPending} className="flex-1 bg-emerald-600 hover:bg-emerald-700 gap-2">
+                  <Plus className="h-4 w-4" /> {createInterventionMutation.isPending ? 'Création...' : 'Créer le remplacement'}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
