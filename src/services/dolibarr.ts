@@ -1102,7 +1102,7 @@ export async function addPayment(invoiceId: string, data: {
   // Swagger requires accountid (mandatory field)
   const result = await dolibarrCall<string>(`/invoices/${invoiceId}/payments`, 'POST', {
     datepaye: toUnixTimestamp(data.datepaye),
-    payment_id: data.paymentid,
+    paymentid: data.paymentid,
     closepaidinvoices: data.closepaidinvoices,
     amount: data.amount,
     accountid: data.accountid || 1,
