@@ -23,8 +23,10 @@ export default function Dashboard() {
   const [period, setPeriod] = useState<Period>('annuel');
 
   const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
   const filteredFactures = factures.filter((f) => {
     const d = new Date(f.date);
+    if (period === 'journalier') return f.date === todayStr;
     if (period === 'hebdomadaire') {
       const weekAgo = new Date(now);
       weekAgo.setDate(weekAgo.getDate() - 7);
@@ -35,7 +37,6 @@ export default function Dashboard() {
   });
 
   const totalCA = filteredFactures.reduce((s, f) => s + f.montantHT, 0);
-  const todayStr = now.toISOString().slice(0, 10);
   const caJournalier = factures
     .filter(f => f.date === todayStr)
     .reduce((s, f) => s + f.montantHT, 0);
