@@ -505,7 +505,10 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
             {/* REFUSÉ */}
             {isRefused && (
               <div className="flex flex-wrap gap-2">
-                <span className="text-xs font-semibold text-red-600 self-center mr-1">Refusé :</span>
+                <span className="text-xs font-semibold text-red-600 self-center mr-1">Refusé / Annulé :</span>
+                <Button onClick={handleReopen} disabled={reopenMutation.isPending} size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700">
+                  {reopenMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />} Rouvrir
+                </Button>
                 <Button onClick={handleClone} disabled={cloneMutation.isPending} size="sm" variant="outline" className="gap-1.5">
                   {cloneMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />} Cloner
                 </Button>
