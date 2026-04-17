@@ -337,6 +337,10 @@ export interface ClientMutationData {
   etage?: string;
   codePorte?: string;
   typeLogement?: TypeLogement;
+  clientType?: ClientType;
+  siret?: string;
+  tvaIntra?: string;
+  parentId?: string;
 }
 
 function buildClientArrayOptions(data: ClientMutationData) {
@@ -347,30 +351,38 @@ function buildClientArrayOptions(data: ClientMutationData) {
   };
 }
 
-export async function createClient(data: ClientMutationData): Promise<string> {
-  const result = await dolibarrCall<string>('/thirdparties', 'POST', {
+function buildClientPayload(data: ClientMutationData) {
+  const isPro = data.clientType === 'professionnel';
+  const payload: Record<string, unknown> = {
     name: data.nom,
     address: data.adresse || '',
     zip: data.codePostal || '',
     town: data.ville || '',
     phone: data.telephone || '',
     email: data.email || '',
-    client: 1,
     array_options: buildClientArrayOptions(data),
-  });
+    client: 1,
+  };
+  if (isPro) {
+    payload.idprof1 = data.siret || '';
+    payload.tva_intra = data.tvaIntra || '';
+  } else {
+    payload.idprof1 = '';
+    payload.tva_intra = '';
+  }
+  if (data.parentId) {
+    payload.parent = parseInt(data.parentId, 10) || data.parentId;
+  }
+  return payload;
+}
+
+export async function createClient(data: ClientMutationData): Promise<string> {
+  const result = await dolibarrCall<string>('/thirdparties', 'POST', buildClientPayload(data));
   return result || '';
 }
 
 export async function updateClient(id: string, data: ClientMutationData): Promise<string | null> {
-  return dolibarrCall<string>(`/thirdparties/${id}`, 'PUT', {
-    name: data.nom,
-    address: data.adresse || '',
-    zip: data.codePostal || '',
-    town: data.ville || '',
-    phone: data.telephone || '',
-    email: data.email || '',
-    array_options: buildClientArrayOptions(data),
-  });
+  return dolibarrCall<string>(`/thirdparties/${id}`, 'PUT', buildClientPayload(data));
 }
 
 export async function deleteClient(id: string): Promise<string | null> {
