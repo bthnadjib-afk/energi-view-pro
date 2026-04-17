@@ -82,6 +82,8 @@ export interface Intervention {
   lines?: InterventionLine[];
 }
 
+export type TypeLogement = 'maison' | 'immeuble' | '';
+
 export interface Client {
   id: string;
   nom: string;
@@ -90,6 +92,9 @@ export interface Client {
   ville: string;
   telephone: string;
   email: string;
+  etage?: string;
+  codePorte?: string;
+  typeLogement?: TypeLogement;
 }
 
 export interface Produit {
@@ -315,7 +320,27 @@ export async function fetchDolibarrUsers(): Promise<DolibarrUser[]> {
 
 // --- Mutation functions ---
 
-export async function createClient(data: { nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }): Promise<string> {
+export interface ClientMutationData {
+  nom: string;
+  adresse?: string;
+  codePostal?: string;
+  ville?: string;
+  telephone?: string;
+  email?: string;
+  etage?: string;
+  codePorte?: string;
+  typeLogement?: TypeLogement;
+}
+
+function buildClientArrayOptions(data: ClientMutationData) {
+  return {
+    options_etage: data.etage || '',
+    options_code_porte: data.codePorte || '',
+    options_type_logement: data.typeLogement || '',
+  };
+}
+
+export async function createClient(data: ClientMutationData): Promise<string> {
   const result = await dolibarrCall<string>('/thirdparties', 'POST', {
     name: data.nom,
     address: data.adresse || '',
@@ -324,11 +349,12 @@ export async function createClient(data: { nom: string; adresse?: string; codePo
     phone: data.telephone || '',
     email: data.email || '',
     client: 1,
+    array_options: buildClientArrayOptions(data),
   });
   return result || '';
 }
 
-export async function updateClient(id: string, data: { nom: string; adresse?: string; codePostal?: string; ville?: string; telephone?: string; email?: string }): Promise<string | null> {
+export async function updateClient(id: string, data: ClientMutationData): Promise<string | null> {
   return dolibarrCall<string>(`/thirdparties/${id}`, 'PUT', {
     name: data.nom,
     address: data.adresse || '',
@@ -336,6 +362,7 @@ export async function updateClient(id: string, data: { nom: string; adresse?: st
     town: data.ville || '',
     phone: data.telephone || '',
     email: data.email || '',
+    array_options: buildClientArrayOptions(data),
   });
 }
 
@@ -1301,6 +1328,8 @@ function mapDolibarrIntervention(d: any): Intervention {
 }
 
 function mapDolibarrClient(d: any): Client {
+  const ao = d.array_options || {};
+  const tl = (ao.options_type_logement || '') as string;
   return {
     id: String(d.id),
     nom: d.name || '',
@@ -1309,6 +1338,9 @@ function mapDolibarrClient(d: any): Client {
     ville: d.town || '',
     telephone: d.phone || '',
     email: d.email || '',
+    etage: ao.options_etage || '',
+    codePorte: ao.options_code_porte || '',
+    typeLogement: (tl === 'maison' || tl === 'immeuble' ? tl : '') as TypeLogement,
   };
 }
 
