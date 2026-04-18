@@ -401,7 +401,40 @@ export function DocumentTemplate({
         </div>
       )}
 
-      {/* ─── SIGNATURES (intervention) ─── */}
+      {/* ─── BON POUR ACCORD (devis & facture) — récap totaux + signature ─── */}
+      {(docType === 'devis' || docType === 'facture') && (
+        <div style={{ marginTop: 16 * unit, display: 'flex', gap: 10 * unit, alignItems: 'stretch' }}>
+          {/* Récap totaux */}
+          <div style={{ flex: 1, border: `1px solid ${primary}`, padding: 8 * unit, fontSize: 8.5 * unit }}>
+            <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 9 * unit, marginBottom: 5 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+              Récapitulatif
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${2 * unit}px 0` }}>
+              <span style={{ color: '#555' }}>Total HT</span>
+              <span style={{ fontWeight: 700 }}>{fmt(data.totaux.ht)} €</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${2 * unit}px 0` }}>
+              <span style={{ color: '#555' }}>Total TVA</span>
+              <span style={{ fontWeight: 700 }}>{fmt(data.totaux.tva)} €</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${4 * unit}px 0 0`, borderTop: `1px solid ${primary}`, marginTop: 3 * unit, fontSize: 10 * unit }}>
+              <span style={{ fontWeight: 700, color: primary }}>Total TTC</span>
+              <span style={{ fontWeight: 700, color: primary }}>{fmt(data.totaux.ttc)} €</span>
+            </div>
+          </div>
+          {/* Bon pour accord */}
+          <div style={{ flex: 1, border: `2px solid ${primary}`, padding: 8 * unit, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 9 * unit, marginBottom: 4 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+              Bon pour accord
+            </div>
+            <div style={{ fontSize: 7.5 * unit, color: '#666', marginBottom: 4 * unit }}>
+              Date et signature précédées de la mention « Bon pour accord » :
+            </div>
+            <div style={{ flex: 1, minHeight: 55 * unit, borderTop: '0.5px dashed #999', marginTop: 4 * unit }} />
+          </div>
+        </div>
+      )}
+
       {showSignatures && (
         <div style={{ marginTop: 14 * unit, display: 'flex', gap: 10 * unit }}>
           <div style={{ flex: 1, border: '1px solid #ccc', padding: 6 * unit, minHeight: 60 * unit }}>
