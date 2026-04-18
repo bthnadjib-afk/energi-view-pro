@@ -302,6 +302,8 @@ export default function Factures() {
             variant="outline"
             className="gap-2 h-12 px-4"
             onClick={() => {
+              setAcompteMode('devis');
+              setAcompteDevisId('');
               setAcompteSocid('');
               setAcompteMontant(0);
               setAcompteDescription('Acompte');
