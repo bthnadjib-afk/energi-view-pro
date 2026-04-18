@@ -1093,9 +1093,11 @@ export default function Factures() {
             <DialogTitle>Aperçu de la facture {pdfPreviewRef}</DialogTitle>
             <DialogDescription className="sr-only">Prévisualisation PDF</DialogDescription>
           </DialogHeader>
-          {pdfPreviewUrl && (
-            <iframe src={pdfPreviewUrl} className="w-full flex-1 rounded border border-border" title={`Facture ${pdfPreviewRef}`} />
-          )}
+          <PdfFitViewer
+            url={pdfPreviewUrl}
+            title={`Facture ${pdfPreviewRef}`}
+            className="w-full flex-1 rounded border border-border"
+          />
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => pdfPreviewUrl && window.open(pdfPreviewUrl, '_blank')}>
               Ouvrir dans un nouvel onglet

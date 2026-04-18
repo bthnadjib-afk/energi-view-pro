@@ -2036,11 +2036,11 @@ export default function Interventions() {
         <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
           <DialogHeader><DialogTitle>Aperçu PDF — {selectedIntervention?.ref}</DialogTitle></DialogHeader>
           <div className="flex-1 min-h-0">
-            {pdfPreviewUrl ? (
-              <iframe src={pdfPreviewUrl} className="w-full h-full rounded-md border border-border" title="Aperçu PDF" />
-            ) : (
-              <p className="text-muted-foreground text-center py-8">Chargement...</p>
-            )}
+            <PdfFitViewer
+              url={pdfPreviewUrl}
+              title="Aperçu PDF"
+              className="w-full h-full rounded-md border border-border"
+            />
           </div>
         </DialogContent>
       </Dialog>
