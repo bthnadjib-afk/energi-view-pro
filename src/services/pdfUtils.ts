@@ -116,17 +116,18 @@ async function fetchAsBase64(url: string): Promise<string> {
 export async function loadRobotoFonts(doc: jsPDF): Promise<void> {
   if (TPL_FONT !== 'roboto') return;
   try {
-    const styles: Array<['normal'|'bold'|'italic'|'bolditalic', string]> = [
-      ['normal', ROBOTO_URLS.normal],
-      ['bold', ROBOTO_URLS.bold],
-      ['italic', ROBOTO_URLS.italic],
+    const variants: Array<['normal'|'bold'|'italic'|'bolditalic', string]> = [
+      ['normal',     ROBOTO_URLS.normal],
+      ['bold',       ROBOTO_URLS.bold],
+      ['italic',     ROBOTO_URLS.italic],
       ['bolditalic', ROBOTO_URLS.bolditalic],
     ];
-    for (const [style, url] of styles) {
+    for (const [style, url] of variants) {
       const b64 = await fetchAsBase64(url);
       const filename = `Roboto-${style}.ttf`;
       doc.addFileToVFS(filename, b64);
-      doc.addFont(filename, 'roboto', style === 'bolditalic' ? 'bold' : style, style === 'bolditalic' ? 'italic' : 'normal');
+      // jsPDF v4 : addFont(filename, familyName, style) — pas de 4e paramètre fontWeight
+      doc.addFont(filename, 'roboto', style);
     }
     _robotoLoaded = true;
   } catch (e) {
@@ -137,15 +138,8 @@ export async function loadRobotoFonts(doc: jsPDF): Promise<void> {
 export function setFont(doc: jsPDF, style: 'normal'|'bold'|'italic'|'bolditalic') {
   try {
     if (TPL_FONT === 'roboto') {
-      // jsPDF API: setFont(family, fontStyle, fontWeight)
-      const map: Record<string, [string, string]> = {
-        normal:     ['normal', 'normal'],
-        bold:       ['bold',   'normal'],
-        italic:     ['italic', 'normal'],
-        bolditalic: ['italic', 'bold'],
-      };
-      const [fontStyle, weight] = map[style];
-      doc.setFont('roboto', fontStyle, weight);
+      // jsPDF v4 : setFont(family, style) — style = 'normal'|'bold'|'italic'|'bolditalic'
+      doc.setFont('roboto', style);
       return;
     }
     doc.setFont(TPL_FONT, style);
