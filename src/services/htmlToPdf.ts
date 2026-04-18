@@ -1,16 +1,13 @@
 /**
  * htmlToPdf.ts — Génération PDF à partir du composant React DocumentTemplate.
  *
- * Stratégie : "WYSIWYG"
- *   1. Render le composant DocumentTemplate dans un container caché (off-screen)
- *      avec une largeur fixe = 210mm en pixels CSS (1mm = 1px à scale=1).
- *   2. Capture le DOM avec html2canvas (rendu identique sur tous appareils).
- *   3. Découpe l'image en pages A4 et génère le PDF avec jsPDF.
- *
- * Avantages :
- *   - Le rendu PDF est strictement identique au playground.
- *   - Aucune police custom à charger (utilise les fonts système).
- *   - Fonctionne sur web/mobile/serveur sans problème de Buffer ou CORS de fonts.
+ * Pipeline :
+ *   1. Render off-screen le DocumentTemplate à largeur A4 (≈794px @96dpi).
+ *   2. Auto-fit densité : on tente de rentrer sur 1 page A4 en réduisant
+ *      progressivement la densité (1.0 → 0.6).
+ *   3. Si même à densité min ça déborde, on bascule en MULTI-PAGE :
+ *      on capture le contenu complet et on le découpe en pages A4.
+ *   4. Si CGV activées, on AJOUTE TOUJOURS une dernière page dédiée aux CGV.
  */
 import { createRoot, type Root } from 'react-dom/client';
 import { createElement } from 'react';
@@ -29,19 +26,17 @@ import logoFallback from '@/assets/logo.png';
 // A4 cible dans le PDF final (mm)
 const A4_W_MM = 210;
 const A4_H_MM = 297;
-// Le template a été construit avec une grille "virtuelle" 210×297 en pixels CSS.
-// On le rend sur une vraie largeur A4 CSS (~794px à 96dpi) pour éviter tout zoom.
+// Largeur CSS A4 à 96dpi
 const TEMPLATE_W_PX = (A4_W_MM / 25.4) * 96;       // ≈ 794 px
 const TEMPLATE_H_PX = (A4_H_MM / 25.4) * 96;       // ≈ 1123 px
 const RENDER_SCALE = 1;
-// Densité max (= aucune compression visuelle). On descend si ça déborde.
 const MAX_DENSITY = 1;
 const MIN_DENSITY = 0.6;
 const DENSITY_STEP = 0.05;
-// Capture nette sans regonfler artificiellement le layout.
+// Capture haute résolution (~300 dpi)
 const RENDER_DPR = 3;
 
-// ─── Lecture config template depuis localStorage ─────────────────────────────
+// ─── Lecture config ───────────────────────────────────────────────────────────
 function readTemplateCfg(): DocumentTemplateCfg {
   try {
     if (typeof window === 'undefined') return {};
@@ -66,7 +61,7 @@ function readEntreprise(): EntrepriseInfo {
   }
 }
 
-// ─── Convertir une URL image en dataURL pour éviter les soucis CORS ────────────
+// ─── URL → dataURL (CORS safe) ────────────────────────────────────────────────
 const _imgCache = new Map<string, string>();
 async function urlToDataUrl(url: string): Promise<string> {
   if (!url) return '';
@@ -84,13 +79,12 @@ async function urlToDataUrl(url: string): Promise<string> {
     _imgCache.set(url, dataUrl);
     return dataUrl;
   } catch {
-    return url; // fallback : utiliser l'URL telle quelle
+    return url;
   }
 }
 
-// ─── Render off-screen + capture html2canvas ───────────────────────────────────
-async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasElement> {
-  // Container off-screen — visible dans le DOM mais positionné hors écran
+// ─── Helper : crée un host off-screen et y monte un Root React ────────────────
+function createHost(): { host: HTMLElement; root: Root } {
   const host = document.createElement('div');
   host.style.position = 'fixed';
   host.style.top = '0';
@@ -99,18 +93,47 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
   host.style.background = '#fff';
   host.style.zIndex = '-1';
   document.body.appendChild(host);
+  const root = createRoot(host);
+  return { host, root };
+}
 
-  let root: Root | null = null;
+function destroyHost(host: HTMLElement, root: Root) {
+  try { root.unmount(); } catch { /* noop */ }
+  if (host.parentNode) host.parentNode.removeChild(host);
+}
+
+async function waitForImages(host: HTMLElement) {
+  const imgs = Array.from(host.querySelectorAll('img'));
+  await Promise.all(
+    imgs.map((img) => {
+      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+        setTimeout(() => resolve(), 2000);
+      });
+    })
+  );
+}
+
+// ─── Render principal : auto-fit densité + capture ────────────────────────────
+interface MainCaptureResult {
+  canvas: HTMLCanvasElement;
+  /** Hauteur réelle du contenu (en px CSS). */
+  contentHeightPx: number;
+  /** Densité finale retenue. */
+  density: number;
+  /** True si le contenu a dû être étalé sur plusieurs pages. */
+  multiPage: boolean;
+}
+
+async function renderMain(props: DocumentTemplateProps): Promise<MainCaptureResult> {
+  const { host, root } = createHost();
   try {
-    root = createRoot(host);
-    // ─── Auto-fit : on cherche la plus grande densité qui tient sur A4.
-    //   1. On rend une fois SANS contrainte de hauteur pour mesurer le vrai
-    //      besoin du contenu à densité 1.
-    //   2. Si ça déborde A4, on réduit la densité par paliers jusqu'à ce
-    //      que le contenu rentre — sans jamais descendre sous MIN_DENSITY.
+    // 1. Auto-fit densité jusqu'à rentrer sur A4
     let density = MAX_DENSITY;
     const measure = async (d: number): Promise<number> => {
-      root!.render(
+      root.render(
         createElement(DocumentTemplate, {
           ...props,
           scale: RENDER_SCALE,
@@ -129,31 +152,25 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
       needed = await measure(density);
     }
 
-    // Render final à la densité retenue, contraint à la hauteur A4.
+    const multiPage = needed > TEMPLATE_H_PX;
+
+    // 2. Render final
+    //    - Single page : on contraint à A4 (overflow hidden).
+    //    - Multi page : on garde autoHeight pour capturer tout le contenu.
     root.render(
       createElement(DocumentTemplate, {
         ...props,
         scale: RENDER_SCALE,
         density,
+        autoHeight: multiPage,
       })
     );
     await new Promise((r) => setTimeout(r, 80));
-
-    // Attendre le décodage des images (logo, signatures)
-    const imgs = Array.from(host.querySelectorAll('img'));
-    await Promise.all(
-      imgs.map((img) => {
-        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-        return new Promise<void>((resolve) => {
-          img.onload = () => resolve();
-          img.onerror = () => resolve();
-          // Sécurité : timeout 2s
-          setTimeout(() => resolve(), 2000);
-        });
-      })
-    );
+    await waitForImages(host);
 
     const target = host.firstElementChild as HTMLElement;
+    const finalHeight = multiPage ? target.scrollHeight : TEMPLATE_H_PX;
+
     const canvas = await html2canvas(target, {
       scale: RENDER_DPR,
       useCORS: true,
@@ -161,34 +178,94 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
       logging: false,
       imageTimeout: 4000,
       width: TEMPLATE_W_PX,
+      height: finalHeight,
+      windowWidth: TEMPLATE_W_PX,
+      windowHeight: finalHeight,
+    });
+
+    return { canvas, contentHeightPx: finalHeight, density, multiPage };
+  } finally {
+    destroyHost(host, root);
+  }
+}
+
+// ─── Render dédié : page CGV uniquement ───────────────────────────────────────
+async function renderCgv(props: DocumentTemplateProps): Promise<HTMLCanvasElement> {
+  const { host, root } = createHost();
+  try {
+    root.render(
+      createElement(DocumentTemplate, {
+        ...props,
+        scale: RENDER_SCALE,
+        density: 1,
+        autoHeight: false,
+        cgvOnly: true,
+      })
+    );
+    await new Promise((r) => setTimeout(r, 80));
+    await waitForImages(host);
+
+    const target = host.firstElementChild as HTMLElement;
+    return await html2canvas(target, {
+      scale: RENDER_DPR,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      width: TEMPLATE_W_PX,
       height: TEMPLATE_H_PX,
       windowWidth: TEMPLATE_W_PX,
       windowHeight: TEMPLATE_H_PX,
     });
-    return canvas;
   } finally {
-    if (root) {
-      try { root.unmount(); } catch { /* noop */ }
-    }
-    if (host.parentNode) host.parentNode.removeChild(host);
+    destroyHost(host, root);
   }
 }
 
-// ─── Découpage canvas en pages A4 et build du PDF ─────────────────────────────
-function canvasToPdf(canvas: HTMLCanvasElement): jsPDF {
-  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-  const imgData = canvas.toDataURL('image/png');
-  pdf.addImage(imgData, 'PNG', 0, 0, A4_W_MM, A4_H_MM);
-  return pdf;
+// ─── Ajoute un canvas à un PDF en le découpant en pages A4 ────────────────────
+function addCanvasToPdf(pdf: jsPDF, canvas: HTMLCanvasElement, isFirstPage: boolean) {
+  // Page A4 unique → on étire 1:1
+  const pageHeightPxAt300 = (TEMPLATE_H_PX) * RENDER_DPR;
+  if (canvas.height <= pageHeightPxAt300 + 2) {
+    if (!isFirstPage) pdf.addPage();
+    const imgData = canvas.toDataURL('image/png');
+    pdf.addImage(imgData, 'PNG', 0, 0, A4_W_MM, A4_H_MM);
+    return;
+  }
+
+  // Multi-page : on découpe le canvas en tranches A4
+  const sliceHeightPx = pageHeightPxAt300;
+  let yOffset = 0;
+  let firstSlice = true;
+  while (yOffset < canvas.height) {
+    const remaining = canvas.height - yOffset;
+    const currentSliceHeight = Math.min(sliceHeightPx, remaining);
+
+    const slice = document.createElement('canvas');
+    slice.width = canvas.width;
+    slice.height = currentSliceHeight;
+    const ctx = slice.getContext('2d')!;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, slice.width, slice.height);
+    ctx.drawImage(
+      canvas,
+      0, yOffset, canvas.width, currentSliceHeight,
+      0, 0, canvas.width, currentSliceHeight
+    );
+
+    if (!firstSlice || !isFirstPage) pdf.addPage();
+    const heightMm = (currentSliceHeight / sliceHeightPx) * A4_H_MM;
+    pdf.addImage(slice.toDataURL('image/png'), 'PNG', 0, 0, A4_W_MM, heightMm);
+
+    yOffset += currentSliceHeight;
+    firstSlice = false;
+  }
 }
 
-// ─── API publique : générer un jsPDF complet à partir des params ──────────────
+// ─── API publique ─────────────────────────────────────────────────────────────
 export interface BuildDocumentPdfParams {
   docType: DocType;
   data: DocumentTemplateData;
-  /** Override config template (sinon lue depuis localStorage). */
   templateOverride?: DocumentTemplateCfg;
-  /** Override entreprise (sinon lue depuis localStorage). */
   entrepriseOverride?: EntrepriseInfo;
 }
 
@@ -196,12 +273,12 @@ export async function buildDocumentPdf(params: BuildDocumentPdfParams): Promise<
   const template = params.templateOverride ?? readTemplateCfg();
   const entreprise = params.entrepriseOverride ?? readEntreprise();
 
-  // Pré-charger le logo en dataURL pour éviter les soucis CORS lors du capture
+  // Pré-charge logo en dataURL
   const logoSrc = template.logoUrl || (logoFallback as unknown as string);
   const logoDataUrl = await urlToDataUrl(logoSrc);
   const tplWithLogo: DocumentTemplateCfg = { ...template, logoUrl: logoDataUrl };
 
-  // Idem pour les signatures intervention (souvent dataURL déjà, mais sécurité)
+  // Pré-charge signatures éventuelles
   const data = { ...params.data };
   if (data.signatureClient && !data.signatureClient.startsWith('data:')) {
     data.signatureClient = await urlToDataUrl(data.signatureClient);
@@ -210,14 +287,36 @@ export async function buildDocumentPdf(params: BuildDocumentPdfParams): Promise<
     data.signatureTech = await urlToDataUrl(data.signatureTech);
   }
 
-  const canvas = await renderToCanvas({
+  // 1. Rendu du document principal
+  const main = await renderMain({
     docType: params.docType,
     data,
     template: tplWithLogo,
     entreprise,
     scale: 1,
   });
-  return canvasToPdf(canvas);
+
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  addCanvasToPdf(pdf, main.canvas, true);
+
+  // 2. Page CGV finale (devis & facture, si activée + texte fourni)
+  const wantsCgv =
+    (params.docType === 'devis' || params.docType === 'facture') &&
+    template.afficherCgv !== false &&
+    !!(template.texteCgv && template.texteCgv.trim().length > 0);
+
+  if (wantsCgv) {
+    const cgvCanvas = await renderCgv({
+      docType: params.docType,
+      data,
+      template: tplWithLogo,
+      entreprise,
+      scale: 1,
+    });
+    addCanvasToPdf(pdf, cgvCanvas, false);
+  }
+
+  return pdf;
 }
 
 // ─── Helpers pratiques ────────────────────────────────────────────────────────
