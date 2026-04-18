@@ -43,13 +43,9 @@ async function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): Pro
   y += 8;
 
   // ─── BARRE INFO ───────────────────────────────────────────────
-  const validStr = devis.finValidite
-    ? `Valable jusqu'au ${formatDateFR(devis.finValidite)}`
-    : 'Valable 30 jours';
   const barH = drawInfoBar(doc, y, [
-    { label: 'Référence',   value: toText(devis.ref) },
-    { label: 'Date',        value: formatDateFR(devis.date) },
-    { label: 'Validité',    value: validStr },
+    { label: 'Référence', value: toText(devis.ref) },
+    { label: 'Date',      value: formatDateFR(devis.date) },
   ]);
   y += barH + 8;
 
