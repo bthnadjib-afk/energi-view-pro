@@ -211,10 +211,9 @@ export function drawParties(
   client: ClientInfo,
   entreprise?: EntrepriseInfo
 ): number {
-  const colMid = ML + CW / 2;
   const startY = y;
 
-  // Client (gauche)
+  // ─── CLIENT (gauche, aligné à gauche) ─────────────────────────
   setFont(doc, 'bolditalic');
   doc.setFontSize(9.5);
   doc.setTextColor(...NOIR);
@@ -232,13 +231,13 @@ export function drawParties(
   if (client.telephone) clientLines.push(toText(client.telephone));
   clientLines.forEach(l => { doc.text(l, ML, y); y += 4.8; });
 
-  // Entreprise (droite)
+  // ─── ENTREPRISE (droite, aligné à droite sur COL_R) ───────────
   const ent = entreprise;
   let ey = startY;
   setFont(doc, 'bolditalic');
   doc.setFontSize(9.5);
   doc.setTextColor(...NOIR);
-  doc.text(toText(ent?.nom || 'EURL ELECTRICIEN DU GENEVOIS').toUpperCase(), colMid, ey);
+  doc.text(toText(ent?.nom || 'EURL ELECTRICIEN DU GENEVOIS').toUpperCase(), COL_R, ey, { align: 'right' });
   ey += 5.5;
 
   setFont(doc, 'normal');
@@ -251,7 +250,7 @@ export function drawParties(
     (ent?.email || 'CONTACT@ELECTRICIENDUGENEVOIS.FR').toUpperCase(),
     ent?.telephone || '06 02 04 42 02',
   ];
-  entLines.forEach(l => { doc.text(l, colMid, ey); ey += 4.8; });
+  entLines.forEach(l => { doc.text(l, COL_R, ey, { align: 'right' }); ey += 4.8; });
 
   return Math.max(y, ey);
 }
