@@ -264,152 +264,69 @@ function SliderField({ label, value, min, max, step, unit, onChange }: { label: 
 }
 
 // ─── Aperçu A4 ──────────────────────────────────────────────────────
+// On utilise le MÊME composant DocumentTemplate que pour la génération PDF
+// → garantit que ce que l'utilisateur voit ici = ce qu'il obtient en PDF.
 
-function A4Preview({ docType, template: t, entreprise, totals }: { docType: DocType; template: AppConfig['template']; entreprise: AppConfig['entreprise']; totals: { ht: number; tva: number; ttc: number } }) {
-  // A4 = 210mm × 297mm — affichage à l'échelle (1mm = ~2.5px pour preview lisible)
+function A4Preview({
+  docType,
+  template: t,
+  entreprise,
+  totals,
+}: {
+  docType: DocType;
+  template: AppConfig['template'];
+  entreprise: AppConfig['entreprise'];
+  totals: { ht: number; tva: number; ttc: number };
+}) {
   const SCALE = 2.5;
-  const W = 210 * SCALE;
-  const H = 297 * SCALE;
 
-  const titre = docType === 'facture' ? 'FACTURE' : docType === 'devis' ? 'DEVIS' : "BON D'INTERVENTION";
-  const fontFamily = t.police === 'times' ? 'Times, serif' : t.police === 'courier' ? '"Courier New", monospace' : 'Helvetica, Arial, sans-serif';
-
-  const fmt = (n: number) => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const dateNow = new Date().toLocaleDateString('fr-FR');
+  const data = {
+    ref: docType === 'facture' ? 'FA2025-0042' : docType === 'devis' ? 'PR2025-0042' : 'FI2025-0042',
+    date: new Date().toISOString().slice(0, 10),
+    type: docType === 'intervention' ? 'Dépannage' : undefined,
+    technicien: docType === 'intervention' ? 'Marc Dubois' : undefined,
+    description:
+      docType === 'intervention'
+        ? "Intervention pour remplacement du tableau électrique principal et installation d'un disjoncteur différentiel."
+        : undefined,
+    client: {
+      nom: 'Dupont Jean',
+      adresse: '12 rue des Lilas',
+      codePostal: '74100',
+      ville: 'Annemasse',
+      email: 'jean.dupont@example.fr',
+      telephone: '06 12 34 56 78',
+    },
+    lignes: SAMPLE_LIGNES.map((l) => ({
+      designation: l.desc,
+      ref: l.ref,
+      quantite: l.qte,
+      unite: 'U',
+      prixUnitaire: l.pu,
+      tauxTVA: l.tva,
+      totalHT: l.qte * l.pu,
+    })),
+    totaux: {
+      ht: totals.ht,
+      tva: totals.tva,
+      ttc: totals.ttc,
+      tvaParTaux: [{ taux: 20, montant: totals.tva }],
+    },
+  };
 
   return (
-    <div className="overflow-auto rounded-lg border border-border bg-muted/30 p-4 flex justify-center" style={{ maxHeight: '80vh' }}>
-      <div
-        className="bg-white shadow-2xl"
-        style={{
-          width: W,
-          minHeight: H,
-          fontFamily,
-          color: t.couleurTexte,
-          paddingTop: t.margeHaut * SCALE,
-          paddingBottom: t.margeBas * SCALE,
-          paddingLeft: t.margeGauche * SCALE,
-          paddingRight: t.margeDroite * SCALE,
-          fontSize: t.tailleTexte * 1.4,
-        }}
-      >
-        {/* Logo */}
-        <div style={{ marginBottom: 14 }}>
-          {t.logoUrl ? (
-            <img src={t.logoUrl} alt="" style={{ height: 38, objectFit: 'contain' }} />
-          ) : (
-            <div style={{ height: 38, width: 130, background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#999' }}>
-              [Logo]
-            </div>
-          )}
-        </div>
-
-        {/* Titre */}
-        <div style={{ fontSize: t.tailleTitre, fontWeight: 700, color: t.couleurPrimaire, fontStyle: 'italic', lineHeight: 1.1 }}>
-          {titre}
-        </div>
-        <div style={{ fontSize: 9, color: '#666', fontStyle: 'italic', marginTop: 2, marginBottom: 14 }}>
-          NUMÉRO : {docType === 'facture' ? 'FA2025-0042' : docType === 'devis' ? 'PR2025-0042' : 'FI2025-0042'}
-        </div>
-
-        {/* Bandeau infos */}
-        <div style={{ display: 'flex', background: t.couleurPrimaire, color: '#fff', borderRadius: 2, marginBottom: 14 }}>
-          {[
-            { l: 'Référence', v: docType === 'facture' ? 'FA2025-0042' : 'PR2025-0042' },
-            { l: 'Date', v: dateNow },
-            { l: docType === 'facture' ? 'Échéance' : 'Validité', v: docType === 'facture' ? 'À réception' : '30 jours' },
-          ].map((c, i) => (
-            <div key={i} style={{ flex: 1, padding: '6px 8px', borderRight: i < 2 ? '1px solid rgba(255,255,255,0.2)' : 'none' }}>
-              <div style={{ fontSize: 7, color: '#bbb', textTransform: 'uppercase' }}>{c.l}</div>
-              <div style={{ fontSize: 9, fontWeight: 700 }}>{c.v}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Parties */}
-        <div style={{ display: 'flex', marginBottom: 14, gap: 16 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontStyle: 'italic', marginBottom: 3, color: t.couleurPrimaire }}>{`{{client.nom}}`}</div>
-            <div style={{ fontSize: 9, color: '#333', lineHeight: 1.5 }}>
-              <div>{`{{client.adresse}}`}</div>
-              <div>{`{{client.codePostal}} {{client.ville}}`}</div>
-              <div>{`{{client.email}}`}</div>
-            </div>
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontStyle: 'italic', marginBottom: 3, color: t.couleurPrimaire, textTransform: 'uppercase' }}>
-              {entreprise.nom || 'Votre entreprise'}
-            </div>
-            <div style={{ fontSize: 9, color: '#333', lineHeight: 1.5 }}>
-              <div>{entreprise.adresse || '99 Route du Chatelet'}</div>
-              <div>{entreprise.codePostal || '74800'} {entreprise.ville || 'Cornier'}</div>
-              <div>SIRET : {entreprise.siret || '940 874 936 00013'}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tableau */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 9 }}>
-          <thead>
-            <tr style={{ background: t.couleurPrimaire, color: '#fff' }}>
-              <th style={{ padding: 4, textAlign: 'left', fontWeight: 700 }}>Description</th>
-              <th style={{ padding: 4, textAlign: 'center', fontWeight: 700, width: 50 }}>Qté</th>
-              <th style={{ padding: 4, textAlign: 'right', fontWeight: 700, width: 70 }}>P.U.</th>
-              <th style={{ padding: 4, textAlign: 'right', fontWeight: 700, width: 80 }}>Montant</th>
-            </tr>
-          </thead>
-          <tbody>
-            {SAMPLE_LIGNES.map((l, i) => (
-              <tr key={i} style={{ background: i % 2 ? '#f7f7f7' : '#fff', borderBottom: '0.5px solid #e0e0e0' }}>
-                <td style={{ padding: 4 }}>{l.desc}</td>
-                <td style={{ padding: 4, textAlign: 'center' }}>{l.qte}</td>
-                <td style={{ padding: 4, textAlign: 'right' }}>{fmt(l.pu)} €</td>
-                <td style={{ padding: 4, textAlign: 'right', fontWeight: 700 }}>{fmt(l.qte * l.pu)} €</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* Totaux */}
-        <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ minWidth: 200, fontSize: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
-              <span style={{ color: '#555', fontStyle: 'italic' }}>TOTAL HT :</span>
-              <span style={{ fontWeight: 700 }}>{fmt(totals.ht)} €</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
-              <span style={{ color: '#555', fontStyle: 'italic' }}>TVA (20%) :</span>
-              <span style={{ fontWeight: 700 }}>{fmt(totals.tva)} €</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: `1.5px solid ${t.couleurPrimaire}`, marginTop: 4, fontSize: 12 }}>
-              <span style={{ fontWeight: 700, fontStyle: 'italic' }}>TOTAL TTC :</span>
-              <span style={{ fontWeight: 700, color: t.couleurPrimaire }}>{fmt(totals.ttc)} €</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Acompte (devis seulement) */}
-        {docType === 'devis' && (
-          <div style={{ marginTop: 14, padding: 8, border: `2px solid ${t.couleurAccent}`, background: `${t.couleurAccent}10`, borderRadius: 4, textAlign: 'center', color: t.couleurAccent, fontSize: 10, fontWeight: 700, fontStyle: 'italic' }}>
-            ⚠ ACOMPTE 30 % À PAYER À LA SIGNATURE — SOIT {fmt(totals.ttc * 0.30)} €
-          </div>
-        )}
-
-        {/* RIB */}
-        {t.afficherRib && (
-          <div style={{ marginTop: 14, fontSize: 9 }}>
-            <div style={{ fontWeight: 700, color: t.couleurPrimaire, marginBottom: 3 }}>Moyens de paiement :</div>
-            <div style={{ fontFamily: 'Courier, monospace', color: '#333', lineHeight: 1.6 }}>
-              <div>IBAN : FR76 1695 8000 0179 9683 5713 173</div>
-              <div>BIC&nbsp;&nbsp;: QNTOFRP1XXX</div>
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div style={{ marginTop: 24, paddingTop: 6, borderTop: '0.5px solid #ccc', fontSize: 7, color: '#777', textAlign: 'center', fontStyle: 'italic', lineHeight: 1.6 }}>
-          {t.piedDePage || "Nos travaux sont couverts par notre assurance décennale et RC Pro auprès d'ERGO — Contrat n° 24015161184."}
-        </div>
+    <div
+      className="overflow-auto rounded-lg border border-border bg-muted/30 p-4 flex justify-center"
+      style={{ maxHeight: '80vh' }}
+    >
+      <div className="shadow-2xl bg-white" style={{ width: 210 * SCALE }}>
+        <DocumentTemplate
+          docType={docType as SharedDocType}
+          data={data}
+          template={t}
+          entreprise={entreprise}
+          scale={SCALE}
+        />
       </div>
     </div>
   );
