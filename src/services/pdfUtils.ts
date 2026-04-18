@@ -277,7 +277,8 @@ export function drawTotaux(
   return y;
 }
 
-// ─── Signature + NET À PAYER ──────────────────────────────────
+// ─── Signature (gauche) + NET À PAYER + petit encart ACOMPTE (droite) ──
+// L'encart acompte fait la MÊME LARGEUR que la box NET et est juste en dessous.
 export function drawSignatureAndNet(
   doc: jsPDF,
   y: number,
@@ -286,12 +287,15 @@ export function drawSignatureAndNet(
   acompteLabel?: string,
   acompteValue?: string
 ): number {
-  const sigW  = Math.round(CW * 0.52);
-  const netW  = CW - sigW - 5;
-  const netX  = ML + sigW + 5;
-  const sigH  = 30;
+  const rightW = Math.round(CW * 0.45);     // largeur bloc droit (TTC + acompte)
+  const rightX = COL_R - rightW;
+  const sigW   = rightX - ML - 5;           // signature à gauche, gap 5mm
+  const netH   = 16;                        // hauteur box NET
+  const acoH   = acompteLabel ? 12 : 0;     // hauteur petit encart acompte
+  const totalH = netH + (acoH ? acoH + 2 : 0); // 2mm de gap entre les 2 boxes
+  const sigH   = Math.max(totalH, 30);
 
-  // Box signature (tiretée)
+  // ─ Box signature (gauche) ─
   doc.setDrawColor(...GRIS_LIGNE);
   doc.setLineWidth(0.5);
   doc.rect(ML, y, sigW, sigH, 'S');
@@ -300,26 +304,27 @@ export function drawSignatureAndNet(
   doc.setTextColor(...GRIS_SOMBRE);
   doc.text("Signature précédée de la mention « bon pour accord » :", ML + 3, y + 6);
 
-  // Bloc droit : NET + ACOMPTE
+  // ─ Box NET À PAYER (droite, haut) ─
+  doc.setFillColor(...NOIR);
+  doc.rect(rightX, y, rightW, netH, 'F');
   setFont(doc, 'bolditalic');
-  doc.setFontSize(12);
-  doc.setTextColor(...NOIR);
-  const netLines = doc.splitTextToSize(`${netLabel} : ${netValue}`, netW);
-  doc.text(netLines, netX + netW / 2, y + 9, { align: 'center' });
+  doc.setFontSize(11);
+  doc.setTextColor(...BLANC);
+  doc.text(`${netLabel} : ${netValue}`, rightX + rightW / 2, y + netH / 2 + 1.5, { align: 'center' });
 
+  // ─ Petit encart ACOMPTE (droite, juste en dessous, même largeur) ─
   if (acompteLabel && acompteValue) {
-    const boxY = y + 16;
-    const boxH = 13;
+    const acoY = y + netH + 2;
     doc.setFillColor(...ROUGE_BG);
     doc.setDrawColor(...ROUGE);
-    doc.setLineWidth(1.5);
-    doc.roundedRect(netX, boxY, netW, boxH, 1.5, 1.5, 'FD');
+    doc.setLineWidth(1.2);
+    doc.roundedRect(rightX, acoY, rightW, acoH, 1.2, 1.2, 'FD');
     setFont(doc, 'bolditalic');
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setTextColor(...ROUGE);
-    doc.text(acompteLabel, netX + netW / 2, boxY + 5.5, { align: 'center' });
-    doc.setFontSize(10);
-    doc.text(acompteValue, netX + netW / 2, boxY + 10.5, { align: 'center' });
+    doc.text(acompteLabel, rightX + rightW / 2, acoY + 4.5, { align: 'center' });
+    doc.setFontSize(9);
+    doc.text(acompteValue, rightX + rightW / 2, acoY + 9, { align: 'center' });
   }
 
   return y + sigH;
