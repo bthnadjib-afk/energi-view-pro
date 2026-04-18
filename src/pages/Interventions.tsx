@@ -17,6 +17,7 @@ import {
   type InterventionType, type Intervention, type InterventionLine,
 } from '@/services/dolibarr';
 import { interventionPdfToBlobUrl, downloadInterventionPdf } from '@/services/interventionRenderer';
+import { PdfFitViewer } from '@/components/PdfFitViewer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

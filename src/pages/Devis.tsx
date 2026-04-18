@@ -12,6 +12,7 @@ import {
   saveDevisSignatureToken, markDevisSent, closeDevis, markDevisAutoExpired, markDevisRelance1, markDevisRelanceDone, type Devis as DevisType, type Client,
 } from '@/services/dolibarr';
 import { openDevisPdf, devisPdfToBase64, devisPdfToBlobUrl } from '@/services/devisRenderer';
+import { PdfFitViewer } from '@/components/PdfFitViewer';
 import { useConfig } from '@/hooks/useConfig';
 import { useRecordDevisEnvoi, useDevisRelances, useMarkDevisRelance, getDevisRelanceStatus } from '@/hooks/useDevisRelances';
 import { cn } from '@/lib/utils';

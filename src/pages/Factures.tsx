@@ -8,6 +8,7 @@ import { useFactureRelances, useRecordFactureEnvoi, useSetFactureEnvoiDate, getR
 import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, getFactureCloseCodeLabel, isFactureAbandonnee, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
 import { useQuery } from '@tanstack/react-query';
 import { openInvoicePdf, invoicePdfToBase64, invoicePdfToBlobUrl } from '@/services/invoiceRenderer';
+import { PdfFitViewer } from '@/components/PdfFitViewer';
 import { useConfig } from '@/hooks/useConfig';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
