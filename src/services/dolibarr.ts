@@ -287,13 +287,24 @@ export function getDevisStatutLabel(fk_statut: number): string {
 
 export function getFactureStatutLabel(fk_statut: number, paye: boolean, totalPaye?: number, type?: number, close_code?: string): string {
   if (type === 2) return 'Avoir';
-  if (fk_statut === 3 && (close_code === 'badcustomer' || close_code === 'abandon')) return 'Abandonnée';
-  if (paye) return 'Payée';
+  // Dolibarr "abandonnée" : settopaid avec close_code retourne soit status=3 soit status=2 selon la version,
+  // dans tous les cas paye=0 et close_code rempli signifie facture classée comme abandonnée.
+  if (!paye && close_code && (close_code === 'badcustomer' || close_code === 'abandon' || close_code === 'other')) {
+    return 'Abandonnée';
+  }
   if (fk_statut === 3) return 'Abandonnée';
+  if (paye) return 'Payée';
   if (fk_statut === 0) return 'Brouillon';
   if (fk_statut >= 1 && !paye && (totalPaye || 0) > 0) return 'Partiellement payée';
-   if (fk_statut >= 1) return 'Validée';
+  if (fk_statut >= 1) return 'Validée';
   return `Statut ${fk_statut}`;
+}
+
+/** True si la facture est classée comme abandonnée (peu importe le status numérique de Dolibarr). */
+export function isFactureAbandonnee(fk_statut: number, paye: boolean, close_code?: string | null): boolean {
+  if (fk_statut === 3) return true;
+  if (!paye && close_code && ['badcustomer', 'abandon', 'other'].includes(close_code)) return true;
+  return false;
 }
 
 export function getInterventionStatutLabel(fk_statut: number): string {
