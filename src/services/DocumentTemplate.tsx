@@ -68,6 +68,15 @@ export interface DocumentTemplateCfg {
   tailleTableauLignes?: number;
   tailleTotaux?: number;
   tailleTotalTTC?: number;
+  tailleEncartTexte?: number;
+  taillePaiement?: number;
+  taillePiedDePage?: number;
+  logoHauteur?: number;
+  logoLargeurMax?: number;
+  largeurEncartTotaux?: number;
+  largeurEncartBonAccord?: number;
+  entrepriseEnFaceClient?: boolean;
+  rubanCompact?: boolean;
   captureWidth?: number;
   piedDePage?: string;
   afficherRib?: boolean;
