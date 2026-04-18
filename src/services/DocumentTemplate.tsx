@@ -121,6 +121,7 @@ export function DocumentTemplate({
   scale = 1,
   density = 1,
   autoHeight = false,
+  cgvOnly = false,
 }: DocumentTemplateProps) {
   const unit = scale * PX_PER_MM * density;
   const W = A4_W_PX * scale;
@@ -158,6 +159,20 @@ export function DocumentTemplate({
     lineHeight: density < 1 ? 1.24 : 1.4,
     overflow: autoHeight ? 'visible' : 'hidden',
   };
+
+  // ─── Mode CGV uniquement (page finale dédiée) ─────────────────────
+  if (cgvOnly) {
+    return (
+      <div style={pageStyle}>
+        <div style={{ fontSize: 16 * unit, fontWeight: 700, fontStyle: 'italic', color: primary, marginBottom: 10 * unit, borderBottom: `1.5px solid ${primary}`, paddingBottom: 4 * unit }}>
+          Conditions Générales de Vente
+        </div>
+        <div style={{ fontSize: 8 * unit, color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.5, textAlign: 'justify' }}>
+          {t.texteCgv || 'Aucune CGV configurée. Renseignez le texte dans Préférences → Template.'}
+        </div>
+      </div>
+    );
+  }
 
   const showEcheance = docType === 'facture';
   const showValidite = docType === 'devis';
