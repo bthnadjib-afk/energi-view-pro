@@ -225,13 +225,14 @@ export function DocumentTemplate({
   const showValidite = docType === 'devis';
   const showAcompte = docType === 'devis';
   const showSignatures = docType === 'intervention';
-  const showTableTotals = docType !== 'intervention' || (data.lignes && data.lignes.length > 0);
+  // Pas de totaux sur le bon d'intervention (pas de prix)
+  const showTableTotals = docType === 'devis' || docType === 'facture';
   const acompte = data.totaux.ttc * 0.3;
 
-  // Bloc "infos entreprise" — utilisé soit dans le header (mode classique), soit en face du client (mode côte-à-côte)
+  // Bloc "infos entreprise" — nom + coordonnées en italique
   const blocEntreprise = (
-    <div style={{ fontSize: fsCoord, color: '#444', lineHeight: density < 1 ? 1.25 : 1.5 }}>
-      <div style={{ fontWeight: 700, color: primary, fontSize: fsEntreprise, textTransform: 'uppercase', marginBottom: 2 * unit }}>
+    <div style={{ fontSize: fsCoord, color: '#444', lineHeight: density < 1 ? 1.25 : 1.5, fontStyle: 'italic' }}>
+      <div style={{ fontWeight: 700, color: primary, fontSize: fsEntreprise, textTransform: 'uppercase', marginBottom: 2 * unit, fontStyle: 'italic' }}>
         {entreprise.nom || ''}
       </div>
       {entreprise.adresse && <div>{entreprise.adresse}</div>}
@@ -244,19 +245,23 @@ export function DocumentTemplate({
     </div>
   );
 
+  // Bloc client — sur le bon d'intervention : nom uniquement (pas de coordonnées)
+  const showClientCoords = docType !== 'intervention';
   const blocClient = (
     <div>
       <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 10 * unit, marginBottom: 2 * unit }}>
         {data.client.nom}
       </div>
-      <div style={{ fontSize: fsCoord, color: '#333', lineHeight: density < 1 ? 1.22 : 1.5 }}>
-        {data.client.adresse && <div>{data.client.adresse}</div>}
-        {(data.client.codePostal || data.client.ville) && (
-          <div>{data.client.codePostal} {data.client.ville}</div>
-        )}
-        {data.client.email && <div>{data.client.email}</div>}
-        {data.client.telephone && <div>{data.client.telephone}</div>}
-      </div>
+      {showClientCoords && (
+        <div style={{ fontSize: fsCoord, color: '#333', lineHeight: density < 1 ? 1.22 : 1.5, fontStyle: 'italic' }}>
+          {data.client.adresse && <div>{data.client.adresse}</div>}
+          {(data.client.codePostal || data.client.ville) && (
+            <div>{data.client.codePostal} {data.client.ville}</div>
+          )}
+          {data.client.email && <div>{data.client.email}</div>}
+          {data.client.telephone && <div>{data.client.telephone}</div>}
+        </div>
+      )}
     </div>
   );
 
@@ -368,8 +373,8 @@ export function DocumentTemplate({
         </div>
       )}
 
-      {/* ─── TABLEAU DES LIGNES ─── */}
-      {data.lignes.length > 0 && (
+      {/* ─── TABLEAU DES LIGNES ─── (masqué pour le bon d'intervention : pas de prix) */}
+      {data.lignes.length > 0 && docType !== 'intervention' && (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fsTableLigne, marginBottom: 8 * unit, lineHeight: density < 1 ? 1.12 : 1.3 }}>
           <thead>
             <tr style={{ background: primary, color: '#fff', fontSize: fsTableHeader }}>
@@ -398,6 +403,28 @@ export function DocumentTemplate({
                 <td style={{ padding: 4 * unit, textAlign: 'right', verticalAlign: 'top' }}>{fmt(l.prixUnitaire)} €</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.tauxTVA}%</td>
                 <td style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>{fmt(l.totalHT)} €</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {/* ─── Liste simplifiée pour le bon d'intervention (désignation + qté/unité, sans prix) ─── */}
+      {data.lignes.length > 0 && docType === 'intervention' && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fsTableLigne, marginBottom: 8 * unit, lineHeight: density < 1 ? 1.12 : 1.3 }}>
+          <thead>
+            <tr style={{ background: primary, color: '#fff', fontSize: fsTableHeader }}>
+              <th style={{ padding: 4 * unit, textAlign: 'left', fontWeight: 700 }}>Travaux / Fournitures</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 50 * unit }}>Qté</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 50 * unit }}>Unité</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.lignes.map((l, i) => (
+              <tr key={i} style={{ background: i % 2 ? '#f7f7f7' : '#fff', borderBottom: '0.5px solid #e0e0e0' }}>
+                <td style={{ padding: 4 * unit, verticalAlign: 'top' }}>{l.designation}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.quantite}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.unite || 'U'}</td>
               </tr>
             ))}
           </tbody>
@@ -465,56 +492,54 @@ export function DocumentTemplate({
         </div>
       )}
 
-      {/* ─── BON POUR ACCORD (devis & facture) — récap totaux + signature ─── */}
-      {(docType === 'devis' || docType === 'facture') && (
-        <div style={{ marginTop: 16 * unit, display: 'flex', gap: 10 * unit, alignItems: 'stretch' }}>
-          {/* Récap totaux — largeur configurable */}
-          <div style={{ width: wEncTotaux, border: `1px solid ${primary}`, padding: 8 * unit, fontSize: fsEncartTexte }}>
-            <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 5 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+      {/* ─── DEVIS : Récap totaux + Bon pour accord (uniquement devis, pas facture) ─── */}
+      {docType === 'devis' && (
+        <div style={{ marginTop: 12 * unit, display: 'flex', gap: 10 * unit, alignItems: 'stretch' }}>
+          <div style={{ width: wEncTotaux, border: `1px solid ${primary}`, padding: 6 * unit, fontSize: fsEncartTexte }}>
+            <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 3 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
               Récapitulatif
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${2 * unit}px 0` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${1.5 * unit}px 0` }}>
               <span style={{ color: '#555' }}>Total HT</span>
               <span style={{ fontWeight: 700 }}>{fmt(data.totaux.ht)} €</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${2 * unit}px 0` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${1.5 * unit}px 0` }}>
               <span style={{ color: '#555' }}>Total TVA</span>
               <span style={{ fontWeight: 700 }}>{fmt(data.totaux.tva)} €</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${4 * unit}px 0 0`, borderTop: `1px solid ${primary}`, marginTop: 3 * unit, fontSize: fsEncartTexte * 1.18 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0 0`, borderTop: `1px solid ${primary}`, marginTop: 2 * unit, fontSize: fsEncartTexte * 1.18 }}>
               <span style={{ fontWeight: 700, color: primary }}>Total TTC</span>
               <span style={{ fontWeight: 700, color: primary }}>{fmt(data.totaux.ttc)} €</span>
             </div>
           </div>
-          {/* Bon pour accord — largeur configurable */}
-          <div style={{ width: wEncBonAccord, border: `2px solid ${primary}`, padding: 8 * unit, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 4 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          <div style={{ width: wEncBonAccord, border: `2px solid ${primary}`, padding: 6 * unit, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 2 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
               Bon pour accord
             </div>
-            <div style={{ fontSize: fsEncartTexte * 0.88, color: '#666', marginBottom: 4 * unit }}>
+            <div style={{ fontSize: fsEncartTexte * 0.88, color: '#666', marginBottom: 2 * unit }}>
               Date et signature précédées de la mention « Bon pour accord » :
             </div>
-            <div style={{ flex: 1, minHeight: 55 * unit, borderTop: '0.5px dashed #999', marginTop: 4 * unit }} />
+            <div style={{ flex: 1, minHeight: 30 * unit, borderTop: '0.5px dashed #999', marginTop: 2 * unit }} />
           </div>
         </div>
       )}
 
       {showSignatures && (
-        <div style={{ marginTop: 14 * unit, display: 'flex', gap: 10 * unit }}>
-          <div style={{ flex: 1, border: '1px solid #ccc', padding: 6 * unit, minHeight: 60 * unit }}>
-            <div style={{ fontSize: 7.5 * unit, fontWeight: 700, fontStyle: 'italic', color: '#444', marginBottom: 4 * unit }}>
+        <div style={{ marginTop: 12 * unit, display: 'flex', gap: 10 * unit }}>
+          <div style={{ flex: 1, border: '1px solid #ccc', padding: 5 * unit, minHeight: 38 * unit }}>
+            <div style={{ fontSize: 7.5 * unit, fontWeight: 700, fontStyle: 'italic', color: '#444', marginBottom: 3 * unit }}>
               Signature du technicien :
             </div>
             {data.signatureTech && (
-              <img src={data.signatureTech} alt="" crossOrigin="anonymous" style={{ maxWidth: '100%', maxHeight: 50 * unit, objectFit: 'contain' }} />
+              <img src={data.signatureTech} alt="" crossOrigin="anonymous" style={{ maxWidth: '100%', maxHeight: 32 * unit, objectFit: 'contain' }} />
             )}
           </div>
-          <div style={{ flex: 1, border: '1px solid #ccc', padding: 6 * unit, minHeight: 60 * unit }}>
-            <div style={{ fontSize: 7.5 * unit, fontWeight: 700, fontStyle: 'italic', color: '#444', marginBottom: 4 * unit }}>
-              Signature du client (bon pour accord) :
+          <div style={{ flex: 1, border: '1px solid #ccc', padding: 5 * unit, minHeight: 38 * unit }}>
+            <div style={{ fontSize: 7.5 * unit, fontWeight: 700, fontStyle: 'italic', color: '#444', marginBottom: 3 * unit }}>
+              Signature du client :
             </div>
             {data.signatureClient && (
-              <img src={data.signatureClient} alt="" crossOrigin="anonymous" style={{ maxWidth: '100%', maxHeight: 50 * unit, objectFit: 'contain' }} />
+              <img src={data.signatureClient} alt="" crossOrigin="anonymous" style={{ maxWidth: '100%', maxHeight: 32 * unit, objectFit: 'contain' }} />
             )}
           </div>
         </div>
