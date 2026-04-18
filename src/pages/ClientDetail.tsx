@@ -12,8 +12,8 @@ import { useClients, useDevis, useFactures, useInterventions } from '@/hooks/use
 import { useDevisRelances, getDevisRelanceStatus } from '@/hooks/useDevisRelances';
 import { useFactureRelances, getRelanceStatus } from '@/hooks/useFactureRelances';
 import { formatDateFR } from '@/services/dolibarr';
-import { openDevisPdf } from '@/services/devisPdf';
-import { openFacturePdf } from '@/services/facturePdf';
+import { openDevisPdf } from '@/services/devisRenderer';
+import { openInvoicePdf as openFacturePdf } from '@/services/invoiceRenderer';
 import { supabase } from '@/integrations/supabase/client';
 import { useConfig } from '@/hooks/useConfig';
 import { cn } from '@/lib/utils';

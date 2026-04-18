@@ -16,7 +16,7 @@ import {
   updateIntervention, deleteIntervention, setInterventionStatus,
   type InterventionType, type Intervention, type InterventionLine,
 } from '@/services/dolibarr';
-import { generateInterventionPdfLocal, generateInterventionPdfBlobUrl } from '@/services/interventionPdf';
+import { interventionPdfToBlobUrl, downloadInterventionPdf } from '@/services/interventionRenderer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -582,7 +582,7 @@ export default function Interventions() {
     setGeneratingPDF(true);
     try {
       const client = clients.find(c => c.id === selectedIntervention.socid);
-      const blobUrl = await generateInterventionPdfBlobUrl({
+      const blobUrl = await interventionPdfToBlobUrl({
         intervention: selectedIntervention,
         client,
         lines: interventionLines,
@@ -1699,7 +1699,7 @@ export default function Interventions() {
                       onClick={async () => {
                         if (!selectedIntervention) return;
                         const client = clients.find(c => c.id === selectedIntervention.socid);
-                        await generateInterventionPdfLocal({
+                        await downloadInterventionPdf({
                           intervention: selectedIntervention,
                           client,
                           lines: interventionLines,

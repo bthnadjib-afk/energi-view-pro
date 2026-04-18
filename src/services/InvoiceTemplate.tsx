@@ -1,6 +1,6 @@
 /**
  * InvoiceTemplate.tsx — Facture PDF via @react-pdf/renderer
- * Design basé sur la référence EDG-FACTURE-ACCOMPTE-PCMG-V33
+ * Les couleurs, marges, logo, RIB et footer sont pilotés par templateCfg.
  */
 import React from 'react';
 import {
@@ -27,12 +27,31 @@ export interface EntrepriseInfo {
   bic?: string;
 }
 
+export interface TemplateCfg {
+  logoUrl?: string;
+  couleurPrimaire?: string;
+  couleurAccent?: string;
+  couleurTexte?: string;
+  police?: 'helvetica' | 'times' | 'courier' | 'roboto';
+  margeHaut?: number;
+  margeBas?: number;
+  margeGauche?: number;
+  margeDroite?: number;
+  tailleTitre?: number;
+  tailleTexte?: number;
+  piedDePage?: string;
+  afficherRib?: boolean;
+  afficherCgv?: boolean;
+}
+
 export interface InvoiceTemplateProps {
   facture: Facture;
   client?: Client;
   entreprise?: EntrepriseInfo;
   /** Data URL du logo (base64) — chargé dans invoiceRenderer avant rendu */
   logoDataUrl?: string;
+  /** Config template depuis localStorage */
+  templateCfg?: TemplateCfg;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -56,240 +75,238 @@ function safe(v: string | null | undefined): string {
   return v ?? '';
 }
 
-// ─── Palette ────────────────────────────────────────────────────────────────
+// ─── StyleSheet dynamique ────────────────────────────────────────────────────
 
-const NOIR   = '#1a1a1a';
-const BLANC  = '#ffffff';
-const GRIS_L = '#f4f4f4';
-const GRIS_T = '#555555';
-const GRIS_B = '#cccccc';
+function makeStyles(cfg: TemplateCfg) {
+  const NOIR   = cfg.couleurPrimaire || '#1a1a1a';
+  const BLANC  = '#ffffff';
+  const GRIS_L = '#f4f4f4';
+  const GRIS_T = '#555555';
+  const GRIS_B = '#cccccc';
 
-// ─── StyleSheet ─────────────────────────────────────────────────────────────
+  const MT = cfg.margeHaut    ?? 18;
+  const MB = cfg.margeBas     ?? 22;
+  const ML = cfg.margeGauche  ?? 15;
+  const MR = cfg.margeDroite  ?? 15;
 
-const S = StyleSheet.create({
-  page: {
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: NOIR,
-    backgroundColor: BLANC,
-    paddingTop: 18,
-    paddingBottom: 22,
-    paddingLeft: 15,
-    paddingRight: 15,
-    flexDirection: 'column',
-  },
+  const TITRE_SIZE = cfg.tailleTitre ?? 22;
+  const TEXT_SIZE  = cfg.tailleTexte ?? 9;
 
-  // ── Logo ──
-  logo: { width: 60, height: 20, objectFit: 'contain', marginBottom: 7 },
+  return StyleSheet.create({
+    page: {
+      fontFamily: 'Helvetica',
+      fontSize: TEXT_SIZE,
+      color: NOIR,
+      backgroundColor: BLANC,
+      paddingTop: MT,
+      paddingBottom: MB,
+      paddingLeft: ML,
+      paddingRight: MR,
+      flexDirection: 'column',
+    },
 
-  // ── Titre ──
-  titre: {
-    fontFamily: 'Helvetica-BoldOblique',
-    fontSize: 22,
-    color: NOIR,
-    marginBottom: 2,
-    lineHeight: 1,
-  },
-  refLine: {
-    fontFamily: 'Helvetica-Oblique',
-    fontSize: 8,
-    color: GRIS_T,
-    marginBottom: 8,
-  },
+    logo: { width: 60, height: 20, objectFit: 'contain', marginBottom: 7 },
 
-  // ── Barre info (fond noir) ──
-  infoBar: {
-    flexDirection: 'row',
-    backgroundColor: NOIR,
-    marginBottom: 8,
-  },
-  infoCell: {
-    flex: 1,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    borderRight: '0.5pt solid #444444',
-  },
-  infoCellLast: {
-    flex: 1,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-  },
-  infoLabel: {
-    fontFamily: 'Helvetica',
-    fontSize: 6.5,
-    color: '#999999',
-    marginBottom: 1.5,
-    textTransform: 'uppercase',
-  },
-  infoValue: {
-    fontFamily: 'Helvetica-Bold',
-    fontSize: 8,
-    color: BLANC,
-  },
+    titre: {
+      fontFamily: 'Helvetica-BoldOblique',
+      fontSize: TITRE_SIZE,
+      color: NOIR,
+      marginBottom: 2,
+      lineHeight: 1,
+    },
+    refLine: {
+      fontFamily: 'Helvetica-Oblique',
+      fontSize: 8,
+      color: GRIS_T,
+      marginBottom: 8,
+    },
 
-  // ── Parties (client / entreprise) ──
-  parties: { flexDirection: 'row', marginBottom: 8 },
-  partyLeft:  { flex: 1, paddingRight: 8 },
-  partyRight: { flex: 1, paddingLeft: 8 },
-  partyLabel: {
-    fontFamily: 'Helvetica-Bold',
-    fontSize: 7,
-    color: GRIS_T,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 2,
-  },
-  partyName: {
-    fontFamily: 'Helvetica-BoldOblique',
-    fontSize: 9.5,
-    color: NOIR,
-    marginBottom: 2,
-  },
-  partyLine: {
-    fontFamily: 'Helvetica',
-    fontSize: 8.5,
-    color: '#333333',
-    lineHeight: 1.6,
-  },
+    infoBar: {
+      flexDirection: 'row',
+      backgroundColor: NOIR,
+      marginBottom: 8,
+    },
+    infoCell: {
+      flex: 1,
+      paddingVertical: 4,
+      paddingHorizontal: 6,
+      borderRight: '0.5pt solid #444444',
+    },
+    infoCellLast: {
+      flex: 1,
+      paddingVertical: 4,
+      paddingHorizontal: 6,
+    },
+    infoLabel: {
+      fontFamily: 'Helvetica',
+      fontSize: 6.5,
+      color: '#999999',
+      marginBottom: 1.5,
+      textTransform: 'uppercase',
+    },
+    infoValue: {
+      fontFamily: 'Helvetica-Bold',
+      fontSize: 8,
+      color: BLANC,
+    },
 
-  // ── Tableau — En-tête ──
-  tableHeader: {
-    flexDirection: 'row',
-    borderTop: '1.5pt solid #1a1a1a',
-    borderBottom: '1.5pt solid #1a1a1a',
-    paddingVertical: 3,
-  },
-  thDesc:  { width: '43%', fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2 },
-  thRef:   { width: '10%', fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2, textAlign: 'center' },
-  thQte:   { width: '7%',  fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2, textAlign: 'center' },
-  thUnit:  { width: '8%',  fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2, textAlign: 'center' },
-  thPrix:  { width: '16%', fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2, textAlign: 'right' },
-  thMont:  { width: '16%', fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2, textAlign: 'right' },
+    parties: { flexDirection: 'row', marginBottom: 8 },
+    partyLeft:  { flex: 1, paddingRight: 8 },
+    partyRight: { flex: 1, paddingLeft: 8 },
+    partyLabel: {
+      fontFamily: 'Helvetica-Bold',
+      fontSize: 7,
+      color: GRIS_T,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      marginBottom: 2,
+    },
+    partyName: {
+      fontFamily: 'Helvetica-BoldOblique',
+      fontSize: 9.5,
+      color: NOIR,
+      marginBottom: 2,
+    },
+    partyLine: {
+      fontFamily: 'Helvetica',
+      fontSize: 8.5,
+      color: '#333333',
+      lineHeight: 1.6,
+    },
 
-  // ── Tableau — Section ──
-  sectionRow: { paddingVertical: 3, paddingHorizontal: 2 },
-  sectionText: {
-    fontFamily: 'Helvetica-BoldOblique',
-    fontSize: 8.5,
-    color: NOIR,
-  },
+    tableHeader: {
+      flexDirection: 'row',
+      borderTop: `1.5pt solid ${NOIR}`,
+      borderBottom: `1.5pt solid ${NOIR}`,
+      paddingVertical: 3,
+    },
+    thDesc:  { width: '43%', fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2 },
+    thRef:   { width: '10%', fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2, textAlign: 'center' },
+    thQte:   { width: '7%',  fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2, textAlign: 'center' },
+    thUnit:  { width: '8%',  fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2, textAlign: 'center' },
+    thPrix:  { width: '16%', fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2, textAlign: 'right' },
+    thMont:  { width: '16%', fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2, textAlign: 'right' },
 
-  // ── Tableau — Ligne données ──
-  dataRow: {
-    flexDirection: 'row',
-    borderBottom: '0.3pt solid #dddddd',
-    minHeight: 14,
-    paddingVertical: 2,
-  },
-  dataRowAlt: {
-    flexDirection: 'row',
-    borderBottom: '0.3pt solid #dddddd',
-    backgroundColor: GRIS_L,
-    minHeight: 14,
-    paddingVertical: 2,
-  },
-  tdDesc:  { width: '43%', fontFamily: 'Helvetica', fontSize: 8, paddingHorizontal: 2, paddingTop: 1 },
-  tdRef:   { width: '10%', fontFamily: 'Helvetica', fontSize: 7.5, paddingHorizontal: 2, paddingTop: 1, textAlign: 'center', color: GRIS_T },
-  tdQte:   { width: '7%',  fontFamily: 'Helvetica', fontSize: 8, paddingHorizontal: 2, paddingTop: 1, textAlign: 'center' },
-  tdUnit:  { width: '8%',  fontFamily: 'Helvetica', fontSize: 8, paddingHorizontal: 2, paddingTop: 1, textAlign: 'center' },
-  tdPrix:  { width: '16%', fontFamily: 'Helvetica', fontSize: 8, paddingHorizontal: 2, paddingTop: 1, textAlign: 'right' },
-  tdMont:  { width: '16%', fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2, paddingTop: 1, textAlign: 'right' },
+    sectionRow: { paddingVertical: 3, paddingHorizontal: 2 },
+    sectionText: {
+      fontFamily: 'Helvetica-BoldOblique',
+      fontSize: 8.5,
+      color: NOIR,
+    },
 
-  // ── Séparateurs ──
-  sepThin: { borderBottom: '0.5pt solid #cccccc', marginVertical: 4 },
-  sepBold: { borderBottom: '1.5pt solid #1a1a1a', marginTop: 4, marginBottom: 0 },
+    dataRow: {
+      flexDirection: 'row',
+      borderBottom: '0.3pt solid #dddddd',
+      minHeight: 14,
+      paddingVertical: 2,
+    },
+    dataRowAlt: {
+      flexDirection: 'row',
+      borderBottom: '0.3pt solid #dddddd',
+      backgroundColor: GRIS_L,
+      minHeight: 14,
+      paddingVertical: 2,
+    },
+    tdDesc:  { width: '43%', fontFamily: 'Helvetica', fontSize: 8, paddingHorizontal: 2, paddingTop: 1 },
+    tdRef:   { width: '10%', fontFamily: 'Helvetica', fontSize: 7.5, paddingHorizontal: 2, paddingTop: 1, textAlign: 'center', color: GRIS_T },
+    tdQte:   { width: '7%',  fontFamily: 'Helvetica', fontSize: 8, paddingHorizontal: 2, paddingTop: 1, textAlign: 'center' },
+    tdUnit:  { width: '8%',  fontFamily: 'Helvetica', fontSize: 8, paddingHorizontal: 2, paddingTop: 1, textAlign: 'center' },
+    tdPrix:  { width: '16%', fontFamily: 'Helvetica', fontSize: 8, paddingHorizontal: 2, paddingTop: 1, textAlign: 'right' },
+    tdMont:  { width: '16%', fontFamily: 'Helvetica-Bold', fontSize: 8, paddingHorizontal: 2, paddingTop: 1, textAlign: 'right' },
 
-  // ── Totaux ──
-  bottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingVertical: 5,
-  },
-  dateNote: {
-    fontFamily: 'Helvetica-Oblique',
-    fontSize: 7.5,
-    color: GRIS_T,
-    lineHeight: 1.7,
-    flex: 1,
-    paddingRight: 10,
-  },
-  totauxBlock: {
-    alignItems: 'flex-end',
-    minWidth: 90,
-  },
-  totLine: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: 2,
-  },
-  totLabel: {
-    fontFamily: 'Helvetica-Oblique',
-    fontSize: 8.5,
-    color: GRIS_T,
-    textAlign: 'right',
-    marginRight: 6,
-  },
-  totValue: {
-    fontFamily: 'Helvetica-Bold',
-    fontSize: 8.5,
-    color: NOIR,
-    textAlign: 'right',
-    minWidth: 30,
-  },
-  totLabelLarge: {
-    fontFamily: 'Helvetica-BoldOblique',
-    fontSize: 9.5,
-    color: NOIR,
-    textAlign: 'right',
-    marginRight: 6,
-    marginTop: 2,
-  },
-  totValueLarge: {
-    fontFamily: 'Helvetica-Bold',
-    fontSize: 9.5,
-    color: NOIR,
-    textAlign: 'right',
-    minWidth: 30,
-    marginTop: 2,
-  },
+    sepThin: { borderBottom: `0.5pt solid ${GRIS_B}`, marginVertical: 4 },
+    sepBold: { borderBottom: `1.5pt solid ${NOIR}`, marginTop: 4, marginBottom: 0 },
 
-  // ── Montant principal ──
-  montantBlock: { paddingTop: 8, paddingBottom: 6 },
-  montantText: {
-    fontFamily: 'Helvetica-BoldOblique',
-    fontSize: 20,
-    color: NOIR,
-    lineHeight: 1.2,
-  },
-  montantSub: {
-    fontFamily: 'Helvetica-Oblique',
-    fontSize: 7.5,
-    color: GRIS_T,
-    marginTop: 2,
-  },
+    bottomRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      paddingVertical: 5,
+    },
+    dateNote: {
+      fontFamily: 'Helvetica-Oblique',
+      fontSize: 7.5,
+      color: GRIS_T,
+      lineHeight: 1.7,
+      flex: 1,
+      paddingRight: 10,
+    },
+    totauxBlock: {
+      alignItems: 'flex-end',
+      minWidth: 90,
+    },
+    totLine: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginBottom: 2,
+    },
+    totLabel: {
+      fontFamily: 'Helvetica-Oblique',
+      fontSize: 8.5,
+      color: GRIS_T,
+      textAlign: 'right',
+      marginRight: 6,
+    },
+    totValue: {
+      fontFamily: 'Helvetica-Bold',
+      fontSize: 8.5,
+      color: NOIR,
+      textAlign: 'right',
+      minWidth: 30,
+    },
+    totLabelLarge: {
+      fontFamily: 'Helvetica-BoldOblique',
+      fontSize: 9.5,
+      color: NOIR,
+      textAlign: 'right',
+      marginRight: 6,
+      marginTop: 2,
+    },
+    totValueLarge: {
+      fontFamily: 'Helvetica-Bold',
+      fontSize: 9.5,
+      color: NOIR,
+      textAlign: 'right',
+      minWidth: 30,
+      marginTop: 2,
+    },
 
-  // ── RIB ──
-  ribBlock: { marginTop: 4, marginBottom: 4 },
-  ribTitre: { fontFamily: 'Helvetica-Bold', fontSize: 8.5, color: NOIR, marginBottom: 2 },
-  ribLine:  { fontFamily: 'Courier', fontSize: 8, color: '#333333', lineHeight: 1.7 },
+    montantBlock: { paddingTop: 8, paddingBottom: 6 },
+    montantText: {
+      fontFamily: 'Helvetica-BoldOblique',
+      fontSize: 20,
+      color: NOIR,
+      lineHeight: 1.2,
+    },
+    montantSub: {
+      fontFamily: 'Helvetica-Oblique',
+      fontSize: 7.5,
+      color: GRIS_T,
+      marginTop: 2,
+    },
 
-  // ── Footer ──
-  footer: {
-    marginTop: 'auto',
-    paddingTop: 4,
-    borderTop: '0.5pt solid #cccccc',
-    fontFamily: 'Helvetica-Oblique',
-    fontSize: 6.5,
-    color: '#777777',
-    textAlign: 'center',
-    lineHeight: 1.75,
-  },
-});
+    ribBlock: { marginTop: 4, marginBottom: 4 },
+    ribTitre: { fontFamily: 'Helvetica-Bold', fontSize: 8.5, color: NOIR, marginBottom: 2 },
+    ribLine:  { fontFamily: 'Courier', fontSize: 8, color: '#333333', lineHeight: 1.7 },
+
+    footer: {
+      marginTop: 'auto',
+      paddingTop: 4,
+      borderTop: `0.5pt solid ${GRIS_B}`,
+      fontFamily: 'Helvetica-Oblique',
+      fontSize: 6.5,
+      color: '#777777',
+      textAlign: 'center',
+      lineHeight: 1.75,
+    },
+  });
+}
 
 // ─── Sous-composants ─────────────────────────────────────────────────────────
 
-function DataRow({ ligne, index }: { ligne: DevisLigne; index: number }) {
+type S = ReturnType<typeof makeStyles>;
+
+function DataRow({ ligne, index, S }: { ligne: DevisLigne; index: number; S: S }) {
   const row = index % 2 === 1 ? S.dataRowAlt : S.dataRow;
   return (
     <View style={row} wrap={false}>
@@ -303,7 +320,7 @@ function DataRow({ ligne, index }: { ligne: DevisLigne; index: number }) {
   );
 }
 
-function SectionRow({ label }: { label: string }) {
+function SectionRow({ label, S }: { label: string; S: S }) {
   return (
     <View style={S.sectionRow}>
       <Text style={S.sectionText}>{label}</Text>
@@ -311,7 +328,7 @@ function SectionRow({ label }: { label: string }) {
   );
 }
 
-function LignesTable({ lignes }: { lignes: DevisLigne[] }) {
+function LignesTable({ lignes, S }: { lignes: DevisLigne[]; S: S }) {
   const mo  = lignes.filter(l => l.productType === 'main_oeuvre');
   const fo  = lignes.filter(l => l.productType === 'fourniture');
   const all = mo.length === 0 && fo.length === 0 ? lignes : [];
@@ -331,22 +348,22 @@ function LignesTable({ lignes }: { lignes: DevisLigne[] }) {
 
       {mo.length > 0 && (
         <>
-          <SectionRow label="Main d'œuvre" />
-          {mo.map(l => <DataRow key={`mo-${idx}`} ligne={l} index={idx++} />)}
+          <SectionRow label="Main d'œuvre" S={S} />
+          {mo.map(l => <DataRow key={`mo-${idx}`} ligne={l} index={idx++} S={S} />)}
         </>
       )}
       {fo.length > 0 && (
         <>
-          <SectionRow label="Fournitures" />
-          {fo.map(l => <DataRow key={`fo-${idx}`} ligne={l} index={idx++} />)}
+          <SectionRow label="Fournitures" S={S} />
+          {fo.map(l => <DataRow key={`fo-${idx}`} ligne={l} index={idx++} S={S} />)}
         </>
       )}
-      {all.map(l => <DataRow key={`all-${idx}`} ligne={l} index={idx++} />)}
+      {all.map(l => <DataRow key={`all-${idx}`} ligne={l} index={idx++} S={S} />)}
     </View>
   );
 }
 
-function TotRow({ label, value, large }: { label: string; value: string; large?: boolean }) {
+function TotRow({ label, value, large, S }: { label: string; value: string; large?: boolean; S: S }) {
   return (
     <View style={S.totLine}>
       <Text style={large ? S.totLabelLarge : S.totLabel}>{label}</Text>
@@ -357,7 +374,12 @@ function TotRow({ label, value, large }: { label: string; value: string; large?:
 
 // ─── Document principal ──────────────────────────────────────────────────────
 
-export function InvoiceDocument({ facture, client, entreprise, logoDataUrl }: InvoiceTemplateProps) {
+export function InvoiceDocument({ facture, client, entreprise, logoDataUrl, templateCfg }: InvoiceTemplateProps) {
+  const cfg = templateCfg ?? {};
+  const S = makeStyles(cfg);
+
+  const showRib = cfg.afficherRib !== false;
+  const footerText = cfg.piedDePage?.trim() || null;
 
   // ── Type / titre ──
   const isAcompte = facture.type === 3;
@@ -468,7 +490,7 @@ export function InvoiceDocument({ facture, client, entreprise, logoDataUrl }: In
         </View>
 
         {/* ── TABLEAU ──────────────────────── */}
-        <LignesTable lignes={facture.lignes || []} />
+        <LignesTable lignes={facture.lignes || []} S={S} />
 
         {/* ── SÉPARATEUR MINCE ─────────────── */}
         <View style={S.sepThin} />
@@ -482,14 +504,14 @@ export function InvoiceDocument({ facture, client, entreprise, logoDataUrl }: In
             )}
           </View>
           <View style={S.totauxBlock}>
-            <TotRow label="TOTAL HT :" value={`${fmt(facture.montantHT)} €`} />
+            <TotRow label="TOTAL HT :" value={`${fmt(facture.montantHT)} €`} S={S} />
             {Object.keys(tvaMap).length > 0
               ? Object.entries(tvaMap).map(([taux, montantTva]) => (
-                  <TotRow key={taux} label={`TVA ${taux} % :`} value={`${fmt(montantTva)} €`} />
+                  <TotRow key={taux} label={`TVA ${taux} % :`} value={`${fmt(montantTva)} €`} S={S} />
                 ))
-              : <TotRow label="TVA :" value={`${fmt(tvaFallback)} €`} />
+              : <TotRow label="TVA :" value={`${fmt(tvaFallback)} €`} S={S} />
             }
-            <TotRow label="TOTAL TTC :" value={`${fmt(facture.montantTTC)} €`} large />
+            <TotRow label="TOTAL TTC :" value={`${fmt(facture.montantTTC)} €`} large S={S} />
           </View>
         </View>
 
@@ -510,18 +532,26 @@ export function InvoiceDocument({ facture, client, entreprise, logoDataUrl }: In
         {/* ── SÉPARATEUR MINCE ─────────────── */}
         <View style={S.sepThin} />
 
-        {/* ── RIB ──────────────────────────── */}
-        <View style={S.ribBlock}>
-          <Text style={S.ribTitre}>Moyens de paiement :</Text>
-          <Text style={S.ribLine}>IBAN : {iban}</Text>
-          <Text style={S.ribLine}>BIC  : {bic}</Text>
-        </View>
+        {/* ── RIB (conditionnel) ───────────── */}
+        {showRib && (
+          <View style={S.ribBlock}>
+            <Text style={S.ribTitre}>Moyens de paiement :</Text>
+            <Text style={S.ribLine}>IBAN : {iban}</Text>
+            <Text style={S.ribLine}>BIC  : {bic}</Text>
+          </View>
+        )}
 
         {/* ── FOOTER LÉGAL ─────────────────── */}
         <View style={S.footer}>
-          <Text>Tout retard de paiement entraînera des pénalités de 10 % par an et une indemnité forfaitaire de 40 € pour frais de recouvrement (art. L441-10 du Code de commerce).</Text>
-          <Text>Nos travaux sont couverts par notre assurance décennale et RC Pro auprès d'ERGO – Contrat n° 24015161184.</Text>
-          <Text>Les matériaux et équipements restent la propriété de l'entreprise jusqu'au paiement intégral de la facture (art. 2367 du Code civil).</Text>
+          {footerText ? (
+            <Text>{footerText}</Text>
+          ) : (
+            <>
+              <Text>Tout retard de paiement entraînera des pénalités de 10 % par an et une indemnité forfaitaire de 40 € pour frais de recouvrement (art. L441-10 du Code de commerce).</Text>
+              <Text>Nos travaux sont couverts par notre assurance décennale et RC Pro auprès d'ERGO – Contrat n° 24015161184.</Text>
+              <Text>Les matériaux et équipements restent la propriété de l'entreprise jusqu'au paiement intégral de la facture (art. 2367 du Code civil).</Text>
+            </>
+          )}
         </View>
 
       </Page>

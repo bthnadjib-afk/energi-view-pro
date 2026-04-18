@@ -3,8 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Intervention, Client, InterventionLine } from '@/services/dolibarr';
 import {
-  ML, MR, MT, PAGE_W, PAGE_H, COL_R, CW,
-  NOIR, BLANC, GRIS_CLAIR, GRIS_LIGNE, GRIS_TEXTE, GRIS_SOMBRE,
+  getPdfConfig,
   toText, formatDateFR,
   loadRobotoFonts, setFont,
   drawLogo, drawInfoBar, drawParties, drawFooter,
@@ -12,11 +11,11 @@ import {
 } from './pdfUtils';
 
 const TYPE_LABELS: Record<string, string> = {
-  devis: 'Établissement devis',
-  panne: 'Dépannage',
-  panne_urgence: 'Urgence',
-  sav: 'SAV / Garantie',
-  chantier: 'Chantier',
+  devis:        'Établissement devis',
+  panne:        'Dépannage',
+  panne_urgence:'Urgence',
+  sav:          'SAV / Garantie',
+  chantier:     'Chantier',
 };
 
 export interface InterventionPdfParams {
@@ -39,22 +38,26 @@ function formatDuration(seconds: number): string {
 async function buildInterventionPdf({
   intervention, client, lines, entreprise, signatureClient, signatureTech,
 }: InterventionPdfParams): Promise<jsPDF> {
+  // Relecture fraîche de la config à chaque génération
+  const cfg = getPdfConfig();
+  const { NOIR, BLANC, GRIS_CLAIR, GRIS_LIGNE, GRIS_TEXTE, GRIS_SOMBRE, ML, MR, MT, COL_R, CW } = cfg;
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  await loadRobotoFonts(doc);
+  await loadRobotoFonts(doc, cfg);
   let y = MT;
 
   // ─── LOGO ────────────────────────────────────────────────────
-  const logoH = await drawLogo(doc, ML, y);
+  const logoH = await drawLogo(doc, ML, y, cfg);
   y += logoH + 7;
 
   // ─── TITRE ───────────────────────────────────────────────────
-  setFont(doc, 'bolditalic');
+  setFont(doc, 'bolditalic', cfg);
   doc.setFontSize(22);
   doc.setTextColor(...NOIR);
   doc.text("BON D'INTERVENTION", ML, y);
   y += 6;
 
-  setFont(doc, 'italic');
+  setFont(doc, 'italic', cfg);
   doc.setFontSize(8);
   doc.setTextColor(...GRIS_TEXTE);
   doc.text(`RÉFÉRENCE : ${toText(intervention.ref)}`, ML, y);
@@ -62,11 +65,11 @@ async function buildInterventionPdf({
 
   // ─── BARRE INFO ───────────────────────────────────────────────
   const barH = drawInfoBar(doc, y, [
-    { label: 'Référence',   value: toText(intervention.ref) },
-    { label: 'Date',        value: formatDateFR(intervention.date) },
-    { label: 'Type',        value: TYPE_LABELS[intervention.type] || toText(intervention.type) },
-    { label: 'Technicien',  value: toText(intervention.technicien || '—') },
-  ]);
+    { label: 'Référence',  value: toText(intervention.ref) },
+    { label: 'Date',       value: formatDateFR(intervention.date) },
+    { label: 'Type',       value: TYPE_LABELS[intervention.type] || toText(intervention.type) },
+    { label: 'Technicien', value: toText(intervention.technicien || '—') },
+  ], cfg);
   y += barH + 8;
 
   // ─── CLIENT / ENTREPRISE ──────────────────────────────────────
@@ -78,12 +81,11 @@ async function buildInterventionPdf({
     email:      client?.email,
     telephone:  client?.telephone,
   };
-  y = drawParties(doc, y, clientInfo, entreprise) + 8;
+  y = drawParties(doc, y, clientInfo, entreprise, cfg) + 8;
 
-  // ─── DESCRIPTION INTERVENTION ────────────────────────────────
+  // ─── DESCRIPTION ─────────────────────────────────────────────
   if (intervention.description) {
-    // Titre section
-    setFont(doc, 'bolditalic');
+    setFont(doc, 'bolditalic', cfg);
     doc.setFontSize(9.5);
     doc.setTextColor(...NOIR);
     doc.text('Description', ML, y);
@@ -93,7 +95,7 @@ async function buildInterventionPdf({
     doc.line(ML, y, COL_R, y);
     y += 5;
 
-    setFont(doc, 'normal');
+    setFont(doc, 'normal', cfg);
     doc.setFontSize(8.5);
     doc.setTextColor(34, 34, 34);
     const descLines = doc.splitTextToSize(toText(intervention.description), CW);
@@ -103,7 +105,7 @@ async function buildInterventionPdf({
 
   // ─── TABLEAU DES LIGNES ───────────────────────────────────────
   if (lines && lines.length > 0) {
-    setFont(doc, 'bolditalic');
+    setFont(doc, 'bolditalic', cfg);
     doc.setFontSize(9.5);
     doc.setTextColor(...NOIR);
     doc.text("Lignes d'intervention", ML, y);
@@ -115,6 +117,7 @@ async function buildInterventionPdf({
 
     const totalDuration = lines.reduce((sum, l) => sum + (l.duree || 0), 0);
 
+    // Largeurs : 10+120+28+22 = 180 = CW
     autoTable(doc, {
       startY: y, margin: { left: ML, right: MR },
       head: [['#', 'Description', 'Date', 'Durée']],
@@ -154,16 +157,15 @@ async function buildInterventionPdf({
   doc.line(ML, y, COL_R, y);
   y += 8;
 
-  // ─── SIGNATURES (côte à côte) ────────────────────────────────
+  // ─── SIGNATURES ──────────────────────────────────────────────
   const sigW  = (CW - 10) / 2;
   const sigH  = 28;
   const sig2X = ML + sigW + 10;
 
-  // Box Technicien
   doc.setDrawColor(...GRIS_LIGNE);
   doc.setLineWidth(0.5);
   doc.rect(ML, y, sigW, sigH, 'S');
-  setFont(doc, 'bolditalic');
+  setFont(doc, 'bolditalic', cfg);
   doc.setFontSize(7.5);
   doc.setTextColor(...GRIS_SOMBRE);
   doc.text('Signature du technicien :', ML + 3, y + 6);
@@ -171,9 +173,8 @@ async function buildInterventionPdf({
     try { doc.addImage(signatureTech, 'PNG', ML + 2, y + 8, sigW - 4, sigH - 12); } catch {}
   }
 
-  // Box Client
   doc.rect(sig2X, y, sigW, sigH, 'S');
-  setFont(doc, 'bolditalic');
+  setFont(doc, 'bolditalic', cfg);
   doc.setFontSize(7.5);
   doc.setTextColor(...GRIS_SOMBRE);
   doc.text("Signature du client (bon pour accord) :", sig2X + 3, y + 6);
@@ -185,12 +186,12 @@ async function buildInterventionPdf({
 
   // ─── OBSERVATIONS ────────────────────────────────────────────
   if ((intervention as any).observations) {
-    setFont(doc, 'bolditalic');
+    setFont(doc, 'bolditalic', cfg);
     doc.setFontSize(8.5);
     doc.setTextColor(...NOIR);
     doc.text('Observations :', ML, y);
     y += 5;
-    setFont(doc, 'normal');
+    setFont(doc, 'normal', cfg);
     doc.setFontSize(8);
     doc.setTextColor(...GRIS_SOMBRE);
     const obsLines = doc.splitTextToSize(toText((intervention as any).observations), CW);
@@ -198,12 +199,12 @@ async function buildInterventionPdf({
   }
 
   // ─── FOOTER ───────────────────────────────────────────────────
-  drawFooter(doc);
+  drawFooter(doc, cfg);
 
   return doc;
 }
 
-// ─── API publique (async) ─────────────────────────────────────
+// ─── API publique ─────────────────────────────────────────────
 
 export async function generateInterventionPdfLocal(params: InterventionPdfParams): Promise<void> {
   const doc = await buildInterventionPdf(params);

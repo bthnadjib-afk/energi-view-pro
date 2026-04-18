@@ -152,8 +152,10 @@ export default function TemplatePlayground() {
                 <Select value={t.police} onValueChange={(v: any) => updateTemplate({ police: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="roboto">Roboto (Google Fonts)</SelectItem>
-                    <SelectItem value="helvetica">Helvetica (sans-serif)</SelectItem>
+                    <SelectItem value="roboto">Roboto</SelectItem>
+                    <SelectItem value="montserrat">Montserrat</SelectItem>
+                    <SelectItem value="inter">Inter</SelectItem>
+                    <SelectItem value="helvetica">Helvetica</SelectItem>
                     <SelectItem value="times">Times (serif)</SelectItem>
                     <SelectItem value="courier">Courier (monospace)</SelectItem>
                   </SelectContent>
@@ -273,7 +275,7 @@ function A4Preview({ docType, template: t, entreprise, totals }: { docType: DocT
   const H = 297 * SCALE;
 
   const titre = docType === 'facture' ? 'FACTURE' : docType === 'devis' ? 'DEVIS' : "BON D'INTERVENTION";
-  const fontFamily = t.police === 'times' ? 'Times, serif' : t.police === 'courier' ? '"Courier New", monospace' : t.police === 'roboto' ? 'Roboto, "Helvetica Neue", Arial, sans-serif' : 'Helvetica, Arial, sans-serif';
+  const fontFamily = t.police === 'times' ? 'Times, serif' : t.police === 'courier' ? '"Courier New", monospace' : t.police === 'roboto' ? 'Roboto, "Helvetica Neue", Arial, sans-serif' : t.police === 'montserrat' ? 'Montserrat, "Helvetica Neue", Arial, sans-serif' : t.police === 'inter' ? 'Inter, "Helvetica Neue", Arial, sans-serif' : 'Helvetica, Arial, sans-serif';
 
   const fmt = (n: number) => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const dateNow = new Date().toLocaleDateString('fr-FR');

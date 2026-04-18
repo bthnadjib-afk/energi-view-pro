@@ -3,9 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Facture, DevisLigne, Client } from '@/services/dolibarr';
 import {
-  ML, MR, MT, PAGE_W, PAGE_H, COL_R, CW,
-  NOIR, BLANC, GRIS_CLAIR, GRIS_LIGNE, GRIS_TEXTE,
-  ROUGE, ROUGE_BG, TPL_SHOW_RIB,
+  getPdfConfig,
   fmt, toText, formatDateFR,
   loadRobotoFonts, setFont,
   drawLogo, drawInfoBar, drawParties, drawTotaux,
@@ -14,8 +12,6 @@ import {
   type EntrepriseInfo, type ClientInfo,
 } from './pdfUtils';
 
-const VERT: [number,number,number] = [22, 163, 74];
-
 export interface FacturePdfParams {
   facture: Facture;
   client?: Client;
@@ -23,16 +19,18 @@ export interface FacturePdfParams {
 }
 
 async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams): Promise<jsPDF> {
+  const cfg = getPdfConfig();
+  const { NOIR, BLANC, GRIS_CLAIR, GRIS_LIGNE, GRIS_TEXTE, ML, MR, MT, COL_R, CW } = cfg;
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  await loadRobotoFonts(doc);
+  await loadRobotoFonts(doc, cfg);
   let y = MT;
 
   // ─── LOGO ────────────────────────────────────────────────────
-  const logoH = await drawLogo(doc, ML, y);
+  const logoH = await drawLogo(doc, ML, y, cfg);
   y += logoH + 7;
 
   // ─── TITRE ───────────────────────────────────────────────────
-  // Détermine le type de facture
   const isAcompte  = (facture as any).type === 'acompte'  || facture.ref?.includes('ACOMPTE');
   const isSolde    = (facture as any).type === 'solde'    || facture.ref?.includes('SOLDE');
   const isAvoir    = (facture as any).type === 'avoir';
@@ -41,13 +39,13 @@ async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams
               : isAvoir   ? "AVOIR"
               : 'FACTURE';
 
-  setFont(doc, 'bolditalic');
+  setFont(doc, 'bolditalic', cfg);
   doc.setFontSize(22);
   doc.setTextColor(...NOIR);
   doc.text(titre, ML, y);
   y += 6;
 
-  setFont(doc, 'italic');
+  setFont(doc, 'italic', cfg);
   doc.setFontSize(8);
   doc.setTextColor(...GRIS_TEXTE);
   doc.text(`NUMÉRO : ${toText(facture.ref)}`, ML, y);
@@ -62,7 +60,7 @@ async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams
   if (facture.paye) {
     barCells.push({ label: 'Statut', value: '✓ PAYÉE' });
   }
-  const barH = drawInfoBar(doc, y, barCells.slice(0, 3));
+  const barH = drawInfoBar(doc, y, barCells.slice(0, 3), cfg);
   y += barH + 8;
 
   // ─── CLIENT / ENTREPRISE ──────────────────────────────────────
@@ -74,7 +72,7 @@ async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams
     email:      client?.email,
     telephone:  client?.telephone,
   };
-  y = drawParties(doc, y, clientInfo, entreprise) + 10;
+  y = drawParties(doc, y, clientInfo, entreprise, cfg) + 10;
 
   // ─── TABLEAU ──────────────────────────────────────────────────
   const lignesMO = facture.lignes.filter(l => l.productType === 'main_oeuvre');
@@ -143,7 +141,7 @@ async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams
   y += 6;
 
   // ─── DATE (gauche) + TOTAUX (droite) ─────────────────────────
-  setFont(doc, 'italic');
+  setFont(doc, 'italic', cfg);
   doc.setFontSize(8);
   doc.setTextColor(...GRIS_TEXTE);
   doc.text(`Date de la facture : ${formatDateFR(facture.date)}`, ML, y);
@@ -171,10 +169,10 @@ async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams
     totRows.push({ label: 'TVA :', value: `${fmt(facture.montantTTC - facture.montantHT)} €` });
   }
 
-  const totEndY = drawTotaux(doc, y, totRows);
+  const totEndY = drawTotaux(doc, y, totRows, cfg);
   y = Math.max(y + 14, totEndY) + 6;
 
-  // ─── SIGNATURE (gauche) + NET À PAYER + petit encart ACOMPTE (droite) ─
+  // ─── SIGNATURE + NET À PAYER ──────────────────────────────────
   const montantAffiche = isAcompte
     ? Math.round(facture.montantTTC * 0.30 * 100) / 100
     : facture.resteAPayer > 0 && !facture.paye ? facture.resteAPayer : facture.montantTTC;
@@ -184,7 +182,6 @@ async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams
     : facture.resteAPayer > 0 && facture.resteAPayer < facture.montantTTC ? 'RESTE À PAYER'
     : 'NET À PAYER';
 
-  // Petit encart acompte uniquement si paiements partiels (déjà réglé)
   let acoLabel: string | undefined;
   let acoValue: string | undefined;
   if (!facture.paye && facture.resteAPayer > 0 && facture.resteAPayer < facture.montantTTC && !isAcompte) {
@@ -195,16 +192,17 @@ async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams
   y = drawSignatureAndNet(
     doc, y,
     labelAffiche, `${fmt(montantAffiche)} €`,
+    cfg,
     acoLabel, acoValue
   ) + 8;
 
   // ─── RIB ──────────────────────────────────────────────────────
-  if (TPL_SHOW_RIB) {
-    y = drawRib(doc, y) + 2;
+  if (cfg.TPL_SHOW_RIB) {
+    y = drawRib(doc, y, cfg) + 2;
   }
 
   // ─── FOOTER ───────────────────────────────────────────────────
-  drawFooter(doc);
+  drawFooter(doc, cfg);
 
   return doc;
 }

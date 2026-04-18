@@ -3,9 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Devis, DevisLigne, Client } from '@/services/dolibarr';
 import {
-  ML, MR, MT, PAGE_W, PAGE_H, COL_R, CW,
-  NOIR, BLANC, GRIS_CLAIR, GRIS_LIGNE, GRIS_TEXTE,
-  TPL_SHOW_RIB, TPL_SHOW_CGV,
+  getPdfConfig,
   fmt, toText, formatDateFR,
   loadRobotoFonts, setFont,
   drawLogo, drawInfoBar, drawParties, drawTotaux,
@@ -20,23 +18,27 @@ export interface DevisPdfParams {
 }
 
 async function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): Promise<jsPDF> {
+  // Relecture fraîche de la config à chaque génération
+  const cfg = getPdfConfig();
+  const { NOIR, BLANC, GRIS_CLAIR, GRIS_LIGNE, GRIS_TEXTE, ML, MR, MT, COL_R, CW } = cfg;
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  await loadRobotoFonts(doc);
+  await loadRobotoFonts(doc, cfg);
 
   let y = MT;
 
   // ─── LOGO ────────────────────────────────────────────────────
-  const logoH = await drawLogo(doc, ML, y);
+  const logoH = await drawLogo(doc, ML, y, cfg);
   y += logoH + 7;
 
   // ─── TITRE ───────────────────────────────────────────────────
-  setFont(doc, 'bolditalic');
+  setFont(doc, 'bolditalic', cfg);
   doc.setFontSize(22);
   doc.setTextColor(...NOIR);
   doc.text('DEVIS', ML, y);
   y += 6;
 
-  setFont(doc, 'italic');
+  setFont(doc, 'italic', cfg);
   doc.setFontSize(8);
   doc.setTextColor(...GRIS_TEXTE);
   doc.text(`NUMÉRO DE DEVIS : ${toText(devis.ref)}`, ML, y);
@@ -46,23 +48,23 @@ async function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): Pro
   const barH = drawInfoBar(doc, y, [
     { label: 'Référence', value: toText(devis.ref) },
     { label: 'Date',      value: formatDateFR(devis.date) },
-  ]);
+  ], cfg);
   y += barH + 8;
 
   // ─── CLIENT / ENTREPRISE ──────────────────────────────────────
   const clientInfo: ClientInfo = {
-    nom:       client?.nom || devis.client,
-    adresse:   client?.adresse,
+    nom:        client?.nom || devis.client,
+    adresse:    client?.adresse,
     codePostal: client?.codePostal,
     ville:      client?.ville,
     email:      client?.email,
     telephone:  client?.telephone,
   };
-  y = drawParties(doc, y, clientInfo, entreprise) + 10;
+  y = drawParties(doc, y, clientInfo, entreprise, cfg) + 10;
 
   // ─── TABLEAU DES LIGNES ───────────────────────────────────────
-  const lignesMO = devis.lignes.filter(l => l.productType === 'main_oeuvre');
-  const lignesFO = devis.lignes.filter(l => l.productType === 'fourniture');
+  const lignesMO = (devis.lignes || []).filter(l => l.productType === 'main_oeuvre');
+  const lignesFO = (devis.lignes || []).filter(l => l.productType === 'fourniture');
 
   function buildRows(lignes: DevisLigne[]) {
     return lignes.map(l => [
@@ -94,9 +96,10 @@ async function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): Pro
     buildRows(lignesFO).forEach(r => body.push(r));
   }
   if (body.length === 0) {
-    devis.lignes.forEach(l => buildRows([l]).forEach(r => body.push(r)));
+    (devis.lignes || []).forEach(l => buildRows([l]).forEach(r => body.push(r)));
   }
 
+  // Largeurs : 80+16+11+12+23+13+25 = 180 = CW
   autoTable(doc, {
     startY: y,
     margin: { left: ML, right: MR },
@@ -133,16 +136,15 @@ async function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): Pro
   doc.line(ML, y, COL_R, y);
   y += 6;
 
-  // ─── DATE (gauche) + TOTAUX (droite) ─────────────────────────
-  setFont(doc, 'italic');
+  // ─── DATE + TOTAUX ─────────────────────────────────────────
+  setFont(doc, 'italic', cfg);
   doc.setFontSize(8);
   doc.setTextColor(...GRIS_TEXTE);
   doc.text(`Devis établi le ${formatDateFR(devis.date)}`, ML, y);
   doc.text('La présente offre est valable sous réserve de disponibilité des fournitures.', ML, y + 4.5);
 
-  // Calcul TVA par taux
   const tvaMap: Record<string, number> = {};
-  devis.lignes.forEach(l => {
+  (devis.lignes || []).forEach(l => {
     if (l.tauxTVA > 0) {
       const key = `${l.tauxTVA}`;
       tvaMap[key] = (tvaMap[key] || 0) + (l.totalHT * l.tauxTVA / 100);
@@ -160,7 +162,7 @@ async function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): Pro
     totRows.push({ label: 'TVA :', value: `${fmt(devis.montantTTC - devis.montantHT)} €` });
   }
 
-  const totEndY = drawTotaux(doc, y, totRows);
+  const totEndY = drawTotaux(doc, y, totRows, cfg);
   y = Math.max(y + 14, totEndY) + 6;
 
   // ─── SIGNATURE + NET À PAYER ──────────────────────────────────
@@ -168,20 +170,21 @@ async function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): Pro
   y = drawSignatureAndNet(
     doc, y,
     'NET À PAYER', `${fmt(devis.montantTTC)} €`,
+    cfg,
     '⚠  ACOMPTE 30 % À PAYER À LA SIGNATURE', `SOIT ${fmt(acompte)} €`
   ) + 8;
 
   // ─── RIB ──────────────────────────────────────────────────────
-  if (TPL_SHOW_RIB) {
-    y = drawRib(doc, y) + 2;
+  if (cfg.TPL_SHOW_RIB) {
+    y = drawRib(doc, y, cfg) + 2;
   }
 
   // ─── FOOTER ───────────────────────────────────────────────────
-  drawFooter(doc);
+  drawFooter(doc, cfg);
 
   // ─── CGV (page 2) ─────────────────────────────────────────────
-  if (TPL_SHOW_CGV) {
-    drawCGV(doc);
+  if (cfg.TPL_SHOW_CGV) {
+    drawCGV(doc, cfg);
   }
 
   return doc;

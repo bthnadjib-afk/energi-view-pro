@@ -1,17 +1,16 @@
 /**
- * invoiceRenderer.ts — Génération PDF facture via @react-pdf/renderer
- * Lit la config template depuis localStorage pour appliquer couleurs,
- * marges, logo custom, RIB et footer à chaque génération.
+ * interventionRenderer.ts — Génération PDF bon d'intervention via @react-pdf/renderer + SharedPdfTemplate
  */
 import React from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { SharedDocument } from './SharedPdfTemplate';
 import type { TemplateCfg } from './SharedPdfTemplate';
-import type { InvoiceTemplateProps } from './InvoiceTemplate';
+import type { Intervention, InterventionLine, Client } from '@/services/dolibarr';
+import type { EntrepriseInfo } from './SharedPdfTemplate';
 // @ts-ignore
 import defaultLogoUrl from '@/assets/logo.png';
 
-// ─── Lecture config template depuis localStorage ─────────────────────────────
+// ─── Config template depuis localStorage ─────────────────────────────────────
 
 function readTemplateCfg(): TemplateCfg {
   try {
@@ -23,7 +22,7 @@ function readTemplateCfg(): TemplateCfg {
   } catch { return {}; }
 }
 
-// ─── Cache logo (clé = URL source) ──────────────────────────────────────────
+// ─── Cache logo ───────────────────────────────────────────────────────────────
 
 let _logoCache: { url: string; data: string } | null = null;
 
@@ -43,19 +42,26 @@ async function loadLogoDataUrl(src: string): Promise<string> {
       reader.onerror = () => resolve('');
       reader.readAsDataURL(blob);
     });
-  } catch {
-    return '';
-  }
+  } catch { return ''; }
 }
 
-// ─── Construction du blob PDF ────────────────────────────────────────────────
+// ─── Construction blob ────────────────────────────────────────────────────────
 
-async function buildBlob(params: InvoiceTemplateProps): Promise<Blob> {
+export interface InterventionRendererParams {
+  intervention: Intervention;
+  lines: InterventionLine[];
+  client?: Client;
+  entreprise?: EntrepriseInfo;
+  signatureClient?: string;
+  signatureTech?: string;
+}
+
+async function buildBlob(params: InterventionRendererParams): Promise<Blob> {
   const templateCfg = readTemplateCfg();
   const logoSrc = templateCfg.logoUrl || defaultLogoUrl;
   const logoDataUrl = await loadLogoDataUrl(logoSrc);
   const element = React.createElement(SharedDocument as any, {
-    type: 'facture',
+    type: 'intervention',
     ...params,
     logoDataUrl,
     templateCfg,
@@ -63,36 +69,33 @@ async function buildBlob(params: InvoiceTemplateProps): Promise<Blob> {
   return pdf(element as any).toBlob();
 }
 
-// ─── API publique ────────────────────────────────────────────────────────────
+// ─── API publique ─────────────────────────────────────────────────────────────
 
-export async function invoicePdfToBlobUrl(params: InvoiceTemplateProps): Promise<string> {
+export async function interventionPdfToBlobUrl(params: InterventionRendererParams): Promise<string> {
   const blob = await buildBlob(params);
   return URL.createObjectURL(blob);
 }
 
-export async function openInvoicePdf(params: InvoiceTemplateProps): Promise<void> {
+export async function openInterventionPdf(params: InterventionRendererParams): Promise<void> {
   const blob = await buildBlob(params);
   window.open(URL.createObjectURL(blob), '_blank');
 }
 
-export async function downloadInvoicePdf(params: InvoiceTemplateProps): Promise<void> {
+export async function downloadInterventionPdf(params: InterventionRendererParams): Promise<void> {
   const blob = await buildBlob(params);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${params.facture.ref || 'facture'}.pdf`;
+  a.download = `${params.intervention.ref || 'intervention'}.pdf`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-export async function invoicePdfToBase64(params: InvoiceTemplateProps): Promise<string> {
+export async function interventionPdfToBase64(params: InterventionRendererParams): Promise<string> {
   const blob = await buildBlob(params);
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.split(',')[1]);
-    };
+    reader.onload = () => resolve((reader.result as string).split(',')[1]);
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
