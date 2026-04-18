@@ -93,7 +93,7 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
   host.style.position = 'fixed';
   host.style.top = '0';
   host.style.left = '-10000px';
-  host.style.width = `${A4_W_MM}px`;
+  host.style.width = `${A4_W_PX}px`;
   host.style.background = '#fff';
   host.style.zIndex = '-1';
   document.body.appendChild(host);
@@ -101,8 +101,8 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
   let root: Root | null = null;
   try {
     root = createRoot(host);
-    // Render synchronisé puis attente d'un cycle pour garantir layout + images
-    root.render(createElement(DocumentTemplate, { ...props, scale: 1 }));
+    // Render à l'échelle "1mm = PX_PER_MM px" pour matcher une vraie page A4
+    root.render(createElement(DocumentTemplate, { ...props, scale: RENDER_SCALE }));
     await new Promise((r) => setTimeout(r, 80));
 
     // Attendre le décodage des images (logo, signatures)
@@ -119,13 +119,17 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
       })
     );
 
-    const canvas = await html2canvas(host.firstElementChild as HTMLElement, {
+    const target = host.firstElementChild as HTMLElement;
+    const canvas = await html2canvas(target, {
       scale: RENDER_DPR,
       useCORS: true,
       backgroundColor: '#ffffff',
       logging: false,
       imageTimeout: 4000,
-      windowWidth: A4_W_MM,
+      width: A4_W_PX,
+      height: target.scrollHeight,
+      windowWidth: A4_W_PX,
+      windowHeight: target.scrollHeight,
     });
     return canvas;
   } finally {
