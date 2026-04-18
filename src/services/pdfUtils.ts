@@ -104,13 +104,20 @@ export async function loadRobotoFonts(_doc: jsPDF): Promise<void> {
 }
 
 export function setFont(doc: jsPDF, style: 'normal'|'bold'|'italic'|'bolditalic') {
-  doc.setFont('helvetica', style);
+  // 'times' supporte les 4 styles, 'helvetica' aussi, 'courier' supporte normal/bold/oblique/boldoblique
+  // jsPDF mappe 'italic' → 'oblique' pour helvetica/courier automatiquement
+  try {
+    doc.setFont(TPL_FONT, style);
+  } catch {
+    doc.setFont('helvetica', style);
+  }
 }
 
-// ─── Dessin du logo ───────────────────────────────────────────
+// ─── Dessin du logo (logo personnalisé via TPL_LOGO_URL en priorité) ─
 export async function drawLogo(doc: jsPDF, x: number, y: number): Promise<number> {
+  const src = TPL_LOGO_URL || logoUrl;
   try {
-    const img = await loadImageEl(logoUrl);
+    const img = await loadImageEl(src);
     const logoW = 52;
     const logoH = Math.round(logoW / 3.5);
     doc.addImage(img, 'PNG', x, y, logoW, logoH);
