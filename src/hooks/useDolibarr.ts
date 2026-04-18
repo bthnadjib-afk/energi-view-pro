@@ -379,6 +379,8 @@ export function useCreateAcompteFromDevis() {
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
+
+export function useCreateAvoir() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: { factureSourceId: string }) => createAvoirFromFacture(data.factureSourceId),
