@@ -219,6 +219,11 @@ export function AppSidebar() {
           <p className="text-xs text-muted-foreground truncate mb-2 px-1">{profile.nom || profile.email}</p>
         )}
         <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground mt-1"
+          onClick={signOut}
+        >
           <LogOut className="h-4 w-4" />
           {!collapsed && <span>Déconnexion</span>}
         </Button>
