@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { Settings, Eye, EyeOff, BookOpen, Sun, Moon, Mail, Lock } from 'lucide-react';
+import { Settings, Eye, EyeOff, BookOpen, Sun, Moon, Mail, Lock, FileText, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserPrefs } from '@/contexts/UserPrefsContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuthContext } from '@/contexts/AuthContext';
+import TemplatePlayground from '@/components/TemplatePlayground';
 
 export default function Preferences() {
   const { tutorialEnabled, setTutorialEnabled } = useUserPrefs();
@@ -66,13 +68,21 @@ export default function Preferences() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-7xl">
       <div>
         <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
           <Settings className="h-6 w-6" /> Préférences
         </h1>
         <p className="text-muted-foreground text-sm mt-1">Personnalisez votre expérience</p>
       </div>
+
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList>
+          <TabsTrigger value="general" className="gap-2"><SlidersHorizontal className="h-4 w-4" /> Général</TabsTrigger>
+          <TabsTrigger value="template" className="gap-2"><FileText className="h-4 w-4" /> Template</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general" className="space-y-6 mt-6 max-w-2xl">
 
       {/* Apparence */}
       <div className="bg-card rounded-xl border border-border p-6 space-y-5">
@@ -185,6 +195,12 @@ export default function Preferences() {
           </Button>
         </div>
       </div>
+        </TabsContent>
+
+        <TabsContent value="template" className="mt-6">
+          <TemplatePlayground />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
