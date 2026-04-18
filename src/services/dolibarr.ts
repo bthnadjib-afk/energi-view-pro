@@ -1222,7 +1222,7 @@ export async function sendInterventionByEmail(id: string, to: string, subject: s
   const storedConfig = typeof window !== 'undefined' ? window.localStorage.getItem('electropro-config') : null;
   const entreprise = storedConfig ? JSON.parse(storedConfig)?.entreprise : undefined;
   const mappedIntervention = mapDolibarrIntervention(intervention);
-  const pdfBase64 = generateInterventionPdfBase64({
+  const pdfBase64 = await generateInterventionPdfBase64({
     intervention: mappedIntervention,
     client,
     lines,
