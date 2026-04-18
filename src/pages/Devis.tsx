@@ -12,6 +12,7 @@ import {
   saveDevisSignatureToken, markDevisSent, closeDevis, markDevisAutoExpired, markDevisRelance1, markDevisRelanceDone, type Devis as DevisType, type Client,
 } from '@/services/dolibarr';
 import { openDevisPdf, devisPdfToBase64, devisPdfToBlobUrl } from '@/services/devisRenderer';
+import { PdfFitViewer } from '@/components/PdfFitViewer';
 import { useConfig } from '@/hooks/useConfig';
 import { useRecordDevisEnvoi, useDevisRelances, useMarkDevisRelance, getDevisRelanceStatus } from '@/hooks/useDevisRelances';
 import { cn } from '@/lib/utils';
@@ -778,11 +779,11 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                 <DialogTitle>Aperçu du devis {devis.ref}</DialogTitle>
               </DialogHeader>
               <div className="flex-1 min-h-0">
-                {pdfPreviewUrl ? (
-                  <iframe src={pdfPreviewUrl} className="w-full h-full rounded-md border border-border" title={`Devis ${devis.ref}`} />
-                ) : (
-                  <p className="text-muted-foreground text-center py-8">Chargement...</p>
-                )}
+                <PdfFitViewer
+                  url={pdfPreviewUrl}
+                  title={`Devis ${devis.ref}`}
+                  className="w-full h-full rounded-md border border-border"
+                />
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => pdfPreviewUrl && window.open(pdfPreviewUrl, '_blank')}>
