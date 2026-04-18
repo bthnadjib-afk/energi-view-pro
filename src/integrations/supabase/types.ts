@@ -224,6 +224,113 @@ export type Database = {
         }
         Relationships: []
       }
+      sourcing_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          designation: string
+          devise: string | null
+          id: string
+          importe: boolean
+          importe_at: string | null
+          importe_product_id: string | null
+          prix_fournisseur: number | null
+          ref_externe: string | null
+          scan_batch_id: string | null
+          stock_dispo: string | null
+          supplier_id: string
+          url_image: string | null
+          url_produit: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          designation: string
+          devise?: string | null
+          id?: string
+          importe?: boolean
+          importe_at?: string | null
+          importe_product_id?: string | null
+          prix_fournisseur?: number | null
+          ref_externe?: string | null
+          scan_batch_id?: string | null
+          stock_dispo?: string | null
+          supplier_id: string
+          url_image?: string | null
+          url_produit?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          designation?: string
+          devise?: string | null
+          id?: string
+          importe?: boolean
+          importe_at?: string | null
+          importe_product_id?: string | null
+          prix_fournisseur?: number | null
+          ref_externe?: string | null
+          scan_batch_id?: string | null
+          stock_dispo?: string | null
+          supplier_id?: string
+          url_image?: string | null
+          url_produit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sourcing_items_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "sourcing_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sourcing_suppliers: {
+        Row: {
+          actif: boolean
+          created_at: string
+          dernier_message: string | null
+          dernier_statut: string | null
+          derniere_execution: string | null
+          frequence: string
+          id: string
+          nb_articles_detectes: number
+          nom: string
+          updated_at: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          actif?: boolean
+          created_at?: string
+          dernier_message?: string | null
+          dernier_statut?: string | null
+          derniere_execution?: string | null
+          frequence?: string
+          id?: string
+          nb_articles_detectes?: number
+          nom: string
+          updated_at?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          actif?: boolean
+          created_at?: string
+          dernier_message?: string | null
+          dernier_statut?: string | null
+          derniere_execution?: string | null
+          frequence?: string
+          id?: string
+          nb_articles_detectes?: number
+          nom?: string
+          updated_at?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
