@@ -80,6 +80,7 @@ export default function TemplatePlayground() {
       piedDePage: '',
       afficherRib: true,
       afficherCgv: true,
+      texteCgv: '',
     });
     toast.success('Template réinitialisé aux valeurs par défaut');
   };
@@ -193,9 +194,24 @@ export default function TemplatePlayground() {
             <Switch checked={t.afficherRib} onCheckedChange={(v) => updateTemplate({ afficherRib: v })} />
           </div>
           <div className="flex items-center justify-between">
-            <Label className="text-sm font-normal">Joindre les CGV (page 2 du devis)</Label>
+            <Label className="text-sm font-normal">Joindre les CGV (page finale)</Label>
             <Switch checked={t.afficherCgv} onCheckedChange={(v) => updateTemplate({ afficherCgv: v })} />
           </div>
+          {t.afficherCgv && (
+            <div className="space-y-2">
+              <Label className="text-xs">Texte des Conditions Générales de Vente</Label>
+              <Textarea
+                placeholder="Saisissez ici le texte intégral de vos CGV. Il sera ajouté en dernière page des devis et factures."
+                value={t.texteCgv}
+                onChange={(e) => updateTemplate({ texteCgv: e.target.value })}
+                rows={8}
+                className="text-xs font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                Les CGV occuperont toujours la dernière page du PDF (devis & factures uniquement).
+              </p>
+            </div>
+          )}
         </div>
 
         <Button onClick={saveToSupabase} disabled={saving} className="w-full gap-2">

@@ -61,6 +61,8 @@ export interface DocumentTemplateCfg {
   tailleTexte?: number;
   piedDePage?: string;
   afficherRib?: boolean;
+  afficherCgv?: boolean;
+  texteCgv?: string;
 }
 
 export interface EntrepriseInfo {
@@ -84,6 +86,8 @@ export interface DocumentTemplateProps {
   density?: number;
   /** Si true, le document peut grandir au-delà de l'A4 pour mesurer le besoin réel. */
   autoHeight?: boolean;
+  /** Si true, n'affiche QUE la page CGV (utilisée comme dernière page du PDF). */
+  cgvOnly?: boolean;
 }
 
 const PX_PER_MM = 96 / 25.4;
@@ -117,6 +121,7 @@ export function DocumentTemplate({
   scale = 1,
   density = 1,
   autoHeight = false,
+  cgvOnly = false,
 }: DocumentTemplateProps) {
   const unit = scale * PX_PER_MM * density;
   const W = A4_W_PX * scale;
@@ -154,6 +159,20 @@ export function DocumentTemplate({
     lineHeight: density < 1 ? 1.24 : 1.4,
     overflow: autoHeight ? 'visible' : 'hidden',
   };
+
+  // ─── Mode CGV uniquement (page finale dédiée) ─────────────────────
+  if (cgvOnly) {
+    return (
+      <div style={pageStyle}>
+        <div style={{ fontSize: 16 * unit, fontWeight: 700, fontStyle: 'italic', color: primary, marginBottom: 10 * unit, borderBottom: `1.5px solid ${primary}`, paddingBottom: 4 * unit }}>
+          Conditions Générales de Vente
+        </div>
+        <div style={{ fontSize: 8 * unit, color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.5, textAlign: 'justify' }}>
+          {t.texteCgv || 'Aucune CGV configurée. Renseignez le texte dans Préférences → Template.'}
+        </div>
+      </div>
+    );
+  }
 
   const showEcheance = docType === 'facture';
   const showValidite = docType === 'devis';
@@ -382,7 +401,40 @@ export function DocumentTemplate({
         </div>
       )}
 
-      {/* ─── SIGNATURES (intervention) ─── */}
+      {/* ─── BON POUR ACCORD (devis & facture) — récap totaux + signature ─── */}
+      {(docType === 'devis' || docType === 'facture') && (
+        <div style={{ marginTop: 16 * unit, display: 'flex', gap: 10 * unit, alignItems: 'stretch' }}>
+          {/* Récap totaux */}
+          <div style={{ flex: 1, border: `1px solid ${primary}`, padding: 8 * unit, fontSize: 8.5 * unit }}>
+            <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 9 * unit, marginBottom: 5 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+              Récapitulatif
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${2 * unit}px 0` }}>
+              <span style={{ color: '#555' }}>Total HT</span>
+              <span style={{ fontWeight: 700 }}>{fmt(data.totaux.ht)} €</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${2 * unit}px 0` }}>
+              <span style={{ color: '#555' }}>Total TVA</span>
+              <span style={{ fontWeight: 700 }}>{fmt(data.totaux.tva)} €</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${4 * unit}px 0 0`, borderTop: `1px solid ${primary}`, marginTop: 3 * unit, fontSize: 10 * unit }}>
+              <span style={{ fontWeight: 700, color: primary }}>Total TTC</span>
+              <span style={{ fontWeight: 700, color: primary }}>{fmt(data.totaux.ttc)} €</span>
+            </div>
+          </div>
+          {/* Bon pour accord */}
+          <div style={{ flex: 1, border: `2px solid ${primary}`, padding: 8 * unit, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 9 * unit, marginBottom: 4 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+              Bon pour accord
+            </div>
+            <div style={{ fontSize: 7.5 * unit, color: '#666', marginBottom: 4 * unit }}>
+              Date et signature précédées de la mention « Bon pour accord » :
+            </div>
+            <div style={{ flex: 1, minHeight: 55 * unit, borderTop: '0.5px dashed #999', marginTop: 4 * unit }} />
+          </div>
+        </div>
+      )}
+
       {showSignatures && (
         <div style={{ marginTop: 14 * unit, display: 'flex', gap: 10 * unit }}>
           <div style={{ flex: 1, border: '1px solid #ccc', padding: 6 * unit, minHeight: 60 * unit }}>

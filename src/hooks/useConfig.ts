@@ -53,6 +53,7 @@ export interface AppConfig {
     piedDePage: string;       // texte libre du footer
     afficherRib: boolean;
     afficherCgv: boolean;
+    texteCgv: string;         // contenu des CGV (multi-ligne) — page finale du PDF
   };
 }
 
@@ -107,6 +108,7 @@ const DEFAULT_CONFIG: AppConfig = {
     piedDePage: '',
     afficherRib: true,
     afficherCgv: true,
+    texteCgv: '',
   },
 };
 
