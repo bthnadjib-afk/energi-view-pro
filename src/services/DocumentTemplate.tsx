@@ -82,8 +82,9 @@ export interface DocumentTemplateProps {
   scale?: number;
 }
 
-const A4_W_PX = (210 / 25.4) * 96;
-const A4_H_PX = (297 / 25.4) * 96;
+const PX_PER_MM = 96 / 25.4;
+const A4_W_PX = 210 * PX_PER_MM;
+const A4_H_PX = 297 * PX_PER_MM;
 
 const fmt = (n: number) =>
   (Number.isFinite(n) ? n : 0).toLocaleString('fr-FR', {
@@ -111,14 +112,15 @@ export function DocumentTemplate({
   entreprise = {},
   scale = 1,
 }: DocumentTemplateProps) {
-  const W = A4_W_PX * scale;
-  const H = A4_H_PX * scale;
-  const mt = (t.margeHaut ?? 18) * scale;
-  const mb = (t.margeBas ?? 20) * scale;
-  const ml = (t.margeGauche ?? 15) * scale;
-  const mr = (t.margeDroite ?? 15) * scale;
-  const baseFontSize = (t.tailleTexte ?? 8.5) * scale * 1.2;
-  const titleSize = (t.tailleTitre ?? 22) * scale;
+  const unit = scale * PX_PER_MM;
+  const W = 210 * unit;
+  const H = 297 * unit;
+  const mt = (t.margeHaut ?? 18) * unit;
+  const mb = (t.margeBas ?? 20) * unit;
+  const ml = (t.margeGauche ?? 15) * unit;
+  const mr = (t.margeDroite ?? 15) * unit;
+  const baseFontSize = (t.tailleTexte ?? 8.5) * unit * 1.2;
+  const titleSize = (t.tailleTitre ?? 22) * unit;
 
   const primary = t.couleurPrimaire || '#1a1a1a';
   const accent = t.couleurAccent || '#cc0000';
@@ -155,25 +157,25 @@ export function DocumentTemplate({
   return (
     <div style={pageStyle}>
       {/* ─── EN-TÊTE : LOGO + TITRE ─── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 * scale }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 * unit }}>
         <div>
           {t.logoUrl ? (
             <img
               src={t.logoUrl}
               alt=""
               crossOrigin="anonymous"
-              style={{ height: 50 * scale, maxWidth: 180 * scale, objectFit: 'contain', display: 'block' }}
+              style={{ height: 50 * unit, maxWidth: 180 * unit, objectFit: 'contain', display: 'block' }}
             />
           ) : (
             <div
               style={{
-                height: 50 * scale,
-                width: 130 * scale,
+                height: 50 * unit,
+                width: 130 * unit,
                 background: '#eee',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 10 * scale,
+                fontSize: 10 * unit,
                 color: '#999',
               }}
             >
@@ -181,8 +183,8 @@ export function DocumentTemplate({
             </div>
           )}
         </div>
-        <div style={{ textAlign: 'right', fontSize: 9 * scale, color: '#444', lineHeight: 1.5 }}>
-          <div style={{ fontWeight: 700, color: primary, fontSize: 11 * scale, textTransform: 'uppercase' }}>
+        <div style={{ textAlign: 'right', fontSize: 9 * unit, color: '#444', lineHeight: 1.5 }}>
+          <div style={{ fontWeight: 700, color: primary, fontSize: 11 * unit, textTransform: 'uppercase' }}>
             {entreprise.nom || ''}
           </div>
           {entreprise.adresse && <div>{entreprise.adresse}</div>}
@@ -205,12 +207,12 @@ export function DocumentTemplate({
           fontStyle: 'italic',
           color: primary,
           lineHeight: 1.1,
-          marginBottom: 2 * scale,
+          marginBottom: 2 * unit,
         }}
       >
         {TITRES[docType]}
       </div>
-      <div style={{ fontSize: 8 * scale, color: '#666', fontStyle: 'italic', marginBottom: 12 * scale }}>
+      <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginBottom: 12 * unit }}>
         NUMÉRO : {data.ref}
       </div>
 
@@ -220,7 +222,7 @@ export function DocumentTemplate({
           display: 'flex',
           background: primary,
           color: '#fff',
-          marginBottom: 14 * scale,
+          marginBottom: 14 * unit,
         }}
       >
         {[
@@ -235,25 +237,25 @@ export function DocumentTemplate({
             key={i}
             style={{
               flex: 1,
-              padding: `${5 * scale}px ${7 * scale}px`,
+              padding: `${5 * unit}px ${7 * unit}px`,
               borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none',
               minWidth: 0,
             }}
           >
-            <div style={{ fontSize: 6.5 * scale, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+            <div style={{ fontSize: 6.5 * unit, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.3 }}>
               {c.l}
             </div>
-            <div style={{ fontSize: 8.5 * scale, fontWeight: 700, marginTop: 1 * scale }}>{c.v}</div>
+            <div style={{ fontSize: 8.5 * unit, fontWeight: 700, marginTop: 1 * unit }}>{c.v}</div>
           </div>
         ))}
       </div>
 
       {/* ─── CLIENT ─── */}
-      <div style={{ marginBottom: 14 * scale }}>
-        <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 10 * scale, marginBottom: 2 * scale }}>
+      <div style={{ marginBottom: 14 * unit }}>
+        <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 10 * unit, marginBottom: 2 * unit }}>
           {data.client.nom}
         </div>
-        <div style={{ fontSize: 8.5 * scale, color: '#333', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 8.5 * unit, color: '#333', lineHeight: 1.5 }}>
           {data.client.adresse && <div>{data.client.adresse}</div>}
           {(data.client.codePostal || data.client.ville) && (
             <div>
@@ -267,26 +269,26 @@ export function DocumentTemplate({
 
       {/* ─── DESCRIPTION (intervention) ─── */}
       {docType === 'intervention' && data.description && (
-        <div style={{ marginBottom: 12 * scale }}>
-          <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 9.5 * scale, marginBottom: 2 * scale, borderBottom: '0.5px solid #ccc', paddingBottom: 2 * scale }}>
+        <div style={{ marginBottom: 12 * unit }}>
+          <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 9.5 * unit, marginBottom: 2 * unit, borderBottom: '0.5px solid #ccc', paddingBottom: 2 * unit }}>
             Description
           </div>
-          <div style={{ fontSize: 8.5 * scale, color: '#333', whiteSpace: 'pre-wrap' }}>{data.description}</div>
+          <div style={{ fontSize: 8.5 * unit, color: '#333', whiteSpace: 'pre-wrap' }}>{data.description}</div>
         </div>
       )}
 
       {/* ─── TABLEAU DES LIGNES ─── */}
       {data.lignes.length > 0 && (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8.5 * scale, marginBottom: 8 * scale }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8.5 * unit, marginBottom: 8 * unit }}>
           <thead>
             <tr style={{ background: primary, color: '#fff' }}>
-              <th style={{ padding: 4 * scale, textAlign: 'left', fontWeight: 700 }}>Description</th>
-              <th style={{ padding: 4 * scale, textAlign: 'center', fontWeight: 700, width: 50 * scale }}>Réf</th>
-              <th style={{ padding: 4 * scale, textAlign: 'center', fontWeight: 700, width: 32 * scale }}>Qté</th>
-              <th style={{ padding: 4 * scale, textAlign: 'center', fontWeight: 700, width: 32 * scale }}>Unité</th>
-              <th style={{ padding: 4 * scale, textAlign: 'right', fontWeight: 700, width: 60 * scale }}>P.U.</th>
-              <th style={{ padding: 4 * scale, textAlign: 'center', fontWeight: 700, width: 36 * scale }}>TVA</th>
-              <th style={{ padding: 4 * scale, textAlign: 'right', fontWeight: 700, width: 70 * scale }}>Montant</th>
+              <th style={{ padding: 4 * unit, textAlign: 'left', fontWeight: 700 }}>Description</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 50 * unit }}>Réf</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 32 * unit }}>Qté</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 32 * unit }}>Unité</th>
+              <th style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, width: 60 * unit }}>P.U.</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 36 * unit }}>TVA</th>
+              <th style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, width: 70 * unit }}>Montant</th>
             </tr>
           </thead>
           <tbody>
@@ -298,13 +300,13 @@ export function DocumentTemplate({
                   borderBottom: '0.5px solid #e0e0e0',
                 }}
               >
-                <td style={{ padding: 4 * scale, verticalAlign: 'top' }}>{l.designation}</td>
-                <td style={{ padding: 4 * scale, textAlign: 'center', color: '#888', verticalAlign: 'top' }}>{l.ref || ''}</td>
-                <td style={{ padding: 4 * scale, textAlign: 'center', verticalAlign: 'top' }}>{l.quantite}</td>
-                <td style={{ padding: 4 * scale, textAlign: 'center', verticalAlign: 'top' }}>{l.unite || 'U'}</td>
-                <td style={{ padding: 4 * scale, textAlign: 'right', verticalAlign: 'top' }}>{fmt(l.prixUnitaire)} €</td>
-                <td style={{ padding: 4 * scale, textAlign: 'center', verticalAlign: 'top' }}>{l.tauxTVA}%</td>
-                <td style={{ padding: 4 * scale, textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>{fmt(l.totalHT)} €</td>
+                <td style={{ padding: 4 * unit, verticalAlign: 'top' }}>{l.designation}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', color: '#888', verticalAlign: 'top' }}>{l.ref || ''}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.quantite}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.unite || 'U'}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'right', verticalAlign: 'top' }}>{fmt(l.prixUnitaire)} €</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.tauxTVA}%</td>
+                <td style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>{fmt(l.totalHT)} €</td>
               </tr>
             ))}
           </tbody>
@@ -313,9 +315,9 @@ export function DocumentTemplate({
 
       {/* ─── TOTAUX ─── */}
       {showTableTotals && (
-        <div style={{ marginTop: 8 * scale, display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ minWidth: 200 * scale, fontSize: 9.5 * scale }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * scale}px 0` }}>
+        <div style={{ marginTop: 8 * unit, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ minWidth: 200 * unit, fontSize: 9.5 * unit }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0` }}>
               <span style={{ color: '#555', fontStyle: 'italic' }}>TOTAL HT :</span>
               <span style={{ fontWeight: 700 }}>{fmt(data.totaux.ht)} €</span>
             </div>
@@ -323,7 +325,7 @@ export function DocumentTemplate({
               ? data.totaux.tvaParTaux
               : [{ taux: 20, montant: data.totaux.tva }]
             ).map((t, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * scale}px 0` }}>
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0` }}>
                 <span style={{ color: '#555', fontStyle: 'italic' }}>TVA ({t.taux}%) :</span>
                 <span style={{ fontWeight: 700 }}>{fmt(t.montant)} €</span>
               </div>
@@ -332,10 +334,10 @@ export function DocumentTemplate({
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
-                padding: `${6 * scale}px 0`,
+                padding: `${6 * unit}px 0`,
                 borderTop: `1.5px solid ${primary}`,
-                marginTop: 4 * scale,
-                fontSize: 11 * scale,
+                marginTop: 4 * unit,
+                fontSize: 11 * unit,
               }}
             >
               <span style={{ fontWeight: 700, fontStyle: 'italic' }}>
@@ -344,7 +346,7 @@ export function DocumentTemplate({
               <span style={{ fontWeight: 700, color: primary }}>{fmt(data.totaux.ttc)} €</span>
             </div>
             {docType === 'facture' && !data.paye && data.resteAPayer != null && data.resteAPayer > 0 && data.resteAPayer < data.totaux.ttc && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * scale}px 0`, fontSize: 9.5 * scale }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0`, fontSize: 9.5 * unit }}>
                 <span style={{ color: accent, fontWeight: 700 }}>RESTE À PAYER :</span>
                 <span style={{ color: accent, fontWeight: 700 }}>{fmt(data.resteAPayer)} €</span>
               </div>
@@ -357,13 +359,13 @@ export function DocumentTemplate({
       {showAcompte && data.totaux.ttc > 0 && (
         <div
           style={{
-            marginTop: 14 * scale,
-            padding: 8 * scale,
+            marginTop: 14 * unit,
+            padding: 8 * unit,
             border: `2px solid ${accent}`,
             background: `${accent}10`,
             textAlign: 'center',
             color: accent,
-            fontSize: 10 * scale,
+            fontSize: 10 * unit,
             fontWeight: 700,
             fontStyle: 'italic',
           }}
@@ -374,21 +376,21 @@ export function DocumentTemplate({
 
       {/* ─── SIGNATURES (intervention) ─── */}
       {showSignatures && (
-        <div style={{ marginTop: 14 * scale, display: 'flex', gap: 10 * scale }}>
-          <div style={{ flex: 1, border: '1px solid #ccc', padding: 6 * scale, minHeight: 60 * scale }}>
-            <div style={{ fontSize: 7.5 * scale, fontWeight: 700, fontStyle: 'italic', color: '#444', marginBottom: 4 * scale }}>
+        <div style={{ marginTop: 14 * unit, display: 'flex', gap: 10 * unit }}>
+          <div style={{ flex: 1, border: '1px solid #ccc', padding: 6 * unit, minHeight: 60 * unit }}>
+            <div style={{ fontSize: 7.5 * unit, fontWeight: 700, fontStyle: 'italic', color: '#444', marginBottom: 4 * unit }}>
               Signature du technicien :
             </div>
             {data.signatureTech && (
-              <img src={data.signatureTech} alt="" crossOrigin="anonymous" style={{ maxWidth: '100%', maxHeight: 50 * scale, objectFit: 'contain' }} />
+              <img src={data.signatureTech} alt="" crossOrigin="anonymous" style={{ maxWidth: '100%', maxHeight: 50 * unit, objectFit: 'contain' }} />
             )}
           </div>
-          <div style={{ flex: 1, border: '1px solid #ccc', padding: 6 * scale, minHeight: 60 * scale }}>
-            <div style={{ fontSize: 7.5 * scale, fontWeight: 700, fontStyle: 'italic', color: '#444', marginBottom: 4 * scale }}>
+          <div style={{ flex: 1, border: '1px solid #ccc', padding: 6 * unit, minHeight: 60 * unit }}>
+            <div style={{ fontSize: 7.5 * unit, fontWeight: 700, fontStyle: 'italic', color: '#444', marginBottom: 4 * unit }}>
               Signature du client (bon pour accord) :
             </div>
             {data.signatureClient && (
-              <img src={data.signatureClient} alt="" crossOrigin="anonymous" style={{ maxWidth: '100%', maxHeight: 50 * scale, objectFit: 'contain' }} />
+              <img src={data.signatureClient} alt="" crossOrigin="anonymous" style={{ maxWidth: '100%', maxHeight: 50 * unit, objectFit: 'contain' }} />
             )}
           </div>
         </div>
@@ -396,18 +398,18 @@ export function DocumentTemplate({
 
       {/* ─── OBSERVATIONS (intervention) ─── */}
       {docType === 'intervention' && data.observations && (
-        <div style={{ marginTop: 12 * scale }}>
-          <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 9 * scale, marginBottom: 2 * scale }}>
+        <div style={{ marginTop: 12 * unit }}>
+          <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 9 * unit, marginBottom: 2 * unit }}>
             Observations :
           </div>
-          <div style={{ fontSize: 8.5 * scale, color: '#444', whiteSpace: 'pre-wrap' }}>{data.observations}</div>
+          <div style={{ fontSize: 8.5 * unit, color: '#444', whiteSpace: 'pre-wrap' }}>{data.observations}</div>
         </div>
       )}
 
       {/* ─── RIB ─── */}
       {t.afficherRib && (
-        <div style={{ marginTop: 14 * scale, fontSize: 9 * scale }}>
-          <div style={{ fontWeight: 700, color: primary, marginBottom: 3 * scale }}>Moyens de paiement :</div>
+        <div style={{ marginTop: 14 * unit, fontSize: 9 * unit }}>
+          <div style={{ fontWeight: 700, color: primary, marginBottom: 3 * unit }}>Moyens de paiement :</div>
           <div style={{ fontFamily: '"Courier New", Courier, monospace', color: '#333', lineHeight: 1.6 }}>
             <div>IBAN : FR76 1695 8000 0179 9683 5713 173</div>
             <div>BIC&nbsp;&nbsp;: QNTOFRP1XXX</div>
@@ -418,10 +420,10 @@ export function DocumentTemplate({
       {/* ─── PIED DE PAGE ─── */}
       <div
         style={{
-          marginTop: 24 * scale,
-          paddingTop: 6 * scale,
+          marginTop: 24 * unit,
+          paddingTop: 6 * unit,
           borderTop: '0.5px solid #ccc',
-          fontSize: 7 * scale,
+          fontSize: 7 * unit,
           color: '#777',
           textAlign: 'center',
           fontStyle: 'italic',
