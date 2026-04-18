@@ -80,6 +80,7 @@ export default function TemplatePlayground() {
       piedDePage: '',
       afficherRib: true,
       afficherCgv: true,
+      texteCgv: '',
     });
     toast.success('Template réinitialisé aux valeurs par défaut');
   };
