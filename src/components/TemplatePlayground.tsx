@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { Upload, Palette, Type, Maximize2, FileText, Image as ImageIcon, Eye, Save, RotateCcw, Trash2, Loader2, ExternalLink, ZoomIn, ZoomOut } from 'lucide-react';
+import { Upload, Palette, Type, Maximize2, FileText, Image as ImageIcon, Eye, Save, RotateCcw, Trash2, Loader2, ExternalLink, ZoomIn, ZoomOut, Ruler } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useConfig, type AppConfig } from '@/hooks/useConfig';
 import { DocumentTemplate, type DocType as SharedDocType } from '@/services/DocumentTemplate';
 import { documentPdfToBlobUrl } from '@/services/htmlToPdf';
+import TemplateSizesPanel from '@/components/TemplateSizesPanel';
 
 type DocType = 'facture' | 'devis' | 'intervention';
 
@@ -101,11 +102,12 @@ export default function TemplatePlayground() {
           </div>
 
           <Tabs defaultValue="logo" className="w-full">
-            <TabsList className="grid grid-cols-4 w-full h-auto">
+            <TabsList className="grid grid-cols-5 w-full h-auto">
               <TabsTrigger value="logo" className="flex-col gap-1 py-2 text-xs"><ImageIcon className="h-3.5 w-3.5" />Logo</TabsTrigger>
               <TabsTrigger value="couleurs" className="flex-col gap-1 py-2 text-xs"><Palette className="h-3.5 w-3.5" />Couleurs</TabsTrigger>
               <TabsTrigger value="typo" className="flex-col gap-1 py-2 text-xs"><Type className="h-3.5 w-3.5" />Police</TabsTrigger>
               <TabsTrigger value="mise" className="flex-col gap-1 py-2 text-xs"><Maximize2 className="h-3.5 w-3.5" />Marges</TabsTrigger>
+              <TabsTrigger value="tailles" className="flex-col gap-1 py-2 text-xs"><Ruler className="h-3.5 w-3.5" />Tailles</TabsTrigger>
             </TabsList>
 
             {/* LOGO */}
@@ -171,6 +173,11 @@ export default function TemplatePlayground() {
               <SliderField label="Marge bas" value={t.margeBas} min={5} max={40} step={1} unit="mm" onChange={(v) => updateTemplate({ margeBas: v })} />
               <SliderField label="Marge gauche" value={t.margeGauche} min={5} max={40} step={1} unit="mm" onChange={(v) => updateTemplate({ margeGauche: v })} />
               <SliderField label="Marge droite" value={t.margeDroite} min={5} max={40} step={1} unit="mm" onChange={(v) => updateTemplate({ margeDroite: v })} />
+            </TabsContent>
+
+            {/* TAILLES — réglage individuel de chaque zone de texte */}
+            <TabsContent value="tailles" className="mt-4">
+              <TemplateSizesPanel template={t} updateTemplate={updateTemplate} />
             </TabsContent>
           </Tabs>
         </div>
