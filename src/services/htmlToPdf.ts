@@ -26,9 +26,9 @@ import logoFallback from '@/assets/logo.png';
 // A4 cible dans le PDF final (mm)
 const A4_W_MM = 210;
 const A4_H_MM = 297;
-// Largeur CSS A4 à 96dpi
-const TEMPLATE_W_PX = (A4_W_MM / 25.4) * 96;       // ≈ 794 px
-const TEMPLATE_H_PX = (A4_H_MM / 25.4) * 96;       // ≈ 1123 px
+// Largeur CSS A4 STRICTE à 96dpi (pixel-to-point)
+const TEMPLATE_W_PX = 794;        // = round((210 / 25.4) * 96)
+const TEMPLATE_H_PX = 1123;       // = round((297 / 25.4) * 96)
 const RENDER_SCALE = 1;
 const MAX_DENSITY = 1;
 // Garde-fou : ne JAMAIS descendre sous 0.85 pour préserver la lisibilité.
@@ -36,8 +36,9 @@ const MAX_DENSITY = 1;
 // que de continuer à miniaturiser le texte.
 const MIN_DENSITY = 0.85;
 const DENSITY_STEP = 0.05;
-// Capture haute résolution (~300 dpi)
-const RENDER_DPR = 3;
+// Capture STRICTEMENT 1:1 (96 DPI). On stabilise d'abord l'échelle ;
+// la qualité d'impression sera revisitée ensuite.
+const RENDER_DPR = 1;
 
 // ─── Lecture config ───────────────────────────────────────────────────────────
 function readTemplateCfg(): DocumentTemplateCfg {
@@ -86,14 +87,20 @@ async function urlToDataUrl(url: string): Promise<string> {
   }
 }
 
-// ─── Helper : crée un host off-screen et y monte un Root React ────────────────
+// ─── Helper : crée un host off-screen STRICTEMENT à largeur A4 (pixel-to-point) ─
 function createHost(): { host: HTMLElement; root: Root } {
   const host = document.createElement('div');
   host.style.position = 'fixed';
   host.style.top = '0';
   host.style.left = '-10000px';
-  host.style.width = `${TEMPLATE_W_PX}px`;
+  host.style.width = `${TEMPLATE_W_PX}px`;     // 794px FIXE
+  host.style.height = 'fit-content';            // pas de contrainte verticale
+  host.style.overflow = 'hidden';               // empêche tout débordement parasite
   host.style.background = '#fff';
+  host.style.margin = '0';
+  host.style.padding = '0';
+  host.style.transform = 'none';                // aucune transformation
+  host.style.zoom = '1' as string;              // aucun zoom navigateur
   host.style.zIndex = '-1';
   document.body.appendChild(host);
   const root = createRoot(host);
@@ -175,14 +182,15 @@ async function renderMain(props: DocumentTemplateProps): Promise<MainCaptureResu
     const finalHeight = multiPage ? target.scrollHeight : TEMPLATE_H_PX;
 
     const canvas = await html2canvas(target, {
-      scale: RENDER_DPR,
+      scale: 1,                  // STRICT 1:1 (pixel-to-point)
       useCORS: true,
+      allowTaint: true,
       backgroundColor: '#ffffff',
       logging: false,
       imageTimeout: 4000,
       width: TEMPLATE_W_PX,
       height: finalHeight,
-      windowWidth: TEMPLATE_W_PX,
+      windowWidth: TEMPLATE_W_PX, // 794
       windowHeight: finalHeight,
     });
 
@@ -210,8 +218,9 @@ async function renderCgv(props: DocumentTemplateProps): Promise<HTMLCanvasElemen
 
     const target = host.firstElementChild as HTMLElement;
     return await html2canvas(target, {
-      scale: RENDER_DPR,
+      scale: 1,                   // STRICT 1:1
       useCORS: true,
+      allowTaint: true,
       backgroundColor: '#ffffff',
       logging: false,
       width: TEMPLATE_W_PX,
@@ -226,17 +235,21 @@ async function renderCgv(props: DocumentTemplateProps): Promise<HTMLCanvasElemen
 
 // ─── Ajoute un canvas à un PDF en le découpant en pages A4 ────────────────────
 function addCanvasToPdf(pdf: jsPDF, canvas: HTMLCanvasElement, isFirstPage: boolean) {
-  // Page A4 unique → on étire 1:1
-  const pageHeightPxAt300 = (TEMPLATE_H_PX) * RENDER_DPR;
-  if (canvas.height <= pageHeightPxAt300 + 2) {
+  // Hauteur d'une page A4 en px à la même résolution que le canvas (RENDER_DPR=1)
+  const pageHeightPxAt1 = TEMPLATE_H_PX * RENDER_DPR;
+
+  // ─── Cas 1 : tout tient sur UNE page A4 → écrasement strict 210×297mm ───
+  if (canvas.height <= pageHeightPxAt1 + 2) {
     if (!isFirstPage) pdf.addPage();
     const imgData = canvas.toDataURL('image/png');
-    pdf.addImage(imgData, 'PNG', 0, 0, A4_W_MM, A4_H_MM);
+    // FORÇAGE PHYSIQUE : on impose 210×297mm, peu importe la taille pixel.
+    // → annule tout effet de zoom / scaling parasite.
+    pdf.addImage(imgData, 'PNG', 0, 0, A4_W_MM, A4_H_MM, undefined, 'FAST');
     return;
   }
 
-  // Multi-page : on découpe le canvas en tranches A4
-  const sliceHeightPx = pageHeightPxAt300;
+  // ─── Cas 2 : multi-page → on découpe en tranches A4 strictes ───
+  const sliceHeightPx = pageHeightPxAt1;
   let yOffset = 0;
   let firstSlice = true;
   while (yOffset < canvas.height) {
@@ -256,8 +269,9 @@ function addCanvasToPdf(pdf: jsPDF, canvas: HTMLCanvasElement, isFirstPage: bool
     );
 
     if (!firstSlice || !isFirstPage) pdf.addPage();
+    // Tranche pleine = 297mm, tranche partielle = proportionnelle (jamais étirée).
     const heightMm = (currentSliceHeight / sliceHeightPx) * A4_H_MM;
-    pdf.addImage(slice.toDataURL('image/png'), 'PNG', 0, 0, A4_W_MM, heightMm);
+    pdf.addImage(slice.toDataURL('image/png'), 'PNG', 0, 0, A4_W_MM, heightMm, undefined, 'FAST');
 
     yOffset += currentSliceHeight;
     firstSlice = false;
