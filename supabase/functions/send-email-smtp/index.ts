@@ -65,7 +65,7 @@ function assertSmtpCode(response: string, expectedCodes: string[]): void {
   }
 }
 
-async function readSmtpResponse(conn: Deno.Conn, decoder: TextDecoder, timeoutMs = 15000): Promise<string> {
+async function readSmtpResponse(conn: Deno.Conn, decoder: TextDecoder, timeoutMs = 60000): Promise<string> {
   const chunks: string[] = []
   const buf = new Uint8Array(4096)
 
@@ -107,26 +107,31 @@ async function trySendSmtp(params: {
   const boundary = `boundary_${crypto.randomUUID().replace(/-/g, '')}`
   const nl = '\r\n'
 
-  let emailBody = `From: ${SMTP_FROM}${nl}`
-  emailBody += `To: ${recipient}${nl}`
-  emailBody += `Subject: =?UTF-8?B?${toBase64Utf8(subject)}?=${nl}`
-  emailBody += `MIME-Version: 1.0${nl}`
-  emailBody += `Content-Type: multipart/mixed; boundary="${boundary}"${nl}${nl}`
+  // Build header + html part (small)
+  const headerPart =
+    `From: ${SMTP_FROM}${nl}` +
+    `To: ${recipient}${nl}` +
+    `Subject: =?UTF-8?B?${toBase64Utf8(subject)}?=${nl}` +
+    `MIME-Version: 1.0${nl}` +
+    `Content-Type: multipart/mixed; boundary="${boundary}"${nl}${nl}` +
+    `--${boundary}${nl}` +
+    `Content-Type: text/html; charset=utf-8${nl}` +
+    `Content-Transfer-Encoding: base64${nl}${nl}` +
+    `${htmlMessageBase64}${nl}${nl}`
 
-  emailBody += `--${boundary}${nl}`
-  emailBody += `Content-Type: text/html; charset=utf-8${nl}`
-  emailBody += `Content-Transfer-Encoding: base64${nl}${nl}`
-  emailBody += `${htmlMessageBase64}${nl}${nl}`
+  // PDF attachment header (without the heavy base64 body)
+  const pdfHeaderPart = (pdfBase64 && pdfFilename)
+    ? `--${boundary}${nl}` +
+      `Content-Type: application/pdf; name="${pdfFilename}"${nl}` +
+      `Content-Disposition: attachment; filename="${pdfFilename}"${nl}` +
+      `Content-Transfer-Encoding: base64${nl}${nl}`
+    : ''
 
-  if (pdfBase64 && pdfFilename) {
-    emailBody += `--${boundary}${nl}`
-    emailBody += `Content-Type: application/pdf; name="${pdfFilename}"${nl}`
-    emailBody += `Content-Disposition: attachment; filename="${pdfFilename}"${nl}`
-    emailBody += `Content-Transfer-Encoding: base64${nl}${nl}`
-    emailBody += `${chunkBase64(String(pdfBase64))}${nl}${nl}`
+  const closingPart = `${nl}--${boundary}--${nl}`
+
+  if (pdfBase64) {
+    console.log(`[SMTP] PDF attachment size: ${Math.round(String(pdfBase64).length / 1024)} KB (base64)`)
   }
-
-  emailBody += `--${boundary}--${nl}`
 
   const port = parseInt(SMTP_PORT, 10)
   let conn: Deno.Conn
