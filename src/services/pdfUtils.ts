@@ -5,25 +5,68 @@
 import jsPDF from 'jspdf';
 import logoUrl from '@/assets/logo.png';
 
-// ─── Palette EDG ──────────────────────────────────────────────
-export const NOIR:       [number,number,number] = [26, 26, 26];
+// ─── Lecture de la config template depuis localStorage ────────
+type TemplateCfg = {
+  logoUrl?: string;
+  couleurPrimaire?: string;
+  couleurAccent?: string;
+  couleurTexte?: string;
+  police?: 'helvetica' | 'times' | 'courier';
+  margeHaut?: number;
+  margeBas?: number;
+  margeGauche?: number;
+  margeDroite?: number;
+  tailleTitre?: number;
+  tailleTexte?: number;
+  piedDePage?: string;
+  afficherRib?: boolean;
+  afficherCgv?: boolean;
+};
+
+function getTemplateCfg(): TemplateCfg {
+  try {
+    if (typeof window === 'undefined') return {};
+    const raw = window.localStorage.getItem('electropro-config');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return (parsed?.template as TemplateCfg) || {};
+  } catch { return {}; }
+}
+
+function hexToRgb(hex: string | undefined, fallback: [number, number, number]): [number, number, number] {
+  if (!hex) return fallback;
+  const m = hex.replace('#', '').match(/^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  if (!m) return fallback;
+  return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+}
+
+// ─── Palette EDG (valeurs de fallback, surchargées par template) ────
+const _T = getTemplateCfg();
+export const NOIR:       [number,number,number] = hexToRgb(_T.couleurPrimaire, [26, 26, 26]);
 export const BLANC:      [number,number,number] = [255,255,255];
 export const GRIS_CLAIR: [number,number,number] = [247,247,247];
 export const GRIS_LIGNE: [number,number,number] = [224,224,224];
 export const GRIS_TEXTE: [number,number,number] = [85, 85, 85];
 export const GRIS_SOMBRE:[number,number,number] = [68, 68, 68];
 export const GRIS_PIED:  [number,number,number] = [120,120,120];
-export const ROUGE:      [number,number,number] = [204,  0,  0];
+export const ROUGE:      [number,number,number] = hexToRgb(_T.couleurAccent, [204,  0,  0]);
 export const ROUGE_BG:   [number,number,number] = [255,248,248];
 
-// ─── Mise en page A4 ──────────────────────────────────────────
-export const ML     = 15;          // margin left
-export const MR     = 15;          // margin right
-export const MT     = 18;          // margin top
+// ─── Mise en page A4 (margeXxx surchargées par template) ────
+export const ML     = _T.margeGauche ?? 15;
+export const MR     = _T.margeDroite ?? 15;
+export const MT     = _T.margeHaut   ?? 18;
 export const PAGE_W = 210;
 export const PAGE_H = 297;
-export const COL_R  = PAGE_W - MR; // 195
-export const CW     = PAGE_W - ML - MR; // 180
+export const COL_R  = PAGE_W - MR;
+export const CW     = PAGE_W - ML - MR;
+
+// Police globale (helvetica/times/courier)
+export const TPL_FONT: 'helvetica' | 'times' | 'courier' = (_T.police || 'helvetica') as any;
+export const TPL_LOGO_URL: string = _T.logoUrl || '';
+export const TPL_FOOTER_TEXT: string = _T.piedDePage || '';
+export const TPL_SHOW_RIB: boolean = _T.afficherRib !== false;
+export const TPL_SHOW_CGV: boolean = _T.afficherCgv !== false;
 
 // ─── Helpers ──────────────────────────────────────────────────
 export function fmt(n: number | null | undefined): string {
