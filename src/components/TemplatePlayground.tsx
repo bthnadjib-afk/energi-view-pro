@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useConfig, type AppConfig } from '@/hooks/useConfig';
+import { DocumentTemplate, type DocType as SharedDocType } from '@/services/DocumentTemplate';
 
 type DocType = 'facture' | 'devis' | 'intervention';
 
