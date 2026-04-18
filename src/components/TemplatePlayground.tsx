@@ -380,39 +380,77 @@ function PreviewPane({
         </Button>
       </div>
 
-      {/* Conteneur scrollable avec le document à 100% (ou zoom appliqué) */}
+      {/* Conteneur scrollable — aperçu MULTI-PAGE :
+          le document est rendu en autoHeight pour voir tout le contenu (avec sauts de page visuels). */}
       <div
         className="overflow-auto rounded-lg border border-border bg-muted/30 p-6 flex justify-center"
         style={{ maxHeight: '80vh' }}
       >
-        <div
-          style={{
-            width: A4_W_PX * zoom,
-            // On applique le zoom via transform pour ne pas redimensionner les enfants un par un
-            // (transform-origin top center pour rester centré)
-          }}
-        >
+        <div style={{ width: A4_W_PX * zoom }}>
           <div
-            className="shadow-2xl bg-white origin-top"
+            className="origin-top-left relative"
             style={{
               width: A4_W_PX,
               transform: `scale(${zoom})`,
               transformOrigin: 'top left',
             }}
           >
-            <DocumentTemplate
-              docType={previewType as SharedDocType}
-              data={data}
-              template={t}
-              entreprise={entreprise}
-              scale={1}
-            />
+            {/* Lignes pointillées rouges TOUTES les 297mm = sauts de page A4 visuels */}
+            <PageBreakOverlay />
+            <div className="shadow-2xl bg-white">
+              <DocumentTemplate
+                docType={previewType as SharedDocType}
+                data={data}
+                template={t}
+                entreprise={entreprise}
+                scale={1}
+                autoHeight
+              />
+            </div>
           </div>
         </div>
       </div>
       <p className="text-xs text-muted-foreground text-center">
-        Aperçu à la vraie taille A4 (210 × 297 mm). Cliquez sur « Ouvrir le PDF A4 » pour voir le rendu final dans une nouvelle fenêtre.
+        Aperçu à la vraie taille A4 (210 × 297 mm). Les pointillés rouges marquent les sauts de page. Cliquez sur « Ouvrir le PDF A4 » pour voir le rendu final.
       </p>
+    </div>
+  );
+}
+
+/** Lignes pointillées rouges toutes les 1123px (= 297mm @ 96 DPI) → sauts de page A4 visuels. */
+function PageBreakOverlay() {
+  const A4_H_PX = (297 / 25.4) * 96;
+  return (
+    <div className="absolute inset-0 pointer-events-none" aria-hidden>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute',
+            top: A4_H_PX * i,
+            left: 0,
+            right: 0,
+            height: 0,
+            borderTop: '2px dashed hsl(var(--destructive) / 0.5)',
+          }}
+        >
+          <span
+            style={{
+              position: 'absolute',
+              top: -10,
+              right: 4,
+              background: 'hsl(var(--destructive))',
+              color: 'hsl(var(--destructive-foreground))',
+              fontSize: 10,
+              padding: '1px 6px',
+              borderRadius: 3,
+              fontFamily: 'monospace',
+            }}
+          >
+            page {i + 1}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
