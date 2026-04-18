@@ -1,231 +1,156 @@
-// Générateur PDF local — Facture — même design que devisPdf (mix modèle 1 & 2)
+// Générateur PDF — FACTURE — ELECTRICIEN DU GENEVOIS
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Facture, DevisLigne, Client } from '@/services/dolibarr';
+import {
+  ML, MR, MT, PAGE_W, PAGE_H, COL_R, CW,
+  NOIR, BLANC, GRIS_CLAIR, GRIS_LIGNE, GRIS_TEXTE,
+  ROUGE, ROUGE_BG,
+  fmt, toText, formatDateFR,
+  loadRobotoFonts, setFont,
+  drawLogo, drawInfoBar, drawParties, drawTotaux,
+  drawRib, drawFooter,
+  type EntrepriseInfo, type ClientInfo,
+} from './pdfUtils';
 
-// ─── Couleurs ───
-const NOIR: [number, number, number] = [15, 15, 15];
-const BLEU: [number, number, number] = [30, 64, 175];
-const VERT: [number, number, number] = [5, 150, 105];
-const GRIS_CLAIR: [number, number, number] = [249, 250, 251];
-const GRIS_LIGNE: [number, number, number] = [229, 231, 235];
-const GRIS_TEXTE: [number, number, number] = [107, 114, 128];
-const JAUNE: [number, number, number] = [234, 179, 8];
-
-const MARGIN = 14;
-const PAGE_W = 210;
-const PAGE_H = 297;
-const COL_R = PAGE_W - MARGIN;
-
-function fmt(n: number): string {
-  return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function formatDateFR(dateStr: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr.includes('T') ? dateStr : dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
-  if (isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-function drawLogo(doc: jsPDF, x: number, y: number): void {
-  doc.setFillColor(...JAUNE);
-  doc.triangle(x + 7, y, x, y + 10, x + 5, y + 10, 'F');
-  doc.triangle(x + 3, y + 8, x + 10, y + 8, x + 3, y + 18, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(...BLEU);
-  doc.text('ELECTRICIEN', x + 13, y + 7);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text('DU GENEVOIS', x + 13, y + 14);
-}
+const VERT: [number,number,number] = [22, 163, 74];
 
 export interface FacturePdfParams {
   facture: Facture;
   client?: Client;
-  entreprise?: {
-    nom: string;
-    adresse: string;
-    codePostal: string;
-    ville: string;
-    siret: string;
-    telephone: string;
-    email: string;
-  };
+  entreprise?: EntrepriseInfo;
 }
 
-function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams): jsPDF {
+async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams): Promise<jsPDF> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  let y = MARGIN;
+  await loadRobotoFonts(doc);
+  let y = MT;
 
-  // ══════════════════════════════════════════════
-  // HEADER
-  // ══════════════════════════════════════════════
-  drawLogo(doc, MARGIN, y);
+  // ─── LOGO ────────────────────────────────────────────────────
+  const logoH = await drawLogo(doc, ML, y);
+  y += logoH + 7;
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(26);
+  // ─── TITRE ───────────────────────────────────────────────────
+  // Détermine le type de facture
+  const isAcompte  = (facture as any).type === 'acompte'  || facture.ref?.includes('ACOMPTE');
+  const isSolde    = (facture as any).type === 'solde'    || facture.ref?.includes('SOLDE');
+  const isAvoir    = (facture as any).type === 'avoir';
+  const titre = isAcompte ? "FACTURE D'ACOMPTE"
+              : isSolde   ? 'FACTURE DE SOLDE'
+              : isAvoir   ? "AVOIR"
+              : 'FACTURE';
+
+  setFont(doc, 'bolditalic');
+  doc.setFontSize(22);
   doc.setTextColor(...NOIR);
-  doc.text('FACTURE', COL_R, y + 8, { align: 'right' });
+  doc.text(titre, ML, y);
+  y += 6;
 
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
+  setFont(doc, 'italic');
+  doc.setFontSize(8);
   doc.setTextColor(...GRIS_TEXTE);
-  doc.text(`NUMÉRO DE FACTURE : ${facture.ref}`, COL_R, y + 15, { align: 'right' });
-
-  // Statut paiement
-  if (facture.paye) {
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...VERT);
-    doc.text('✓ PAYÉE', COL_R, y + 21, { align: 'right' });
-  }
-
-  y += 26;
-
-  // ══════════════════════════════════════════════
-  // BLOC ADRESSES
-  // ══════════════════════════════════════════════
-  const colMid = PAGE_W / 2 + 5;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...GRIS_TEXTE);
-  doc.text('DESTINATAIRE', MARGIN, y);
-  y += 5;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...NOIR);
-  doc.text(client?.nom || facture.client || '', MARGIN, y);
-  y += 5;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(50, 50, 50);
-  const clientLines: string[] = [];
-  if (client?.adresse) clientLines.push(client.adresse);
-  const cityLine = [client?.codePostal, client?.ville].filter(Boolean).join(' ');
-  if (cityLine) clientLines.push(cityLine);
-  if (client?.email) clientLines.push(client.email);
-  if (client?.telephone) clientLines.push(client.telephone);
-  clientLines.forEach(line => { doc.text(line, MARGIN, y); y += 4.5; });
-
-  const ent = entreprise;
-  const entY0 = y - (clientLines.length * 4.5) - 5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...GRIS_TEXTE);
-  doc.text('ÉMETTEUR', colMid, entY0);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...NOIR);
-  doc.text((ent?.nom || 'EURL ELECTRICIEN DU GENEVOIS').toUpperCase(), colMid, entY0 + 5);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(50, 50, 50);
-  let ey = entY0 + 10;
-  doc.text('AU CAPITAL DE 1 000 €', colMid, ey); ey += 4;
-  if (ent?.adresse) { doc.text(ent.adresse.toUpperCase(), colMid, ey); ey += 4; }
-  if (ent?.codePostal || ent?.ville) { doc.text(`${ent?.codePostal || ''} ${ent?.ville || ''}`.trim().toUpperCase(), colMid, ey); ey += 4; }
-  if (ent?.siret) { doc.text(`SIRET : ${ent.siret} — RCS ANNECY`, colMid, ey); ey += 4; }
-  if (ent?.email) { doc.text(ent.email.toUpperCase(), colMid, ey); ey += 4; }
-  if (ent?.telephone) { doc.text(ent.telephone, colMid, ey); ey += 4; }
-
-  y = Math.max(y, ey) + 6;
-  doc.setDrawColor(...GRIS_LIGNE);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN, y, COL_R, y);
+  doc.text(`NUMÉRO : ${toText(facture.ref)}`, ML, y);
   y += 8;
 
-  // ══════════════════════════════════════════════
-  // TABLEAU
-  // ══════════════════════════════════════════════
+  // ─── BARRE INFO ───────────────────────────────────────────────
+  const barCells = [
+    { label: 'Référence', value: toText(facture.ref) },
+    { label: 'Date de facture', value: formatDateFR(facture.date) },
+    { label: 'Échéance', value: (facture as any).echeance ? formatDateFR((facture as any).echeance) : 'À réception' },
+  ];
+  if (facture.paye) {
+    barCells.push({ label: 'Statut', value: '✓ PAYÉE' });
+  }
+  const barH = drawInfoBar(doc, y, barCells.slice(0, 3));
+  y += barH + 8;
+
+  // ─── CLIENT / ENTREPRISE ──────────────────────────────────────
+  const clientInfo: ClientInfo = {
+    nom:        client?.nom || facture.client,
+    adresse:    client?.adresse,
+    codePostal: client?.codePostal,
+    ville:      client?.ville,
+    email:      client?.email,
+    telephone:  client?.telephone,
+  };
+  y = drawParties(doc, y, clientInfo, entreprise) + 10;
+
+  // ─── TABLEAU ──────────────────────────────────────────────────
   const lignesMO = facture.lignes.filter(l => l.productType === 'main_oeuvre');
   const lignesFO = facture.lignes.filter(l => l.productType === 'fourniture');
 
-  function buildRows(lignes: DevisLigne[]): any[][] {
+  function buildRows(lignes: DevisLigne[]) {
     return lignes.map(l => [
-      l.designation,
-      l.ref,
-      String(l.quantite),
-      l.unite || 'U',
-      `${fmt(l.prixUnitaire)} €`,
-      `${l.tauxTVA}%`,
-      `${fmt(l.totalHT)} €`,
+      toText(l.designation || ''),
+      { content: toText(l.ref || ''), styles: { halign: 'center' as const, textColor: [120,120,120] as [number,number,number] } },
+      { content: toText(l.quantite ?? ''), styles: { halign: 'center' as const } },
+      { content: l.unite || 'U', styles: { halign: 'center' as const } },
+      { content: `${fmt(l.prixUnitaire)} €`, styles: { halign: 'right' as const } },
+      { content: `${l.tauxTVA}%`, styles: { halign: 'center' as const } },
+      { content: `${fmt(l.totalHT)} €`, styles: { halign: 'right' as const, fontStyle: 'bold' as const } },
     ]);
   }
 
-  const sectionHeaderStyle = {
-    fillColor: [243, 244, 246] as [number, number, number],
-    textColor: BLEU,
-    fontStyle: 'bold' as const,
-    colSpan: 7,
+  const sectionStyle = {
+    fillColor: [255,255,255] as [number,number,number],
+    textColor: NOIR, fontStyle: 'bolditalic' as const,
+    fontSize: 9, cellPadding: { top: 3, bottom: 1, left: 2, right: 2 },
   };
-
   const body: any[] = [];
   if (lignesMO.length > 0) {
-    body.push([{ content: "Main d'œuvre", styles: sectionHeaderStyle }]);
+    body.push([{ content: "Main d'œuvre", colSpan: 7, styles: sectionStyle }]);
     buildRows(lignesMO).forEach(r => body.push(r));
   }
   if (lignesFO.length > 0) {
-    body.push([{ content: 'Fournitures', styles: sectionHeaderStyle }]);
+    body.push([{ content: 'Fournitures', colSpan: 7, styles: sectionStyle }]);
     buildRows(lignesFO).forEach(r => body.push(r));
   }
   if (body.length === 0) {
-    facture.lignes.forEach(l => body.push(buildRows([l])[0]));
+    facture.lignes.forEach(l => buildRows([l]).forEach(r => body.push(r)));
   }
 
   autoTable(doc, {
-    startY: y,
-    margin: { left: MARGIN, right: MARGIN },
+    startY: y, margin: { left: ML, right: MR },
     head: [['Description', 'Réf', 'Qté', 'Unité', 'Prix unitaire', 'TVA', 'Montant']],
     body,
     theme: 'grid',
     styles: {
-      fontSize: 8.5,
-      cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
-      textColor: NOIR,
-      lineColor: GRIS_LIGNE,
-      lineWidth: 0.2,
+      fontSize: 8.5, font: 'helvetica',
+      cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
+      textColor: NOIR, lineColor: GRIS_LIGNE, lineWidth: 0.3,
     },
-    headStyles: {
-      fillColor: [15, 15, 15],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      fontSize: 8.5,
-      lineColor: [15, 15, 15],
-    },
+    headStyles: { fillColor: NOIR, textColor: BLANC, fontStyle: 'bold', fontSize: 8.5, font: 'helvetica' },
     alternateRowStyles: { fillColor: GRIS_CLAIR },
     columnStyles: {
-      0: { cellWidth: 'auto' },
-      1: { cellWidth: 22, halign: 'center' },
-      2: { cellWidth: 12, halign: 'center' },
-      3: { cellWidth: 14, halign: 'center' },
-      4: { cellWidth: 24, halign: 'right' },
-      5: { cellWidth: 14, halign: 'center' },
-      6: { cellWidth: 24, halign: 'right', fontStyle: 'bold' },
+      0: { cellWidth: 'auto', halign: 'left' },
+      1: { cellWidth: 16,     halign: 'center' },
+      2: { cellWidth: 11,     halign: 'center' },
+      3: { cellWidth: 12,     halign: 'center' },
+      4: { cellWidth: 23,     halign: 'right' },
+      5: { cellWidth: 13,     halign: 'center' },
+      6: { cellWidth: 25,     halign: 'right' },
     },
   });
 
   y = (doc as any).lastAutoTable?.finalY || y + 20;
+
+  // ─── SÉPARATEUR ───────────────────────────────────────────────
+  y += 5;
+  doc.setDrawColor(...GRIS_LIGNE);
+  doc.setLineWidth(0.4);
+  doc.line(ML, y, COL_R, y);
   y += 6;
 
-  // ══════════════════════════════════════════════
-  // Date facture
-  // ══════════════════════════════════════════════
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'italic');
+  // ─── DATE (gauche) + TOTAUX (droite) ─────────────────────────
+  setFont(doc, 'italic');
+  doc.setFontSize(8);
   doc.setTextColor(...GRIS_TEXTE);
-  doc.text(`Facture établie le ${formatDateFR(facture.date)}`, MARGIN, y);
-  y += 10;
+  doc.text(`Date de la facture : ${formatDateFR(facture.date)}`, ML, y);
+  if (isAcompte) {
+    doc.text('La présente facture correspond à un acompte de 30 %.', ML, y + 4.5);
+  }
 
-  // ══════════════════════════════════════════════
-  // TOTAUX
-  // ══════════════════════════════════════════════
+  // Calcul TVA
   const tvaMap: Record<string, number> = {};
   facture.lignes.forEach(l => {
     if (l.tauxTVA > 0) {
@@ -234,118 +159,81 @@ function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams): jsP
     }
   });
 
-  const totW = 85;
-  const totX = COL_R - totW;
-  let totY = y;
-
-  function drawTotalRow(label: string, value: string, bold = false) {
-    doc.setFont('helvetica', bold ? 'bold' : 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(...NOIR);
-    doc.text(label, totX, totY);
-    doc.text(value, COL_R, totY, { align: 'right' });
-    totY += 5.5;
+  const totRows: { label: string; value: string; large?: boolean }[] = [
+    { label: 'TOTAL HT :', value: `${fmt(facture.montantHT)} €` },
+  ];
+  if (Object.keys(tvaMap).length > 0) {
+    Object.entries(tvaMap).forEach(([taux, montant]) =>
+      totRows.push({ label: `TVA (${taux}%) :`, value: `${fmt(montant)} €` })
+    );
+  } else {
+    totRows.push({ label: 'TVA :', value: `${fmt(facture.montantTTC - facture.montantHT)} €` });
   }
 
-  drawTotalRow('TOTAL HT :', `${fmt(facture.montantHT)} €`);
-  Object.entries(tvaMap).forEach(([taux, montant]) => {
-    drawTotalRow(`TVA (${taux}%) :`, `${fmt(montant)} €`);
-  });
-  if (Object.keys(tvaMap).length === 0) {
-    const tva = facture.montantTTC - facture.montantHT;
-    drawTotalRow('TVA :', `${fmt(tva)} €`);
-  }
+  const totEndY = drawTotaux(doc, y, totRows);
+  y = Math.max(y + 14, totEndY) + 6;
 
-  totY += 2;
+  // ─── MONTANT PRINCIPAL (centré, grand) ────────────────────────
+  // Calculer le montant à afficher
+  const montantAffiche = isAcompte
+    ? Math.round(facture.montantTTC * 0.30 * 100) / 100
+    : facture.resteAPayer > 0 && !facture.paye ? facture.resteAPayer : facture.montantTTC;
+
+  const labelAffiche = isAcompte ? 'ACOMPTE À PAYER'
+    : facture.paye ? 'TOTAL TTC'
+    : facture.resteAPayer > 0 && facture.resteAPayer < facture.montantTTC ? 'RESTE À PAYER'
+    : 'NET À PAYER';
+
+  // Grande box montant
+  const bigBoxH = 18;
+  doc.setFillColor(255, 255, 255);
   doc.setDrawColor(...GRIS_LIGNE);
   doc.setLineWidth(0.4);
-  doc.line(totX, totY, COL_R, totY);
-  totY += 5;
+  doc.rect(ML, y, CW, bigBoxH, 'S');
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(...NOIR);
-  doc.text('NET À PAYER :', totX, totY);
-  doc.text(`${fmt(facture.montantTTC)} €`, COL_R, totY, { align: 'right' });
-  totY += 7;
+  setFont(doc, 'bolditalic');
+  doc.setFontSize(18);
+  doc.setTextColor(facture.paye ? VERT[0] : NOIR[0], facture.paye ? VERT[1] : NOIR[1], facture.paye ? VERT[2] : NOIR[2]);
+  doc.text(`${labelAffiche} : ${fmt(montantAffiche)} €`, PAGE_W / 2, y + 11, { align: 'center' });
 
-  if (facture.resteAPayer > 0 && !facture.paye) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(185, 28, 28);
-    doc.text(`Reste à payer : ${fmt(facture.resteAPayer)} €`, COL_R, totY, { align: 'right' });
-    totY += 6;
+  y += bigBoxH + 8;
+
+  // ─── RESTE À PAYER (si paiements partiels) ───────────────────
+  if (!facture.paye && facture.resteAPayer > 0 && facture.resteAPayer < facture.montantTTC && !isAcompte) {
+    setFont(doc, 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...GRIS_TEXTE);
+    doc.text(`TOTAL TTC : ${fmt(facture.montantTTC)} €  |  Déjà réglé : ${fmt(facture.montantTTC - facture.resteAPayer)} €`, PAGE_W / 2, y, { align: 'center' });
+    y += 8;
   }
 
-  if (facture.paye) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(...VERT);
-    doc.text('✓ FACTURE PAYÉE', COL_R, totY, { align: 'right' });
-    totY += 7;
-  }
+  // ─── RIB ──────────────────────────────────────────────────────
+  y = drawRib(doc, y) + 2;
 
-  y = Math.max(y + 10, totY) + 6;
-
-  // ══════════════════════════════════════════════
-  // MOYENS DE PAIEMENT
-  // ══════════════════════════════════════════════
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...NOIR);
-  doc.text('Moyens de paiement :', MARGIN, y);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(50, 50, 50);
-  doc.text('IBAN : FR76 1695 8000 0179 9683 5713 173', MARGIN, y + 6);
-  doc.text('BIC : QNTOFRP1XXX', MARGIN, y + 11);
-
-  y += 18;
-
-  // ══════════════════════════════════════════════
-  // PIED DE PAGE
-  // ══════════════════════════════════════════════
-  const footY = PAGE_H - 18;
-  doc.setDrawColor(...GRIS_LIGNE);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN, footY - 4, COL_R, footY - 4);
-
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(6.5);
-  doc.setTextColor(...GRIS_TEXTE);
-  const legal = [
-    'Nos travaux sont couverts par notre assurance décennale et RC Pro auprès d\'ERGO — Contrat n° 24015161184.',
-    'Les matériaux et équipements restent la propriété de l\'entreprise jusqu\'au paiement intégral de la facture (art. 2367 du Code civil).',
-    'Tout retard de paiement entraînera des pénalités de 10% par an et une indemnité forfaitaire de 40 € pour frais de recouvrement (art. L441-10 du Code de commerce).',
-  ];
-  legal.forEach((line, i) => {
-    doc.text(line, PAGE_W / 2, footY + i * 4, { align: 'center' });
-  });
+  // ─── FOOTER ───────────────────────────────────────────────────
+  drawFooter(doc);
 
   return doc;
 }
 
-export function openFacturePdf(params: FacturePdfParams): void {
-  const doc = buildFacturePdf(params);
-  const blob = doc.output('blob');
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
+// ─── API publique (async) ─────────────────────────────────────
+
+export async function openFacturePdf(params: FacturePdfParams): Promise<void> {
+  const doc = await buildFacturePdf(params);
+  window.open(URL.createObjectURL(doc.output('blob')), '_blank');
 }
 
-/** Génère une URL blob pour afficher dans un iframe (pas bloqué par popup blocker) */
-export function facturePdfToBlobUrl(params: FacturePdfParams): string {
-  const doc = buildFacturePdf(params);
-  const blob = doc.output('blob');
-  return URL.createObjectURL(blob);
+export async function facturePdfToBlobUrl(params: FacturePdfParams): Promise<string> {
+  const doc = await buildFacturePdf(params);
+  return URL.createObjectURL(doc.output('blob'));
 }
 
-export function downloadFacturePdf(params: FacturePdfParams): void {
-  const doc = buildFacturePdf(params);
+export async function downloadFacturePdf(params: FacturePdfParams): Promise<void> {
+  const doc = await buildFacturePdf(params);
   doc.save(`${params.facture.ref}.pdf`);
 }
 
-export function facturePdfToBase64(params: FacturePdfParams): string {
-  const doc = buildFacturePdf(params);
-  const dataUri = doc.output('datauristring');
-  return dataUri.split(',')[1];
+export async function facturePdfToBase64(params: FacturePdfParams): Promise<string> {
+  const doc = await buildFacturePdf(params);
+  return doc.output('datauristring').split(',')[1];
 }

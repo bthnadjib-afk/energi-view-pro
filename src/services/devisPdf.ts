@@ -1,234 +1,149 @@
-// Générateur PDF local — Devis — design mix modèle 1 & 2
+// Générateur PDF — DEVIS — ELECTRICIEN DU GENEVOIS
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Devis, DevisLigne, Client } from '@/services/dolibarr';
-
-// ─── Couleurs ───
-const NOIR: [number, number, number] = [15, 15, 15];
-const BLEU: [number, number, number] = [30, 64, 175];
-const ROUGE: [number, number, number] = [185, 28, 28];
-const ROUGE_BG: [number, number, number] = [254, 242, 242];
-const GRIS_CLAIR: [number, number, number] = [249, 250, 251];
-const GRIS_LIGNE: [number, number, number] = [229, 231, 235];
-const GRIS_TEXTE: [number, number, number] = [107, 114, 128];
-const JAUNE: [number, number, number] = [234, 179, 8];
-
-// ─── Constantes mise en page ───
-const MARGIN = 14;
-const PAGE_W = 210;
-const PAGE_H = 297;
-const COL_R = PAGE_W - MARGIN; // bord droit
-
-// ─── Helpers ───
-function fmt(n: number | null | undefined): string {
-  const num = typeof n === 'number' && isFinite(n) ? n : 0;
-  return num.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function toText(value: unknown): string {
-  return value == null ? '' : String(value);
-}
-
-function formatDateFR(dateStr: string): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr.includes('T') ? dateStr : dateStr.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
-  if (isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-/** Dessine le logo ELECTRICIEN DU GENEVOIS avec un éclair stylisé */
-function drawLogo(doc: jsPDF, x: number, y: number): void {
-  const boltX = x;
-  const boltY = y;
-  doc.setFillColor(...JAUNE);
-  doc.triangle(boltX + 7, boltY, boltX, boltY + 10, boltX + 5, boltY + 10, 'F');
-  doc.triangle(boltX + 3, boltY + 8, boltX + 10, boltY + 8, boltX + 3, boltY + 18, 'F');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(...BLEU);
-  doc.text('ELECTRICIEN', boltX + 13, boltY + 7);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text('DU GENEVOIS', boltX + 13, boltY + 14);
-}
+import {
+  ML, MR, MT, PAGE_W, PAGE_H, COL_R, CW,
+  NOIR, BLANC, GRIS_CLAIR, GRIS_LIGNE, GRIS_TEXTE,
+  fmt, toText, formatDateFR,
+  loadRobotoFonts, setFont,
+  drawLogo, drawInfoBar, drawParties, drawTotaux,
+  drawSignatureAndNet, drawRib, drawFooter, drawCGV,
+  type EntrepriseInfo, type ClientInfo,
+} from './pdfUtils';
 
 export interface DevisPdfParams {
   devis: Devis;
   client?: Client;
-  entreprise?: {
-    nom: string;
-    adresse: string;
-    codePostal: string;
-    ville: string;
-    siret: string;
-    telephone: string;
-    email: string;
-  };
+  entreprise?: EntrepriseInfo;
 }
 
-function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): jsPDF {
+async function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): Promise<jsPDF> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  let y = MARGIN;
+  await loadRobotoFonts(doc);
 
-  drawLogo(doc, MARGIN, y);
+  let y = MT;
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(26);
+  // ─── LOGO ────────────────────────────────────────────────────
+  const logoH = await drawLogo(doc, ML, y);
+  y += logoH + 7;
+
+  // ─── TITRE ───────────────────────────────────────────────────
+  setFont(doc, 'bolditalic');
+  doc.setFontSize(22);
   doc.setTextColor(...NOIR);
-  doc.text('DEVIS', COL_R, y + 8, { align: 'right' });
+  doc.text('DEVIS', ML, y);
+  y += 6;
 
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
+  setFont(doc, 'italic');
+  doc.setFontSize(8);
   doc.setTextColor(...GRIS_TEXTE);
-  doc.text(`NUMÉRO DE DEVIS : ${toText(devis.ref)}`, COL_R, y + 15, { align: 'right' });
-
-  y += 26;
-  const colMid = PAGE_W / 2 + 5;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...GRIS_TEXTE);
-  doc.text('DESTINATAIRE', MARGIN, y);
-  y += 5;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...NOIR);
-  const clientNom = toText(client?.nom || devis.client || '');
-  doc.text(clientNom, MARGIN, y);
-  y += 5;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(50, 50, 50);
-  const clientLines: string[] = [];
-  if (client?.adresse) clientLines.push(toText(client.adresse));
-  const cityLine = [client?.codePostal, client?.ville].filter(Boolean).map(toText).join(' ');
-  if (cityLine) clientLines.push(cityLine);
-  if (client?.email) clientLines.push(toText(client.email));
-  if (client?.telephone) clientLines.push(toText(client.telephone));
-  clientLines.forEach(line => { doc.text(toText(line), MARGIN, y); y += 4.5; });
-
-  const ent = entreprise;
-  const entY0 = y - (clientLines.length * 4.5) - 5;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(...GRIS_TEXTE);
-  doc.text('ÉMETTEUR', colMid, entY0);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(...NOIR);
-  const entNom = toText(ent?.nom || 'EURL ELECTRICIEN DU GENEVOIS').toUpperCase();
-  doc.text(entNom, colMid, entY0 + 5);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(50, 50, 50);
-  let ey = entY0 + 10;
-  doc.text('AU CAPITAL DE 1 000 €', colMid, ey); ey += 4;
-  if (ent?.adresse) { doc.text(toText(ent.adresse).toUpperCase(), colMid, ey); ey += 4; }
-  if (ent?.codePostal || ent?.ville) { doc.text(`${toText(ent?.codePostal)} ${toText(ent?.ville)}`.trim().toUpperCase(), colMid, ey); ey += 4; }
-  if (ent?.siret) { doc.text(`SIRET : ${toText(ent.siret)} — RCS ANNECY`, colMid, ey); ey += 4; }
-  if (ent?.email) { doc.text(toText(ent.email).toUpperCase(), colMid, ey); ey += 4; }
-  if (ent?.telephone) { doc.text(toText(ent.telephone), colMid, ey); ey += 4; }
-
-  // Séparateur horizontal
-  y = Math.max(y, ey) + 6;
-  doc.setDrawColor(...GRIS_LIGNE);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN, y, COL_R, y);
+  doc.text(`NUMÉRO DE DEVIS : ${toText(devis.ref)}`, ML, y);
   y += 8;
 
-  // ══════════════════════════════════════════════
-  // TABLEAU DES LIGNES (en-tête noir, sections)
-  // ══════════════════════════════════════════════
+  // ─── BARRE INFO ───────────────────────────────────────────────
+  const validStr = devis.finValidite
+    ? `Valable jusqu'au ${formatDateFR(devis.finValidite)}`
+    : 'Valable 30 jours';
+  const barH = drawInfoBar(doc, y, [
+    { label: 'Référence',   value: toText(devis.ref) },
+    { label: 'Date',        value: formatDateFR(devis.date) },
+    { label: 'Validité',    value: validStr },
+  ]);
+  y += barH + 8;
+
+  // ─── CLIENT / ENTREPRISE ──────────────────────────────────────
+  const clientInfo: ClientInfo = {
+    nom:       client?.nom || devis.client,
+    adresse:   client?.adresse,
+    codePostal: client?.codePostal,
+    ville:      client?.ville,
+    email:      client?.email,
+    telephone:  client?.telephone,
+  };
+  y = drawParties(doc, y, clientInfo, entreprise) + 10;
+
+  // ─── TABLEAU DES LIGNES ───────────────────────────────────────
   const lignesMO = devis.lignes.filter(l => l.productType === 'main_oeuvre');
   const lignesFO = devis.lignes.filter(l => l.productType === 'fourniture');
 
-  function buildRows(lignes: DevisLigne[]): (string | { content: string; styles: object })[][] {
+  function buildRows(lignes: DevisLigne[]) {
     return lignes.map(l => [
-      String(l.designation || ''),
-      String(l.ref || ''),
-      String(l.quantite ?? ''),
-      l.unite || 'U',
-      `${fmt(l.prixUnitaire)} €`,
-      `${l.tauxTVA}%`,
-      `${fmt(l.totalHT)} €`,
+      toText(l.designation || ''),
+      { content: toText(l.ref || ''), styles: { halign: 'center' as const, textColor: [120,120,120] as [number,number,number] } },
+      { content: toText(l.quantite ?? ''), styles: { halign: 'center' as const } },
+      { content: l.unite || 'U', styles: { halign: 'center' as const } },
+      { content: `${fmt(l.prixUnitaire)} €`, styles: { halign: 'right' as const } },
+      { content: `${l.tauxTVA}%`, styles: { halign: 'center' as const } },
+      { content: `${fmt(l.totalHT)} €`, styles: { halign: 'right' as const, fontStyle: 'bold' as const } },
     ]);
   }
 
-  const sectionHeaderStyle = {
-    fillColor: [243, 244, 246] as [number, number, number],
-    textColor: BLEU,
-    fontStyle: 'bold' as const,
+  const sectionStyle = {
+    fillColor: [255,255,255] as [number,number,number],
+    textColor: NOIR,
+    fontStyle: 'bolditalic' as const,
+    fontSize: 9,
+    cellPadding: { top: 3, bottom: 1, left: 2, right: 2 },
   };
 
   const body: any[] = [];
   if (lignesMO.length > 0) {
-    body.push([{ content: "Main d'œuvre", colSpan: 7, styles: sectionHeaderStyle }]);
+    body.push([{ content: "Main d'œuvre", colSpan: 7, styles: sectionStyle }]);
     buildRows(lignesMO).forEach(r => body.push(r));
   }
   if (lignesFO.length > 0) {
-    body.push([{ content: 'Fournitures', colSpan: 7, styles: sectionHeaderStyle }]);
+    body.push([{ content: 'Fournitures', colSpan: 7, styles: sectionStyle }]);
     buildRows(lignesFO).forEach(r => body.push(r));
   }
   if (body.length === 0) {
-    devis.lignes.forEach(l => body.push(buildRows([l])[0]));
+    devis.lignes.forEach(l => buildRows([l]).forEach(r => body.push(r)));
   }
 
   autoTable(doc, {
     startY: y,
-    margin: { left: MARGIN, right: MARGIN },
+    margin: { left: ML, right: MR },
     head: [['Description', 'Réf', 'Qté', 'Unité', 'Prix unitaire', 'TVA', 'Montant']],
     body,
     theme: 'grid',
     styles: {
-      fontSize: 8.5,
-      cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
-      textColor: NOIR,
-      lineColor: GRIS_LIGNE,
-      lineWidth: 0.2,
+      fontSize: 8.5, font: 'helvetica',
+      cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
+      textColor: NOIR, lineColor: GRIS_LIGNE, lineWidth: 0.3,
     },
     headStyles: {
-      fillColor: [15, 15, 15],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      fontSize: 8.5,
-      lineColor: [15, 15, 15],
+      fillColor: NOIR, textColor: BLANC, fontStyle: 'bold',
+      fontSize: 8.5, font: 'helvetica', lineColor: NOIR,
     },
     alternateRowStyles: { fillColor: GRIS_CLAIR },
     columnStyles: {
-      0: { cellWidth: 'auto' },
-      1: { cellWidth: 22, halign: 'center' },
-      2: { cellWidth: 12, halign: 'center' },
-      3: { cellWidth: 14, halign: 'center' },
-      4: { cellWidth: 24, halign: 'right' },
-      5: { cellWidth: 14, halign: 'center' },
-      6: { cellWidth: 24, halign: 'right', fontStyle: 'bold' },
+      0: { cellWidth: 'auto',  halign: 'left' },
+      1: { cellWidth: 16,      halign: 'center' },
+      2: { cellWidth: 11,      halign: 'center' },
+      3: { cellWidth: 12,      halign: 'center' },
+      4: { cellWidth: 23,      halign: 'right' },
+      5: { cellWidth: 13,      halign: 'center' },
+      6: { cellWidth: 25,      halign: 'right' },
     },
   });
 
   y = (doc as any).lastAutoTable?.finalY || y + 20;
+
+  // ─── SÉPARATEUR ───────────────────────────────────────────────
+  y += 5;
+  doc.setDrawColor(...GRIS_LIGNE);
+  doc.setLineWidth(0.4);
+  doc.line(ML, y, COL_R, y);
   y += 6;
 
-  // ══════════════════════════════════════════════
-  // Date validité
-  // ══════════════════════════════════════════════
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'italic');
+  // ─── DATE (gauche) + TOTAUX (droite) ─────────────────────────
+  setFont(doc, 'italic');
+  doc.setFontSize(8);
   doc.setTextColor(...GRIS_TEXTE);
-  const dateStr = formatDateFR(devis.date);
-  const validStr = devis.finValidite ? formatDateFR(devis.finValidite) : '30 jours à compter de cette date';
-  doc.text(`Devis établi le ${dateStr} | Valable ${validStr}`, MARGIN, y);
-  y += 10;
+  doc.text(`Devis établi le ${formatDateFR(devis.date)}`, ML, y);
+  doc.text('La présente offre est valable sous réserve de disponibilité des fournitures.', ML, y + 4.5);
 
-  // ══════════════════════════════════════════════
-  // TOTAUX (droite) + ACOMPTE (droite sous NET)
-  // ══════════════════════════════════════════════
-
-  // Calculer TVA par taux
+  // Calcul TVA par taux
   const tvaMap: Record<string, number> = {};
   devis.lignes.forEach(l => {
     if (l.tauxTVA > 0) {
@@ -237,143 +152,58 @@ function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): jsPDF {
     }
   });
 
-  const totW = 85;
-  const totX = COL_R - totW;
-  let totY = y;
-
-  function drawTotalRow(label: string, value: string, bold = false, large = false) {
-    doc.setFont('helvetica', bold ? 'bold' : 'normal');
-    doc.setFontSize(large ? 11 : 9);
-    doc.setTextColor(...NOIR);
-    doc.text(label, totX, totY);
-    doc.text(value, COL_R, totY, { align: 'right' });
-    totY += large ? 8 : 5.5;
-  }
-
-  drawTotalRow('TOTAL HT :', `${fmt(devis.montantHT)} €`);
-  Object.entries(tvaMap).forEach(([taux, montant]) => {
-    drawTotalRow(`TVA (${taux}%) :`, `${fmt(montant)} €`);
-  });
-  if (Object.keys(tvaMap).length === 0) {
-    const tva = devis.montantTTC - devis.montantHT;
-    drawTotalRow('TVA :', `${fmt(tva)} €`);
-  }
-
-  totY += 2;
-
-  // Ligne de séparation avant NET
-  doc.setDrawColor(...GRIS_LIGNE);
-  doc.setLineWidth(0.4);
-  doc.line(totX, totY, COL_R, totY);
-  totY += 5;
-
-  // NET À PAYER — grand
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(...NOIR);
-  doc.text('NET À PAYER :', totX, totY);
-  doc.text(`${fmt(devis.montantTTC)} €`, COL_R, totY, { align: 'right' });
-  totY += 10;
-
-  // Acompte box rouge
-  const tauxAcompte = devis.montantHT > 5000 ? 30 : 50;
-  const montantAcompte = Math.round(devis.montantTTC * tauxAcompte) / 100;
-  const boxH = 16;
-  doc.setFillColor(...ROUGE_BG);
-  doc.setDrawColor(...ROUGE);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(totX, totY, totW, boxH, 2, 2, 'FD');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...ROUGE);
-  doc.text(`⚠  ACOMPTE ${tauxAcompte}% À PAYER À LA SIGNATURE`, totX + totW / 2, totY + 6, { align: 'center' });
-  doc.setFontSize(10);
-  doc.text(`SOIT ${fmt(montantAcompte)} €`, totX + totW / 2, totY + 13, { align: 'center' });
-  totY += boxH + 4;
-
-  y = Math.max(y + 10, totY) + 6;
-
-  // ══════════════════════════════════════════════
-  // SIGNATURE (gauche) + MOYENS DE PAIEMENT
-  // ══════════════════════════════════════════════
-  const sigW = 82;
-  const sigH = 28;
-  const sigX = MARGIN;
-
-  doc.setDrawColor(...GRIS_LIGNE);
-  doc.setLineWidth(0.3);
-  // @ts-ignore - jsPDF setLineDashPattern exists at runtime
-  (doc as any).setLineDashPattern?.([2, 2], 0);
-  doc.roundedRect(sigX, y, sigW, sigH, 2, 2, 'S');
-  // @ts-ignore
-  (doc as any).setLineDashPattern?.([], 0);
-
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(8);
-  doc.setTextColor(...GRIS_TEXTE);
-  doc.text("* Signature précédée de la mention 'bon pour accord' :", sigX + 3, y + 6);
-
-  // Moyens de paiement (droite de la signature)
-  const payX = MARGIN + sigW + 10;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...NOIR);
-  doc.text('Moyens de paiement :', payX, y + 5);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(50, 50, 50);
-  doc.text('IBAN : FR76 1695 8000 0179 9683 5713 173', payX, y + 11);
-  doc.text('BIC : QNTOFRP1XXX', payX, y + 16);
-
-  y += sigH + 10;
-
-  // ══════════════════════════════════════════════
-  // PIED DE PAGE LÉGAL
-  // ══════════════════════════════════════════════
-  const footY = PAGE_H - 18;
-  doc.setDrawColor(...GRIS_LIGNE);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN, footY - 4, COL_R, footY - 4);
-
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(6.5);
-  doc.setTextColor(...GRIS_TEXTE);
-  const legal = [
-    'Nos travaux sont couverts par notre assurance décennale et RC Pro auprès d\'ERGO — Contrat n° 24015161184.',
-    'Les matériaux et équipements restent la propriété de l\'entreprise jusqu\'au paiement intégral de la facture (art. 2367 du Code civil).',
-    'Tout retard de paiement entraînera des pénalités de 10% par an et une indemnité forfaitaire de 40 € pour frais de recouvrement (art. L441-10 du Code de commerce).',
+  const totRows: { label: string; value: string; large?: boolean }[] = [
+    { label: 'TOTAL HT :', value: `${fmt(devis.montantHT)} €` },
   ];
-  legal.forEach((line, i) => {
-    doc.text(line, PAGE_W / 2, footY + i * 4, { align: 'center' });
-  });
+  if (Object.keys(tvaMap).length > 0) {
+    Object.entries(tvaMap).forEach(([taux, montant]) =>
+      totRows.push({ label: `TVA (${taux}%) :`, value: `${fmt(montant)} €` })
+    );
+  } else {
+    totRows.push({ label: 'TVA :', value: `${fmt(devis.montantTTC - devis.montantHT)} €` });
+  }
+
+  const totEndY = drawTotaux(doc, y, totRows);
+  y = Math.max(y + 14, totEndY) + 6;
+
+  // ─── SIGNATURE + NET À PAYER ──────────────────────────────────
+  const acompte = Math.round(devis.montantTTC * 0.30 * 100) / 100;
+  y = drawSignatureAndNet(
+    doc, y,
+    'NET À PAYER', `${fmt(devis.montantTTC)} €`,
+    '⚠  ACOMPTE 30 % À PAYER À LA SIGNATURE', `SOIT ${fmt(acompte)} €`
+  ) + 8;
+
+  // ─── RIB ──────────────────────────────────────────────────────
+  y = drawRib(doc, y) + 2;
+
+  // ─── FOOTER ───────────────────────────────────────────────────
+  drawFooter(doc);
+
+  // ─── CGV (page 2) ─────────────────────────────────────────────
+  drawCGV(doc);
 
   return doc;
 }
 
-/** Ouvre le PDF dans un nouvel onglet */
-export function openDevisPdf(params: DevisPdfParams): void {
-  const doc = buildDevisPdf(params);
-  const blob = doc.output('blob');
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
+// ─── API publique ─────────────────────────────────────────────
+
+export async function openDevisPdf(params: DevisPdfParams): Promise<void> {
+  const doc = await buildDevisPdf(params);
+  window.open(URL.createObjectURL(doc.output('blob')), '_blank');
 }
 
-/** Génère une URL blob pour afficher dans un iframe (pas bloqué par popup blocker) */
-export function devisPdfToBlobUrl(params: DevisPdfParams): string {
-  const doc = buildDevisPdf(params);
-  const blob = doc.output('blob');
-  return URL.createObjectURL(blob);
+export async function devisPdfToBlobUrl(params: DevisPdfParams): Promise<string> {
+  const doc = await buildDevisPdf(params);
+  return URL.createObjectURL(doc.output('blob'));
 }
 
-/** Télécharge directement le PDF */
-export function downloadDevisPdf(params: DevisPdfParams): void {
-  const doc = buildDevisPdf(params);
+export async function downloadDevisPdf(params: DevisPdfParams): Promise<void> {
+  const doc = await buildDevisPdf(params);
   doc.save(`${params.devis.ref}.pdf`);
 }
 
-/** Retourne le PDF en base64 (pour envoi email) */
-export function devisPdfToBase64(params: DevisPdfParams): string {
-  const doc = buildDevisPdf(params);
-  const dataUri = doc.output('datauristring');
-  return dataUri.split(',')[1];
+export async function devisPdfToBase64(params: DevisPdfParams): Promise<string> {
+  const doc = await buildDevisPdf(params);
+  return doc.output('datauristring').split(',')[1];
 }

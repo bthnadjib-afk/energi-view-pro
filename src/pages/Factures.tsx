@@ -7,7 +7,7 @@ import { useFactures, useDevis, useClients, useProduits, useCreateFacture, useDe
 import { useFactureRelances, useRecordFactureEnvoi, useSetFactureEnvoiDate, getRelanceStatus } from '@/hooks/useFactureRelances';
 import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, getFactureCloseCodeLabel, isFactureAbandonnee, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
 import { useQuery } from '@tanstack/react-query';
-import { openFacturePdf, facturePdfToBase64, facturePdfToBlobUrl } from '@/services/facturePdf';
+import { openInvoicePdf, invoicePdfToBase64 } from '@/services/invoiceRenderer';
 import { useConfig } from '@/hooks/useConfig';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -695,17 +695,14 @@ export default function Factures() {
                   <Button
                     variant="outline"
                     className="gap-2"
-                    onClick={() => {
+                    onClick={async () => {
                       try {
                         const client = clients.find((c: Client) => c.id === selectedFacture.socid);
-                        const url = facturePdfToBlobUrl({ facture: selectedFacture, client, entreprise: config.entreprise });
-                        setPdfPreviewUrl(url);
-                        setPdfPreviewRef(selectedFacture.ref);
-                        setPdfPreviewOpen(true);
+                        await openInvoicePdf({ facture: selectedFacture, client, entreprise: config.entreprise });
                       } catch (e: any) { toast.error(`Erreur PDF : ${e.message || e}`); }
                     }}
                   >
-                    <FileDown className="h-4 w-4" /> Voir le PDF
+                    <FileDown className="h-4 w-4" /> Générer PDF
                   </Button>
                   {!selectedFacture.paye && (
                     <Button
@@ -1021,7 +1018,7 @@ export default function Factures() {
                 setSendingEmail(true);
                 try {
                   const client = clients.find((c: Client) => c.id === selectedFacture.socid);
-                  const pdfBase64 = facturePdfToBase64({ facture: selectedFacture, client, entreprise: config.entreprise });
+                  const pdfBase64 = await invoicePdfToBase64({ facture: selectedFacture, client, entreprise: config.entreprise });
                   const { supabase } = await import('@/integrations/supabase/client');
                   const { data, error } = await supabase.functions.invoke('send-email-smtp', {
                     body: {
