@@ -31,7 +31,10 @@ const TEMPLATE_W_PX = (A4_W_MM / 25.4) * 96;       // ≈ 794 px
 const TEMPLATE_H_PX = (A4_H_MM / 25.4) * 96;       // ≈ 1123 px
 const RENDER_SCALE = 1;
 const MAX_DENSITY = 1;
-const MIN_DENSITY = 0.6;
+// Garde-fou : ne JAMAIS descendre sous 0.85 pour préserver la lisibilité.
+// Si à 0.85 le contenu dépasse encore, on bascule en MULTI-PAGE plutôt
+// que de continuer à miniaturiser le texte.
+const MIN_DENSITY = 0.85;
 const DENSITY_STEP = 0.05;
 // Capture haute résolution (~300 dpi)
 const RENDER_DPR = 3;

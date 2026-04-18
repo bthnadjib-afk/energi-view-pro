@@ -164,13 +164,16 @@ export function DocumentTemplate({
   };
 
   // ─── Mode CGV uniquement (page finale dédiée) ─────────────────────
+  // Les CGV doivent rester à leur taille NOMINALE pour conformité légale :
+  // on neutralise TEXT_SCALE en divisant l'unit utilisée ici.
   if (cgvOnly) {
+    const cgvUnit = unit / TEXT_SCALE; // = scale * PX_PER_MM * density (sans réduction)
     return (
       <div style={pageStyle}>
-        <div style={{ fontSize: 16 * unit, fontWeight: 700, fontStyle: 'italic', color: primary, marginBottom: 10 * unit, borderBottom: `1.5px solid ${primary}`, paddingBottom: 4 * unit }}>
+        <div style={{ fontSize: 14 * cgvUnit, fontWeight: 700, fontStyle: 'italic', color: primary, marginBottom: 10 * cgvUnit, borderBottom: `1.5px solid ${primary}`, paddingBottom: 4 * cgvUnit }}>
           Conditions Générales de Vente
         </div>
-        <div style={{ fontSize: 8 * unit, color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.5, textAlign: 'justify' }}>
+        <div style={{ fontSize: 8 * cgvUnit, color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.5, textAlign: 'justify' }}>
           {t.texteCgv || 'Aucune CGV configurée. Renseignez le texte dans Préférences → Template.'}
         </div>
       </div>
@@ -187,7 +190,8 @@ export function DocumentTemplate({
   return (
     <div style={pageStyle}>
       {/* ─── EN-TÊTE : LOGO + TITRE ─── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 * unit }}>
+      {/* marginBottom réduit de 20% (14 → 11.2) pour rapprocher Émetteur ↔ Client */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 11.2 * unit }}>
         <div>
           {t.logoUrl ? (
             <img
@@ -252,7 +256,7 @@ export function DocumentTemplate({
           display: 'flex',
           background: primary,
           color: '#fff',
-          marginBottom: 14 * unit,
+          marginBottom: 11.2 * unit,
         }}
       >
         {[
@@ -280,8 +284,8 @@ export function DocumentTemplate({
         ))}
       </div>
 
-      {/* ─── CLIENT ─── */}
-      <div style={{ marginBottom: 14 * unit }}>
+      {/* ─── CLIENT ─── (marginBottom -20% : 14 → 11.2) */}
+      <div style={{ marginBottom: 11.2 * unit }}>
         <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 10 * unit, marginBottom: 2 * unit }}>
           {data.client.nom}
         </div>
@@ -486,7 +490,7 @@ export function DocumentTemplate({
           marginTop: 24 * unit,
           paddingTop: 6 * unit,
           borderTop: '0.5px solid #ccc',
-          fontSize: 7 * unit,
+          fontSize: 8 * unit,
           color: '#777',
           textAlign: 'center',
           fontStyle: 'italic',
