@@ -195,8 +195,29 @@ async function trySendSmtp(params: {
     await sendCmd(`MAIL FROM:<${mailFromAddress}>`, ['250'])
     await sendCmd(`RCPT TO:<${recipient}>`, ['250', '251'])
     await sendCmd('DATA', ['354'])
-    await conn.write(encoder.encode(emailBody + '\r\n.\r\n'))
-    const dataResp = await readSmtpResponse(conn, decoder)
+
+    // Stream the email body in chunks to avoid concatenating a huge string in memory
+    // 1. Headers + HTML part
+    await conn.write(encoder.encode(headerPart))
+
+    // 2. PDF attachment streamed in 64 KB base64 chunks (already line-wrapped to 76 cols below)
+    if (pdfBase64 && pdfFilename) {
+      await conn.write(encoder.encode(pdfHeaderPart))
+      const raw = String(pdfBase64).replace(/\s/g, '')
+      const CHUNK = 64 * 1024 // 64 KB of base64 at a time
+      for (let i = 0; i < raw.length; i += CHUNK) {
+        const slice = raw.slice(i, i + CHUNK)
+        // wrap to 76 columns per RFC 2045
+        const wrapped = slice.match(/.{1,76}/g)?.join('\r\n') || ''
+        await conn.write(encoder.encode(wrapped + '\r\n'))
+      }
+    }
+
+    // 3. Closing boundary + end-of-data marker
+    await conn.write(encoder.encode(closingPart + '\r\n.\r\n'))
+
+    // After a large attachment OVH can take a while to ack — give it 90s
+    const dataResp = await readSmtpResponse(conn, decoder, 90000)
     assertSmtpCode(dataResp, ['250'])
 
     try {
