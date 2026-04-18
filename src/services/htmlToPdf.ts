@@ -34,7 +34,10 @@ const A4_H_MM = 297;
 const TEMPLATE_W_PX = (A4_W_MM / 25.4) * 96;       // ≈ 794 px
 const TEMPLATE_H_PX = (A4_H_MM / 25.4) * 96;       // ≈ 1123 px
 const RENDER_SCALE = 1;
-const EXPORT_DENSITY = 0.8;
+// Densité max (= aucune compression visuelle). On descend si ça déborde.
+const MAX_DENSITY = 1;
+const MIN_DENSITY = 0.6;
+const DENSITY_STEP = 0.05;
 // Capture nette sans regonfler artificiellement le layout.
 const RENDER_DPR = 3;
 
@@ -100,8 +103,40 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
   let root: Root | null = null;
   try {
     root = createRoot(host);
-    // Render à l'échelle native du template pour conserver exactement les proportions
-    root.render(createElement(DocumentTemplate, { ...props, scale: RENDER_SCALE, density: EXPORT_DENSITY }));
+    // ─── Auto-fit : on cherche la plus grande densité qui tient sur A4.
+    //   1. On rend une fois SANS contrainte de hauteur pour mesurer le vrai
+    //      besoin du contenu à densité 1.
+    //   2. Si ça déborde A4, on réduit la densité par paliers jusqu'à ce
+    //      que le contenu rentre — sans jamais descendre sous MIN_DENSITY.
+    let density = MAX_DENSITY;
+    const measure = async (d: number): Promise<number> => {
+      root!.render(
+        createElement(DocumentTemplate, {
+          ...props,
+          scale: RENDER_SCALE,
+          density: d,
+          autoHeight: true,
+        })
+      );
+      await new Promise((r) => setTimeout(r, 60));
+      const el = host.firstElementChild as HTMLElement;
+      return el?.scrollHeight ?? 0;
+    };
+
+    let needed = await measure(density);
+    while (needed > TEMPLATE_H_PX && density > MIN_DENSITY) {
+      density = Math.max(MIN_DENSITY, +(density - DENSITY_STEP).toFixed(2));
+      needed = await measure(density);
+    }
+
+    // Render final à la densité retenue, contraint à la hauteur A4.
+    root.render(
+      createElement(DocumentTemplate, {
+        ...props,
+        scale: RENDER_SCALE,
+        density,
+      })
+    );
     await new Promise((r) => setTimeout(r, 80));
 
     // Attendre le décodage des images (logo, signatures)

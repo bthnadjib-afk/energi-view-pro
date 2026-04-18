@@ -82,6 +82,8 @@ export interface DocumentTemplateProps {
   scale?: number;
   /** Densité interne du contenu sans changer le format de page. */
   density?: number;
+  /** Si true, le document peut grandir au-delà de l'A4 pour mesurer le besoin réel. */
+  autoHeight?: boolean;
 }
 
 const PX_PER_MM = 96 / 25.4;
@@ -114,6 +116,7 @@ export function DocumentTemplate({
   entreprise = {},
   scale = 1,
   density = 1,
+  autoHeight = false,
 }: DocumentTemplateProps) {
   const unit = scale * PX_PER_MM * density;
   const W = A4_W_PX * scale;
@@ -137,8 +140,8 @@ export function DocumentTemplate({
 
   const pageStyle: CSSProperties = {
     width: W,
-    minHeight: H,
-    maxHeight: H,
+    minHeight: autoHeight ? undefined : H,
+    maxHeight: autoHeight ? undefined : H,
     background: '#fff',
     color: textColor,
     fontFamily,
@@ -149,7 +152,7 @@ export function DocumentTemplate({
     paddingRight: mr,
     boxSizing: 'border-box',
     lineHeight: density < 1 ? 1.24 : 1.4,
-    overflow: 'hidden',
+    overflow: autoHeight ? 'visible' : 'hidden',
   };
 
   const showEcheance = docType === 'facture';
