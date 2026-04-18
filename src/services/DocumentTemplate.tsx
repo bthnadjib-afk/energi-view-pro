@@ -123,7 +123,10 @@ export function DocumentTemplate({
   autoHeight = false,
   cgvOnly = false,
 }: DocumentTemplateProps) {
-  const unit = scale * PX_PER_MM * density;
+  // Facteur global appliqué à TOUTES les tailles de texte / paddings dérivés.
+  // 0.5 = tout est divisé par 2 par rapport à la version précédente.
+  const TEXT_SCALE = 0.5;
+  const unit = scale * PX_PER_MM * density * TEXT_SCALE;
   const W = A4_W_PX * scale;
   const H = A4_H_PX * scale;
   const mt = (t.margeHaut ?? 18) * unit;
