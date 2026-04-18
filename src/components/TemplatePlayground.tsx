@@ -279,7 +279,7 @@ function A4Preview({
   entreprise: AppConfig['entreprise'];
   totals: { ht: number; tva: number; ttc: number };
 }) {
-  const SCALE = 2.5;
+  const SCALE = 0.66;
 
   const data = {
     ref: docType === 'facture' ? 'FA2025-0042' : docType === 'devis' ? 'PR2025-0042' : 'FI2025-0042',
@@ -320,7 +320,7 @@ function A4Preview({
       className="overflow-auto rounded-lg border border-border bg-muted/30 p-4 flex justify-center"
       style={{ maxHeight: '80vh' }}
     >
-      <div className="shadow-2xl bg-white" style={{ width: 210 * SCALE }}>
+      <div className="shadow-2xl bg-white" style={{ width: `${(210 / 25.4) * 96 * SCALE}px` }}>
         <DocumentTemplate
           docType={docType as SharedDocType}
           data={data}

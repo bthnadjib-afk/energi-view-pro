@@ -30,10 +30,9 @@ import logoFallback from '@/assets/logo.png';
 const A4_W_MM = 210;
 const A4_H_MM = 297;
 // Le template a été construit avec une grille "virtuelle" 210×297 en pixels CSS.
-// Il ne faut donc PAS le sur-échantillonner en lui injectant un scale mm→px,
-// sinon tout le contenu devient trop gros dans le PDF.
-const TEMPLATE_W_PX = 210;
-const TEMPLATE_H_PX = 297;
+// On le rend sur une vraie largeur A4 CSS (~794px à 96dpi) pour éviter tout zoom.
+const TEMPLATE_W_PX = (A4_W_MM / 25.4) * 96;
+const TEMPLATE_H_PX = (A4_H_MM / 25.4) * 96;
 const RENDER_SCALE = 1;
 // On garde la netteté via html2canvas, pas via le layout interne.
 const RENDER_DPR = 4;
