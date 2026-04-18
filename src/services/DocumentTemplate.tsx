@@ -61,6 +61,8 @@ export interface DocumentTemplateCfg {
   tailleTexte?: number;
   piedDePage?: string;
   afficherRib?: boolean;
+  afficherCgv?: boolean;
+  texteCgv?: string;
 }
 
 export interface EntrepriseInfo {
@@ -84,6 +86,8 @@ export interface DocumentTemplateProps {
   density?: number;
   /** Si true, le document peut grandir au-delà de l'A4 pour mesurer le besoin réel. */
   autoHeight?: boolean;
+  /** Si true, n'affiche QUE la page CGV (utilisée comme dernière page du PDF). */
+  cgvOnly?: boolean;
 }
 
 const PX_PER_MM = 96 / 25.4;
