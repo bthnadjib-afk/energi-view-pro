@@ -146,6 +146,17 @@ export function DocumentTemplate({
   const baseFontSize = (t.tailleTexte ?? 8.5) * unit * 1.2;
   const titleSize = (t.tailleTitre ?? 22) * unit;
 
+  // ─── Tailles fines (chacune réglable indépendamment dans Préférences) ───
+  // Si la valeur n'est pas définie, on retombe sur la valeur historique.
+  const fsEntreprise   = (t.tailleEntreprise   ?? 11)   * unit;
+  const fsCoord        = (t.tailleCoordonnees  ?? 9)    * unit;
+  const fsRubanLabel   = (t.tailleRubanLabel   ?? 6.5)  * unit;
+  const fsRubanValeur  = (t.tailleRubanValeur  ?? 8.5)  * unit;
+  const fsTableHeader  = (t.tailleTableauHeader?? 8.5)  * unit;
+  const fsTableLigne   = (t.tailleTableauLignes?? 8.5)  * unit;
+  const fsTotaux       = (t.tailleTotaux       ?? 9.5)  * unit;
+  const fsTotalTTC     = (t.tailleTotalTTC     ?? 11)   * unit;
+
   const primary = t.couleurPrimaire || '#1a1a1a';
   const accent = t.couleurAccent || '#cc0000';
   const textColor = t.couleurTexte || '#1a1a1a';
