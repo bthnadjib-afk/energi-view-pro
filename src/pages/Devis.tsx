@@ -185,7 +185,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
     }
     setSendingEmail(true);
     try {
-      const pdfBase64 = devisPdfToBase64({ devis, client: client as Client | undefined, entreprise: config.entreprise });
+      const pdfBase64 = await devisPdfToBase64({ devis, client: client as Client | undefined, entreprise: config.entreprise });
       const { data, error } = await supabase.functions.invoke('send-email-smtp', {
         body: {
           to: emailDest,
@@ -1133,7 +1133,7 @@ export default function Devis() {
       const refDate = d.dateValidation || d.date;
       if (!refDate) return false;
       const days = (Date.now() - new Date(refDate).getTime()) / (1000 * 60 * 60 * 24);
-      return days >= 0; // TEST — remettre à 7 après validation
+      return days >= 7;
     });
     if (toRelance.length === 0) return;
     toRelance.forEach(d => autoRelanceRef.current.add(d.id));

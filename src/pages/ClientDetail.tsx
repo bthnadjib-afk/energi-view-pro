@@ -280,7 +280,7 @@ export default function ClientDetail() {
                       <td className="py-3 px-2 text-foreground">{d.montantHT.toLocaleString('fr-FR')} €</td>
                       <td className="py-3 px-2"><StatusBadge statut={d.statut as any} /></td>
                       <td className="py-3 px-2 text-right">
-                        <Button variant="ghost" size="sm" onClick={() => openDevisPdf({ devis: d, client, entreprise: config.entreprise })}>
+                        <Button variant="ghost" size="sm" onClick={() => void openDevisPdf({ devis: d, client, entreprise: config.entreprise })}>
                           <FileDown className="h-4 w-4" />
                         </Button>
                       </td>
@@ -320,7 +320,7 @@ export default function ClientDetail() {
                       </td>
                       <td className="py-3 px-2"><StatusBadge statut={f.statut as any} /></td>
                       <td className="py-3 px-2 text-right">
-                        <Button variant="ghost" size="sm" onClick={() => openFacturePdf({ facture: f, client, entreprise: config.entreprise })}>
+                        <Button variant="ghost" size="sm" onClick={() => void openFacturePdf({ facture: f, client, entreprise: config.entreprise })}>
                           <FileDown className="h-4 w-4" />
                         </Button>
                       </td>
@@ -458,7 +458,7 @@ export default function ClientDetail() {
                     {devis.map(d => (
                       <button
                         key={d.id}
-                        onClick={() => openDevisPdf({ devis: d, client, entreprise: config.entreprise })}
+                        onClick={() => void openDevisPdf({ devis: d, client, entreprise: config.entreprise })}
                         className="w-full flex items-center justify-between text-xs p-2 rounded hover:bg-muted/50 transition-colors text-left"
                       >
                         <span className="font-mono text-foreground truncate">{d.ref}</span>
@@ -480,7 +480,7 @@ export default function ClientDetail() {
                     {factures.map(f => (
                       <button
                         key={f.id}
-                        onClick={() => openFacturePdf({ facture: f, client, entreprise: config.entreprise })}
+                        onClick={() => void openFacturePdf({ facture: f, client, entreprise: config.entreprise })}
                         className="w-full flex items-center justify-between text-xs p-2 rounded hover:bg-muted/50 transition-colors text-left"
                       >
                         <span className="font-mono text-foreground truncate">{f.ref}</span>

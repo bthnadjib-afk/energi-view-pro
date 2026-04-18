@@ -1696,10 +1696,10 @@ export default function Interventions() {
                   )}
                   {selectedIntervention.fk_statut > 0 && (
                     <Button
-                      onClick={() => {
+                      onClick={async () => {
                         if (!selectedIntervention) return;
                         const client = clients.find(c => c.id === selectedIntervention.socid);
-                        generateInterventionPdfLocal({
+                        await generateInterventionPdfLocal({
                           intervention: selectedIntervention,
                           client,
                           lines: interventionLines,
