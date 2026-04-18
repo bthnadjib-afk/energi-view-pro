@@ -6,7 +6,7 @@ import {
   createDevis, updateDevis, updateDevisSocid, cloneDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
   createFacture, validateFacture, deleteFacture, updateFactureLines,
   setFactureToDraft, setFactureToUnpaid, setDevisToDraft, reopenDevis,
-  convertDevisToFacture, createAcompteFacture, createAcompteLibre, createAvoirFromFacture, classifyFactureAbandonee,
+  convertDevisToFacture, createAcompteFacture, createAcompteLibre, createAcompteFromDevis, createAvoirFromFacture, classifyFactureAbandonee,
   createProduit, deleteProduit, updateProduit,
   bulkDeleteDevis, bulkDeleteFactures,
   createDolibarrUser, addPayment, updateDolibarrUser, saveInterventionSignatures,
@@ -364,6 +364,18 @@ export function useCreateAcompteLibre() {
     mutationFn: (data: { socid: string; montant: number; description: string; tva_tx?: number }) =>
       createAcompteLibre(data.socid, data.montant, data.description, data.tva_tx),
     onSuccess: () => { toast.success("Facture d'acompte créée"); qc.invalidateQueries({ queryKey: ['factures'] }); },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
+
+export function useCreateAcompteFromDevis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { devisId: string }) => createAcompteFromDevis(data.devisId),
+    onSuccess: (res) => {
+      toast.success(`Facture d'acompte ${Math.round(res.tauxAcompte * 100)}% créée depuis le devis`);
+      qc.invalidateQueries({ queryKey: ['factures'] });
+    },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });
 }
