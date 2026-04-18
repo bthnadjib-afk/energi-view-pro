@@ -80,6 +80,8 @@ export interface DocumentTemplateProps {
   entreprise?: EntrepriseInfo;
   /** Échelle d'affichage globale du document. Utiliser 1 pour le PDF. */
   scale?: number;
+  /** Densité interne du contenu sans changer le format de page. */
+  density?: number;
 }
 
 const PX_PER_MM = 96 / 25.4;
@@ -111,10 +113,11 @@ export function DocumentTemplate({
   template: t,
   entreprise = {},
   scale = 1,
+  density = 1,
 }: DocumentTemplateProps) {
-  const unit = scale * PX_PER_MM;
-  const W = 210 * unit;
-  const H = 297 * unit;
+  const unit = scale * PX_PER_MM * density;
+  const W = A4_W_PX * scale;
+  const H = A4_H_PX * scale;
   const mt = (t.margeHaut ?? 18) * unit;
   const mb = (t.margeBas ?? 20) * unit;
   const ml = (t.margeGauche ?? 15) * unit;
@@ -135,6 +138,7 @@ export function DocumentTemplate({
   const pageStyle: CSSProperties = {
     width: W,
     minHeight: H,
+    maxHeight: H,
     background: '#fff',
     color: textColor,
     fontFamily,
@@ -144,7 +148,8 @@ export function DocumentTemplate({
     paddingLeft: ml,
     paddingRight: mr,
     boxSizing: 'border-box',
-    lineHeight: 1.4,
+    lineHeight: density < 1 ? 1.24 : 1.4,
+    overflow: 'hidden',
   };
 
   const showEcheance = docType === 'facture';
@@ -183,7 +188,7 @@ export function DocumentTemplate({
             </div>
           )}
         </div>
-        <div style={{ textAlign: 'right', fontSize: 9 * unit, color: '#444', lineHeight: 1.5 }}>
+        <div style={{ textAlign: 'right', fontSize: 9 * unit, color: '#444', lineHeight: density < 1 ? 1.25 : 1.5 }}>
           <div style={{ fontWeight: 700, color: primary, fontSize: 11 * unit, textTransform: 'uppercase' }}>
             {entreprise.nom || ''}
           </div>
@@ -255,7 +260,7 @@ export function DocumentTemplate({
         <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 10 * unit, marginBottom: 2 * unit }}>
           {data.client.nom}
         </div>
-        <div style={{ fontSize: 8.5 * unit, color: '#333', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 8.5 * unit, color: '#333', lineHeight: density < 1 ? 1.22 : 1.5 }}>
           {data.client.adresse && <div>{data.client.adresse}</div>}
           {(data.client.codePostal || data.client.ville) && (
             <div>
@@ -279,7 +284,7 @@ export function DocumentTemplate({
 
       {/* ─── TABLEAU DES LIGNES ─── */}
       {data.lignes.length > 0 && (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8.5 * unit, marginBottom: 8 * unit }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8.5 * unit, marginBottom: 8 * unit, lineHeight: density < 1 ? 1.12 : 1.3 }}>
           <thead>
             <tr style={{ background: primary, color: '#fff' }}>
               <th style={{ padding: 4 * unit, textAlign: 'left', fontWeight: 700 }}>Description</th>

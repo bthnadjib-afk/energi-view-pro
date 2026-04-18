@@ -34,9 +34,9 @@ const A4_H_MM = 297;
 const TEMPLATE_W_PX = (A4_W_MM / 25.4) * 96;       // ≈ 794 px
 const TEMPLATE_H_PX = (A4_H_MM / 25.4) * 96;       // ≈ 1123 px
 const RENDER_SCALE = 1;
-// Capture html2canvas à ~300 dpi (300/96 ≈ 3.125) pour une netteté impression.
-// → canvas final ≈ 2480×3508 px = vrai A4 300 dpi.
-const RENDER_DPR = 300 / 96;
+const EXPORT_DENSITY = 0.8;
+// Capture nette sans regonfler artificiellement le layout.
+const RENDER_DPR = 3;
 
 // ─── Lecture config template depuis localStorage ─────────────────────────────
 function readTemplateCfg(): DocumentTemplateCfg {
@@ -101,7 +101,7 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
   try {
     root = createRoot(host);
     // Render à l'échelle native du template pour conserver exactement les proportions
-    root.render(createElement(DocumentTemplate, { ...props, scale: RENDER_SCALE }));
+    root.render(createElement(DocumentTemplate, { ...props, scale: RENDER_SCALE, density: EXPORT_DENSITY }));
     await new Promise((r) => setTimeout(r, 80));
 
     // Attendre le décodage des images (logo, signatures)
@@ -126,9 +126,9 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
       logging: false,
       imageTimeout: 4000,
       width: TEMPLATE_W_PX,
-      height: target.scrollHeight,
+      height: TEMPLATE_H_PX,
       windowWidth: TEMPLATE_W_PX,
-      windowHeight: target.scrollHeight,
+      windowHeight: TEMPLATE_H_PX,
     });
     return canvas;
   } finally {
