@@ -298,12 +298,22 @@ export function drawRib(doc: jsPDF, y: number): number {
   return y + 4;
 }
 
-// ─── Footer légal (en bas de page) ────────────────────────────
+// ─── Footer légal (en bas de page) — surchargeable via TPL_FOOTER_TEXT ─
 export function drawFooter(doc: jsPDF): void {
   const footY = PAGE_H - 20;
   doc.setDrawColor(...GRIS_LIGNE);
   doc.setLineWidth(0.4);
   doc.line(ML, footY, COL_R, footY);
+
+  // Si l'utilisateur a défini un pied-de-page custom, on l'utilise à la place
+  if (TPL_FOOTER_TEXT && TPL_FOOTER_TEXT.trim().length > 0) {
+    setFont(doc, 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...GRIS_PIED);
+    const wrapped = doc.splitTextToSize(TPL_FOOTER_TEXT, CW);
+    doc.text(wrapped, PAGE_W / 2, footY + 4, { align: 'center' });
+    return;
+  }
 
   const legal = [
     { text: "Nos travaux sont couverts par notre assurance décennale et RC Pro auprès d'ERGO — Contrat n° 24015161184.", bold: true },
