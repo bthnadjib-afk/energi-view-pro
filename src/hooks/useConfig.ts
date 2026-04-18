@@ -59,6 +59,19 @@ export interface AppConfig {
     tailleTableauLignes: number;    // Lignes du tableau (articles)
     tailleTotaux: number;           // Lignes Total HT / Total TVA
     tailleTotalTTC: number;         // Total TTC mis en avant
+    // ─── Nouvelles tailles fines ────────────────────────────
+    tailleEncartTexte: number;      // pt — Texte dans les encarts Récap + Bon pour accord
+    taillePaiement: number;         // pt — Bloc "Moyens de paiement" (IBAN/BIC)
+    taillePiedDePage: number;       // pt — Pied de page (mentions légales)
+    // ─── Logo (mm sur le PDF) ──────────────────────────────
+    logoHauteur: number;            // mm — hauteur max du logo (défaut 13mm ≈ 50px)
+    logoLargeurMax: number;         // mm — largeur max du logo (défaut 48mm ≈ 180px)
+    // ─── Largeur des encarts (mm) ─────────────────────────
+    largeurEncartTotaux: number;    // mm — largeur du bloc Récapitulatif
+    largeurEncartBonAccord: number; // mm — largeur du bloc Bon pour accord
+    // ─── Layout ──────────────────────────────────────────
+    entrepriseEnFaceClient: boolean; // true = entreprise et client côte-à-côte
+    rubanCompact: boolean;           // true = Réf+Date+Échéance sur 1 seule ligne (label inline)
     // ─── Debug : largeur de capture HTML→Canvas (px) ──────────
     captureWidth: number;           // 700–1200, défaut 794 (A4 @ 96dpi)
     piedDePage: string;
@@ -125,6 +138,15 @@ const DEFAULT_CONFIG: AppConfig = {
     tailleTableauLignes: 8.5,
     tailleTotaux: 9.5,
     tailleTotalTTC: 11,
+    tailleEncartTexte: 8.5,
+    taillePaiement: 9,
+    taillePiedDePage: 8,
+    logoHauteur: 13,
+    logoLargeurMax: 48,
+    largeurEncartTotaux: 80,
+    largeurEncartBonAccord: 80,
+    entrepriseEnFaceClient: true,
+    rubanCompact: true,
     captureWidth: 794,
     piedDePage: '',
     afficherRib: true,
