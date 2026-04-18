@@ -92,7 +92,7 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
   host.style.position = 'fixed';
   host.style.top = '0';
   host.style.left = '-10000px';
-  host.style.width = `${A4_W_PX}px`;
+  host.style.width = `${TEMPLATE_W_PX}px`;
   host.style.background = '#fff';
   host.style.zIndex = '-1';
   document.body.appendChild(host);
