@@ -29,7 +29,14 @@ import logoFallback from '@/assets/logo.png';
 // A4 en mm
 const A4_W_MM = 210;
 const A4_H_MM = 297;
-// 1mm = 1 px CSS (scale=1 du DocumentTemplate). On rendra à dpr=2 pour la netteté.
+// Échelle d'affichage du DocumentTemplate pour le rendu PDF.
+// Le composant utilise des "unités" qui représentent des mm. On les rend
+// en pixels CSS via PX_PER_MM pour matcher une vraie page A4 (96dpi).
+const PX_PER_MM = 96 / 25.4; // ≈ 3.7795
+const RENDER_SCALE = PX_PER_MM; // passé au composant comme scale
+const A4_W_PX = A4_W_MM * PX_PER_MM; // ≈ 794
+const A4_H_PX = A4_H_MM * PX_PER_MM; // ≈ 1123
+// Densité de capture html2canvas pour la netteté
 const RENDER_DPR = 2;
 
 // ─── Lecture config template depuis localStorage ─────────────────────────────
