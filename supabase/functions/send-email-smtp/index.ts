@@ -65,7 +65,7 @@ function assertSmtpCode(response: string, expectedCodes: string[]): void {
   }
 }
 
-async function readSmtpResponse(conn: Deno.Conn, decoder: TextDecoder, timeoutMs = 15000): Promise<string> {
+async function readSmtpResponse(conn: Deno.Conn, decoder: TextDecoder, timeoutMs = 60000): Promise<string> {
   const chunks: string[] = []
   const buf = new Uint8Array(4096)
 
@@ -107,26 +107,31 @@ async function trySendSmtp(params: {
   const boundary = `boundary_${crypto.randomUUID().replace(/-/g, '')}`
   const nl = '\r\n'
 
-  let emailBody = `From: ${SMTP_FROM}${nl}`
-  emailBody += `To: ${recipient}${nl}`
-  emailBody += `Subject: =?UTF-8?B?${toBase64Utf8(subject)}?=${nl}`
-  emailBody += `MIME-Version: 1.0${nl}`
-  emailBody += `Content-Type: multipart/mixed; boundary="${boundary}"${nl}${nl}`
+  // Build header + html part (small)
+  const headerPart =
+    `From: ${SMTP_FROM}${nl}` +
+    `To: ${recipient}${nl}` +
+    `Subject: =?UTF-8?B?${toBase64Utf8(subject)}?=${nl}` +
+    `MIME-Version: 1.0${nl}` +
+    `Content-Type: multipart/mixed; boundary="${boundary}"${nl}${nl}` +
+    `--${boundary}${nl}` +
+    `Content-Type: text/html; charset=utf-8${nl}` +
+    `Content-Transfer-Encoding: base64${nl}${nl}` +
+    `${htmlMessageBase64}${nl}${nl}`
 
-  emailBody += `--${boundary}${nl}`
-  emailBody += `Content-Type: text/html; charset=utf-8${nl}`
-  emailBody += `Content-Transfer-Encoding: base64${nl}${nl}`
-  emailBody += `${htmlMessageBase64}${nl}${nl}`
+  // PDF attachment header (without the heavy base64 body)
+  const pdfHeaderPart = (pdfBase64 && pdfFilename)
+    ? `--${boundary}${nl}` +
+      `Content-Type: application/pdf; name="${pdfFilename}"${nl}` +
+      `Content-Disposition: attachment; filename="${pdfFilename}"${nl}` +
+      `Content-Transfer-Encoding: base64${nl}${nl}`
+    : ''
 
-  if (pdfBase64 && pdfFilename) {
-    emailBody += `--${boundary}${nl}`
-    emailBody += `Content-Type: application/pdf; name="${pdfFilename}"${nl}`
-    emailBody += `Content-Disposition: attachment; filename="${pdfFilename}"${nl}`
-    emailBody += `Content-Transfer-Encoding: base64${nl}${nl}`
-    emailBody += `${chunkBase64(String(pdfBase64))}${nl}${nl}`
+  const closingPart = `${nl}--${boundary}--${nl}`
+
+  if (pdfBase64) {
+    console.log(`[SMTP] PDF attachment size: ${Math.round(String(pdfBase64).length / 1024)} KB (base64)`)
   }
-
-  emailBody += `--${boundary}--${nl}`
 
   const port = parseInt(SMTP_PORT, 10)
   let conn: Deno.Conn
@@ -190,8 +195,29 @@ async function trySendSmtp(params: {
     await sendCmd(`MAIL FROM:<${mailFromAddress}>`, ['250'])
     await sendCmd(`RCPT TO:<${recipient}>`, ['250', '251'])
     await sendCmd('DATA', ['354'])
-    await conn.write(encoder.encode(emailBody + '\r\n.\r\n'))
-    const dataResp = await readSmtpResponse(conn, decoder)
+
+    // Stream the email body in chunks to avoid concatenating a huge string in memory
+    // 1. Headers + HTML part
+    await conn.write(encoder.encode(headerPart))
+
+    // 2. PDF attachment streamed in 64 KB base64 chunks (already line-wrapped to 76 cols below)
+    if (pdfBase64 && pdfFilename) {
+      await conn.write(encoder.encode(pdfHeaderPart))
+      const raw = String(pdfBase64).replace(/\s/g, '')
+      const CHUNK = 64 * 1024 // 64 KB of base64 at a time
+      for (let i = 0; i < raw.length; i += CHUNK) {
+        const slice = raw.slice(i, i + CHUNK)
+        // wrap to 76 columns per RFC 2045
+        const wrapped = slice.match(/.{1,76}/g)?.join('\r\n') || ''
+        await conn.write(encoder.encode(wrapped + '\r\n'))
+      }
+    }
+
+    // 3. Closing boundary + end-of-data marker
+    await conn.write(encoder.encode(closingPart + '\r\n.\r\n'))
+
+    // After a large attachment OVH can take a while to ack — give it 90s
+    const dataResp = await readSmtpResponse(conn, decoder, 90000)
     assertSmtpCode(dataResp, ['250'])
 
     try {
