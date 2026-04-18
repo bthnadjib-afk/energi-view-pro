@@ -2,16 +2,18 @@
  * interventionRenderer.ts — Façade vers le générateur jsPDF (interventionPdf.ts)
  */
 import {
-  openInterventionPdf as _open,
-  interventionPdfToBlobUrl as _blob,
-  downloadInterventionPdf as _download,
-  interventionPdfToBase64 as _b64,
+  generateInterventionPdfLocal,
+  generateInterventionPdfBlobUrl,
+  generateInterventionPdfBase64,
   type InterventionPdfParams,
 } from './interventionPdf';
 
 export type InterventionRendererParams = InterventionPdfParams;
 
-export const interventionPdfToBlobUrl = (p: InterventionRendererParams) => _blob(p);
-export const openInterventionPdf      = (p: InterventionRendererParams) => _open(p);
-export const downloadInterventionPdf  = (p: InterventionRendererParams) => _download(p);
-export const interventionPdfToBase64  = (p: InterventionRendererParams) => _b64(p);
+export const interventionPdfToBlobUrl = (p: InterventionRendererParams) => generateInterventionPdfBlobUrl(p);
+export const downloadInterventionPdf  = (p: InterventionRendererParams) => generateInterventionPdfLocal(p);
+export const interventionPdfToBase64  = (p: InterventionRendererParams) => generateInterventionPdfBase64(p);
+export const openInterventionPdf      = async (p: InterventionRendererParams) => {
+  const url = await generateInterventionPdfBlobUrl(p);
+  window.open(url, '_blank');
+};
