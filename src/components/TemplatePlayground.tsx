@@ -222,25 +222,7 @@ export default function TemplatePlayground() {
       </div>
 
       {/* ═══ PANNEAU DROIT — PREVIEW A4 ═══ */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Eye className="h-4 w-4" /> Aperçu en temps réel
-          </div>
-          <Tabs value={previewType} onValueChange={(v: any) => setPreviewType(v)}>
-            <TabsList>
-              <TabsTrigger value="facture">Facture</TabsTrigger>
-              <TabsTrigger value="devis">Devis</TabsTrigger>
-              <TabsTrigger value="intervention">Bon d'intervention</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-
-        <A4Preview docType={previewType} template={t} entreprise={config.entreprise} totals={totals} />
-        <p className="text-xs text-muted-foreground text-center">
-          Aperçu du rendu final. Le PDF généré reprendra ces réglages avec les vraies données client/produits.
-        </p>
-      </div>
+      <PreviewPane previewType={previewType} setPreviewType={setPreviewType} template={t} entreprise={config.entreprise} totals={totals} />
     </div>
   );
 }
