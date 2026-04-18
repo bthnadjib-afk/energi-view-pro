@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { Upload, Palette, Type, Maximize2, FileText, Image as ImageIcon, Eye, Save, RotateCcw, Trash2, Loader2 } from 'lucide-react';
+import { Upload, Palette, Type, Maximize2, FileText, Image as ImageIcon, Eye, Save, RotateCcw, Trash2, Loader2, ExternalLink, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useConfig, type AppConfig } from '@/hooks/useConfig';
 import { DocumentTemplate, type DocType as SharedDocType } from '@/services/DocumentTemplate';
+import { documentPdfToBlobUrl } from '@/services/htmlToPdf';
 
 type DocType = 'facture' | 'devis' | 'intervention';
 
@@ -221,25 +222,7 @@ export default function TemplatePlayground() {
       </div>
 
       {/* ═══ PANNEAU DROIT — PREVIEW A4 ═══ */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Eye className="h-4 w-4" /> Aperçu en temps réel
-          </div>
-          <Tabs value={previewType} onValueChange={(v: any) => setPreviewType(v)}>
-            <TabsList>
-              <TabsTrigger value="facture">Facture</TabsTrigger>
-              <TabsTrigger value="devis">Devis</TabsTrigger>
-              <TabsTrigger value="intervention">Bon d'intervention</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-
-        <A4Preview docType={previewType} template={t} entreprise={config.entreprise} totals={totals} />
-        <p className="text-xs text-muted-foreground text-center">
-          Aperçu du rendu final. Le PDF généré reprendra ces réglages avec les vraies données client/produits.
-        </p>
-      </div>
+      <PreviewPane previewType={previewType} setPreviewType={setPreviewType} template={t} entreprise={config.entreprise} totals={totals} />
     </div>
   );
 }
@@ -284,20 +267,8 @@ function SliderField({ label, value, min, max, step, unit, onChange }: { label: 
 // On utilise le MÊME composant DocumentTemplate que pour la génération PDF
 // → garantit que ce que l'utilisateur voit ici = ce qu'il obtient en PDF.
 
-function A4Preview({
-  docType,
-  template: t,
-  entreprise,
-  totals,
-}: {
-  docType: DocType;
-  template: AppConfig['template'];
-  entreprise: AppConfig['entreprise'];
-  totals: { ht: number; tva: number; ttc: number };
-}) {
-  const SCALE = 0.66;
-
-  const data = {
+function buildSampleData(docType: DocType, totals: { ht: number; tva: number; ttc: number }) {
+  return {
     ref: docType === 'facture' ? 'FA2025-0042' : docType === 'devis' ? 'PR2025-0042' : 'FI2025-0042',
     date: new Date().toISOString().slice(0, 10),
     type: docType === 'intervention' ? 'Dépannage' : undefined,
@@ -330,21 +301,111 @@ function A4Preview({
       tvaParTaux: [{ taux: 20, montant: totals.tva }],
     },
   };
+}
+
+function PreviewPane({
+  previewType,
+  setPreviewType,
+  template: t,
+  entreprise,
+  totals,
+}: {
+  previewType: DocType;
+  setPreviewType: (v: DocType) => void;
+  template: AppConfig['template'];
+  entreprise: AppConfig['entreprise'];
+  totals: { ht: number; tva: number; ttc: number };
+}) {
+  const [zoom, setZoom] = useState(1); // 1 = 100% (vraie taille A4)
+  const [openingPdf, setOpeningPdf] = useState(false);
+  const A4_W_PX = (210 / 25.4) * 96;
+
+  const data = useMemo(() => buildSampleData(previewType, totals), [previewType, totals]);
+
+  const openFullPdf = async () => {
+    setOpeningPdf(true);
+    try {
+      const url = await documentPdfToBlobUrl({
+        docType: previewType as SharedDocType,
+        data,
+        templateOverride: t,
+        entrepriseOverride: entreprise,
+      });
+      window.open(url, '_blank');
+    } catch (e: any) {
+      toast.error(`Erreur génération PDF : ${e.message || e}`);
+    }
+    setOpeningPdf(false);
+  };
 
   return (
-    <div
-      className="overflow-auto rounded-lg border border-border bg-muted/30 p-4 flex justify-center"
-      style={{ maxHeight: '80vh' }}
-    >
-      <div className="shadow-2xl bg-white" style={{ width: `${(210 / 25.4) * 96 * SCALE}px` }}>
-        <DocumentTemplate
-          docType={docType as SharedDocType}
-          data={data}
-          template={t}
-          entreprise={entreprise}
-          scale={SCALE}
-        />
+    <div className="space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Eye className="h-4 w-4" /> Aperçu en temps réel
+        </div>
+        <Tabs value={previewType} onValueChange={(v: any) => setPreviewType(v)}>
+          <TabsList>
+            <TabsTrigger value="facture">Facture</TabsTrigger>
+            <TabsTrigger value="devis">Devis</TabsTrigger>
+            <TabsTrigger value="intervention">Bon d'intervention</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
+
+      {/* Barre de contrôle zoom + plein écran */}
+      <div className="flex items-center justify-between bg-muted/40 rounded-lg border border-border px-3 py-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setZoom(z => Math.max(0.4, +(z - 0.1).toFixed(2)))}>
+            <ZoomOut className="h-3.5 w-3.5" />
+          </Button>
+          <span className="text-xs font-mono text-muted-foreground w-12 text-center">{Math.round(zoom * 100)}%</span>
+          <Button variant="ghost" size="sm" onClick={() => setZoom(z => Math.min(2, +(z + 0.1).toFixed(2)))}>
+            <ZoomIn className="h-3.5 w-3.5" />
+          </Button>
+          <div className="h-4 w-px bg-border mx-1" />
+          <Button variant="ghost" size="sm" className="text-xs" onClick={() => setZoom(1)}>100%</Button>
+          <Button variant="ghost" size="sm" className="text-xs" onClick={() => setZoom(0.66)}>Ajuster</Button>
+        </div>
+        <Button onClick={openFullPdf} disabled={openingPdf} size="sm" variant="outline" className="gap-2">
+          {openingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />}
+          {openingPdf ? 'Génération...' : 'Ouvrir le PDF A4'}
+        </Button>
+      </div>
+
+      {/* Conteneur scrollable avec le document à 100% (ou zoom appliqué) */}
+      <div
+        className="overflow-auto rounded-lg border border-border bg-muted/30 p-6 flex justify-center"
+        style={{ maxHeight: '80vh' }}
+      >
+        <div
+          style={{
+            width: A4_W_PX * zoom,
+            // On applique le zoom via transform pour ne pas redimensionner les enfants un par un
+            // (transform-origin top center pour rester centré)
+          }}
+        >
+          <div
+            className="shadow-2xl bg-white origin-top"
+            style={{
+              width: A4_W_PX,
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top left',
+            }}
+          >
+            <DocumentTemplate
+              docType={previewType as SharedDocType}
+              data={data}
+              template={t}
+              entreprise={entreprise}
+              scale={1}
+            />
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground text-center">
+        Aperçu à la vraie taille A4 (210 × 297 mm). Cliquez sur « Ouvrir le PDF A4 » pour voir le rendu final dans une nouvelle fenêtre.
+      </p>
     </div>
   );
 }
