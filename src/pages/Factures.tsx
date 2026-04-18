@@ -7,7 +7,7 @@ import { useFactures, useDevis, useClients, useProduits, useCreateFacture, useDe
 import { useFactureRelances, useRecordFactureEnvoi, useSetFactureEnvoiDate, getRelanceStatus } from '@/hooks/useFactureRelances';
 import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, getFactureCloseCodeLabel, isFactureAbandonnee, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
 import { useQuery } from '@tanstack/react-query';
-import { openInvoicePdf, invoicePdfToBase64 } from '@/services/invoiceRenderer';
+import { openInvoicePdf, invoicePdfToBase64, invoicePdfToBlobUrl } from '@/services/invoiceRenderer';
 import { useConfig } from '@/hooks/useConfig';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -698,11 +698,15 @@ export default function Factures() {
                     onClick={async () => {
                       try {
                         const client = clients.find((c: Client) => c.id === selectedFacture.socid);
-                        await openInvoicePdf({ facture: selectedFacture, client, entreprise: config.entreprise });
+                        const url = await invoicePdfToBlobUrl({ facture: selectedFacture, client, entreprise: config.entreprise });
+                        if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+                        setPdfPreviewUrl(url);
+                        setPdfPreviewRef(selectedFacture.ref);
+                        setPdfPreviewOpen(true);
                       } catch (e: any) { toast.error(`Erreur PDF : ${e.message || e}`); }
                     }}
                   >
-                    <FileDown className="h-4 w-4" /> Générer PDF
+                    <FileDown className="h-4 w-4" /> Aperçu PDF
                   </Button>
                   {!selectedFacture.paye && (
                     <Button
