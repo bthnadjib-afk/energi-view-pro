@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { Upload, Palette, Type, Maximize2, FileText, Image as ImageIcon, Eye, Save, RotateCcw, Trash2, Loader2 } from 'lucide-react';
+import { Upload, Palette, Type, Maximize2, FileText, Image as ImageIcon, Eye, Save, RotateCcw, Trash2, Loader2, ExternalLink, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useConfig, type AppConfig } from '@/hooks/useConfig';
 import { DocumentTemplate, type DocType as SharedDocType } from '@/services/DocumentTemplate';
+import { documentPdfToBlobUrl } from '@/services/htmlToPdf';
 
 type DocType = 'facture' | 'devis' | 'intervention';
 
