@@ -59,6 +59,16 @@ export interface DocumentTemplateCfg {
   margeDroite?: number;
   tailleTitre?: number;
   tailleTexte?: number;
+  // Tailles fines optionnelles (pt) — fallback sur valeurs historiques si absentes
+  tailleEntreprise?: number;
+  tailleCoordonnees?: number;
+  tailleRubanLabel?: number;
+  tailleRubanValeur?: number;
+  tailleTableauHeader?: number;
+  tailleTableauLignes?: number;
+  tailleTotaux?: number;
+  tailleTotalTTC?: number;
+  captureWidth?: number;
   piedDePage?: string;
   afficherRib?: boolean;
   afficherCgv?: boolean;
