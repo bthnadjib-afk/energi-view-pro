@@ -142,30 +142,8 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
 // ─── Découpage canvas en pages A4 et build du PDF ─────────────────────────────
 function canvasToPdf(canvas: HTMLCanvasElement): jsPDF {
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-  // ratio px↔mm
-  const pxPerMm = canvas.width / A4_W_MM; // largeur canvas / largeur A4
-  const pageHeightPx = Math.floor(A4_H_MM * pxPerMm);
-  const totalPages = Math.max(1, Math.ceil(canvas.height / pageHeightPx));
-
-  const pageCanvas = document.createElement('canvas');
-  pageCanvas.width = canvas.width;
-  pageCanvas.height = pageHeightPx;
-  const pageCtx = pageCanvas.getContext('2d')!;
-
-  for (let p = 0; p < totalPages; p++) {
-    const sy = p * pageHeightPx;
-    const sliceHeight = Math.min(pageHeightPx, canvas.height - sy);
-    pageCtx.fillStyle = '#ffffff';
-    pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-    pageCtx.drawImage(
-      canvas,
-      0, sy, canvas.width, sliceHeight,
-      0, 0, canvas.width, sliceHeight
-    );
-    const imgData = pageCanvas.toDataURL('image/png');
-    if (p > 0) pdf.addPage();
-    pdf.addImage(imgData, 'PNG', 0, 0, A4_W_MM, A4_H_MM);
-  }
+  const imgData = canvas.toDataURL('image/png');
+  pdf.addImage(imgData, 'PNG', 0, 0, A4_W_MM, A4_H_MM);
   return pdf;
 }
 
