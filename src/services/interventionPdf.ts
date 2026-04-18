@@ -1,22 +1,31 @@
-// Générateur PDF — BON D'INTERVENTION — ELECTRICIEN DU GENEVOIS
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// Générateur PDF — BON D'INTERVENTION — via DocumentTemplate (HTML→PDF, WYSIWYG)
 import type { Intervention, Client, InterventionLine } from '@/services/dolibarr';
 import {
-  getPdfConfig,
-  toText, formatDateFR,
-  loadRobotoFonts, setFont,
-  drawLogo, drawInfoBar, drawParties, drawFooter,
-  type EntrepriseInfo, type ClientInfo,
-} from './pdfUtils';
+  buildDocumentPdf,
+  documentPdfToBlobUrl,
+  openDocumentPdf,
+  downloadDocumentPdf,
+  documentPdfToBase64,
+} from './htmlToPdf';
+import type { DocumentTemplateData, EntrepriseInfo } from './DocumentTemplate';
+
+export type { EntrepriseInfo } from './DocumentTemplate';
 
 const TYPE_LABELS: Record<string, string> = {
-  devis:        'Établissement devis',
-  panne:        'Dépannage',
-  panne_urgence:'Urgence',
-  sav:          'SAV / Garantie',
-  chantier:     'Chantier',
+  devis: 'Établissement devis',
+  panne: 'Dépannage',
+  panne_urgence: 'Urgence',
+  sav: 'SAV / Garantie',
+  chantier: 'Chantier',
 };
+
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0 && m > 0) return `${h}h${String(m).padStart(2, '0')}`;
+  if (h > 0) return `${h}h`;
+  return `${m}min`;
+}
 
 export interface InterventionPdfParams {
   intervention: Intervention;
@@ -27,196 +36,69 @@ export interface InterventionPdfParams {
   entreprise?: EntrepriseInfo;
 }
 
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0 && m > 0) return `${h}h${String(m).padStart(2, '0')}`;
-  if (h > 0) return `${h}h`;
-  return `${m}min`;
-}
+function buildData({
+  intervention,
+  client,
+  lines,
+  signatureClient,
+  signatureTech,
+}: InterventionPdfParams): DocumentTemplateData {
+  // Pour les interventions, on présente les lignes comme un mini-tableau "lignes de prestation"
+  // Format compatible avec les colonnes du DocumentTemplate.
+  const lignes = (lines || []).map((l, i) => ({
+    designation: l.description || `Ligne ${i + 1}`,
+    ref: '',
+    quantite: 1,
+    unite: '',
+    prixUnitaire: 0,
+    tauxTVA: 0,
+    totalHT: 0,
+  }));
 
-async function buildInterventionPdf({
-  intervention, client, lines, entreprise, signatureClient, signatureTech,
-}: InterventionPdfParams): Promise<jsPDF> {
-  // Relecture fraîche de la config à chaque génération
-  const cfg = getPdfConfig();
-  const { NOIR, BLANC, GRIS_CLAIR, GRIS_LIGNE, GRIS_TEXTE, GRIS_SOMBRE, ML, MR, MT, COL_R, CW } = cfg;
+  const totalDuration = (lines || []).reduce((s, l) => s + (l.duree || 0), 0);
+  const description = intervention.description || '';
+  const totalDurationLabel = totalDuration > 0 ? `\n\nTotal heures : ${formatDuration(totalDuration)}` : '';
 
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  await loadRobotoFonts(doc, cfg);
-  let y = MT;
-
-  // ─── LOGO ────────────────────────────────────────────────────
-  const logoH = await drawLogo(doc, ML, y, cfg);
-  y += logoH + 7;
-
-  // ─── TITRE ───────────────────────────────────────────────────
-  setFont(doc, 'bolditalic', cfg);
-  doc.setFontSize(22);
-  doc.setTextColor(...NOIR);
-  doc.text("BON D'INTERVENTION", ML, y);
-  y += 6;
-
-  setFont(doc, 'italic', cfg);
-  doc.setFontSize(8);
-  doc.setTextColor(...GRIS_TEXTE);
-  doc.text(`RÉFÉRENCE : ${toText(intervention.ref)}`, ML, y);
-  y += 8;
-
-  // ─── BARRE INFO ───────────────────────────────────────────────
-  const barH = drawInfoBar(doc, y, [
-    { label: 'Référence',  value: toText(intervention.ref) },
-    { label: 'Date',       value: formatDateFR(intervention.date) },
-    { label: 'Type',       value: TYPE_LABELS[intervention.type] || toText(intervention.type) },
-    { label: 'Technicien', value: toText(intervention.technicien || '—') },
-  ], cfg);
-  y += barH + 8;
-
-  // ─── CLIENT / ENTREPRISE ──────────────────────────────────────
-  const clientInfo: ClientInfo = {
-    nom:        client?.nom || intervention.client,
-    adresse:    client?.adresse,
-    codePostal: client?.codePostal,
-    ville:      client?.ville,
-    email:      client?.email,
-    telephone:  client?.telephone,
+  return {
+    ref: intervention.ref,
+    date: intervention.date,
+    type: TYPE_LABELS[intervention.type] || intervention.type,
+    technicien: intervention.technicien || '—',
+    client: {
+      nom: client?.nom || intervention.client,
+      adresse: client?.adresse,
+      codePostal: client?.codePostal,
+      ville: client?.ville,
+      email: client?.email,
+      telephone: client?.telephone,
+    },
+    lignes,
+    totaux: { ht: 0, tva: 0, ttc: 0 },
+    description: description + totalDurationLabel,
+    observations: (intervention as any).compteRendu || (intervention as any).observations || '',
+    signatureClient,
+    signatureTech,
   };
-  y = drawParties(doc, y, clientInfo, entreprise, cfg) + 8;
-
-  // ─── DESCRIPTION ─────────────────────────────────────────────
-  if (intervention.description) {
-    setFont(doc, 'bolditalic', cfg);
-    doc.setFontSize(9.5);
-    doc.setTextColor(...NOIR);
-    doc.text('Description', ML, y);
-    y += 2;
-    doc.setDrawColor(...GRIS_LIGNE);
-    doc.setLineWidth(0.3);
-    doc.line(ML, y, COL_R, y);
-    y += 5;
-
-    setFont(doc, 'normal', cfg);
-    doc.setFontSize(8.5);
-    doc.setTextColor(34, 34, 34);
-    const descLines = doc.splitTextToSize(toText(intervention.description), CW);
-    doc.text(descLines, ML, y);
-    y += descLines.length * 4.5 + 6;
-  }
-
-  // ─── TABLEAU DES LIGNES ───────────────────────────────────────
-  if (lines && lines.length > 0) {
-    setFont(doc, 'bolditalic', cfg);
-    doc.setFontSize(9.5);
-    doc.setTextColor(...NOIR);
-    doc.text("Lignes d'intervention", ML, y);
-    y += 2;
-    doc.setDrawColor(...GRIS_LIGNE);
-    doc.setLineWidth(0.3);
-    doc.line(ML, y, COL_R, y);
-    y += 4;
-
-    const totalDuration = lines.reduce((sum, l) => sum + (l.duree || 0), 0);
-
-    // Largeurs : 10+120+28+22 = 180 = CW
-    autoTable(doc, {
-      startY: y, margin: { left: ML, right: MR },
-      head: [['#', 'Description', 'Date', 'Durée']],
-      body: lines.map((line, i) => [
-        String(i + 1),
-        toText(line.description || ''),
-        formatDateFR(line.date),
-        formatDuration(line.duree || 0),
-      ]),
-      foot: totalDuration > 0
-        ? [['', { content: 'TOTAL HEURES', styles: { fontStyle: 'bolditalic' as const } }, '', formatDuration(totalDuration)]]
-        : undefined,
-      theme: 'grid',
-      styles: {
-        fontSize: 8.5, font: 'helvetica',
-        cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
-        textColor: NOIR, lineColor: GRIS_LIGNE, lineWidth: 0.3,
-      },
-      headStyles: { fillColor: NOIR, textColor: BLANC, fontStyle: 'bold', font: 'helvetica' },
-      footStyles: { fillColor: GRIS_CLAIR, textColor: NOIR, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: GRIS_CLAIR },
-      columnStyles: {
-        0: { cellWidth: 10,  halign: 'center' },
-        1: { cellWidth: 120 },
-        2: { cellWidth: 28,  halign: 'center' },
-        3: { cellWidth: 22,  halign: 'center', fontStyle: 'bold' },
-      },
-    });
-
-    y = (doc as any).lastAutoTable?.finalY || y + 20;
-    y += 8;
-  }
-
-  // ─── SÉPARATEUR ───────────────────────────────────────────────
-  doc.setDrawColor(...GRIS_LIGNE);
-  doc.setLineWidth(0.4);
-  doc.line(ML, y, COL_R, y);
-  y += 8;
-
-  // ─── SIGNATURES ──────────────────────────────────────────────
-  const sigW  = (CW - 10) / 2;
-  const sigH  = 28;
-  const sig2X = ML + sigW + 10;
-
-  doc.setDrawColor(...GRIS_LIGNE);
-  doc.setLineWidth(0.5);
-  doc.rect(ML, y, sigW, sigH, 'S');
-  setFont(doc, 'bolditalic', cfg);
-  doc.setFontSize(7.5);
-  doc.setTextColor(...GRIS_SOMBRE);
-  doc.text('Signature du technicien :', ML + 3, y + 6);
-  if (signatureTech) {
-    try { doc.addImage(signatureTech, 'PNG', ML + 2, y + 8, sigW - 4, sigH - 12); } catch {}
-  }
-
-  doc.rect(sig2X, y, sigW, sigH, 'S');
-  setFont(doc, 'bolditalic', cfg);
-  doc.setFontSize(7.5);
-  doc.setTextColor(...GRIS_SOMBRE);
-  doc.text("Signature du client (bon pour accord) :", sig2X + 3, y + 6);
-  if (signatureClient) {
-    try { doc.addImage(signatureClient, 'PNG', sig2X + 2, y + 8, sigW - 4, sigH - 12); } catch {}
-  }
-
-  y += sigH + 8;
-
-  // ─── OBSERVATIONS ────────────────────────────────────────────
-  if ((intervention as any).observations) {
-    setFont(doc, 'bolditalic', cfg);
-    doc.setFontSize(8.5);
-    doc.setTextColor(...NOIR);
-    doc.text('Observations :', ML, y);
-    y += 5;
-    setFont(doc, 'normal', cfg);
-    doc.setFontSize(8);
-    doc.setTextColor(...GRIS_SOMBRE);
-    const obsLines = doc.splitTextToSize(toText((intervention as any).observations), CW);
-    doc.text(obsLines, ML, y);
-  }
-
-  // ─── FOOTER ───────────────────────────────────────────────────
-  drawFooter(doc, cfg);
-
-  return doc;
 }
 
-// ─── API publique ─────────────────────────────────────────────
-
-export async function generateInterventionPdfLocal(params: InterventionPdfParams): Promise<void> {
-  const doc = await buildInterventionPdf(params);
-  doc.save(`${params.intervention.ref || 'intervention'}.pdf`);
+export async function generateInterventionPdfLocal(p: InterventionPdfParams): Promise<void> {
+  return downloadDocumentPdf(
+    { docType: 'intervention', data: buildData(p), entrepriseOverride: p.entreprise },
+    `${p.intervention.ref || 'intervention'}.pdf`
+  );
 }
 
-export async function generateInterventionPdfBlobUrl(params: InterventionPdfParams): Promise<string> {
-  const doc = await buildInterventionPdf(params);
-  return URL.createObjectURL(doc.output('blob'));
+export async function generateInterventionPdfBlobUrl(p: InterventionPdfParams): Promise<string> {
+  return documentPdfToBlobUrl({ docType: 'intervention', data: buildData(p), entrepriseOverride: p.entreprise });
 }
 
-export async function generateInterventionPdfBase64(params: InterventionPdfParams): Promise<string> {
-  const doc = await buildInterventionPdf(params);
-  return doc.output('datauristring').split(',')[1];
+export async function generateInterventionPdfBase64(p: InterventionPdfParams): Promise<string> {
+  return documentPdfToBase64({ docType: 'intervention', data: buildData(p), entrepriseOverride: p.entreprise });
 }
+
+// Alias compat (utilisés par interventionRenderer.ts façade)
+export const openInterventionPdf = async (p: InterventionPdfParams) =>
+  openDocumentPdf({ docType: 'intervention', data: buildData(p), entrepriseOverride: p.entreprise });
+export const downloadInterventionPdf = generateInterventionPdfLocal;
+export const interventionPdfToBlobUrl = generateInterventionPdfBlobUrl;
+export const interventionPdfToBase64 = generateInterventionPdfBase64;
