@@ -61,8 +61,8 @@ export const PAGE_H = 297;
 export const COL_R  = PAGE_W - MR;
 export const CW     = PAGE_W - ML - MR;
 
-// Police globale (helvetica/times/courier)
-export const TPL_FONT: 'helvetica' | 'times' | 'courier' = (_T.police || 'helvetica') as any;
+// Police globale (helvetica/times/courier/roboto)
+export const TPL_FONT: 'helvetica' | 'times' | 'courier' | 'roboto' = (_T.police || 'roboto') as any;
 export const TPL_LOGO_URL: string = _T.logoUrl || '';
 export const TPL_FOOTER_TEXT: string = _T.piedDePage || '';
 export const TPL_SHOW_RIB: boolean = _T.afficherRib !== false;
