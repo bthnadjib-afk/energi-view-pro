@@ -95,18 +95,59 @@ async function loadImageEl(src: string): Promise<HTMLImageElement> {
   });
 }
 
-// ─── Police Helvetica (intégrée jsPDF, pas de chargement externe) ──────
-// jsPDF ne supporte pas le format woff/woff2 nativement.
-// Helvetica est visuellement identique à Roboto dans les viewers PDF.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function loadRobotoFonts(_doc: jsPDF): Promise<void> {
-  // No-op — Helvetica est utilisée directement via setFont
+// ─── Police Roboto (chargée depuis jsdelivr CDN, mise en cache) ──────
+let _robotoLoaded = false;
+const ROBOTO_URLS: Record<string, string> = {
+  normal:     'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Regular.ttf',
+  bold:       'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Bold.ttf',
+  italic:     'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Italic.ttf',
+  bolditalic: 'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-BoldItalic.ttf',
+};
+
+async function fetchAsBase64(url: string): Promise<string> {
+  const res = await fetch(url);
+  const buf = await res.arrayBuffer();
+  let bin = '';
+  const bytes = new Uint8Array(buf);
+  for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+export async function loadRobotoFonts(doc: jsPDF): Promise<void> {
+  if (TPL_FONT !== 'roboto') return;
+  try {
+    const styles: Array<['normal'|'bold'|'italic'|'bolditalic', string]> = [
+      ['normal', ROBOTO_URLS.normal],
+      ['bold', ROBOTO_URLS.bold],
+      ['italic', ROBOTO_URLS.italic],
+      ['bolditalic', ROBOTO_URLS.bolditalic],
+    ];
+    for (const [style, url] of styles) {
+      const b64 = await fetchAsBase64(url);
+      const filename = `Roboto-${style}.ttf`;
+      doc.addFileToVFS(filename, b64);
+      doc.addFont(filename, 'roboto', style === 'bolditalic' ? 'bold' : style, style === 'bolditalic' ? 'italic' : 'normal');
+    }
+    _robotoLoaded = true;
+  } catch (e) {
+    console.warn('Roboto load failed, fallback helvetica', e);
+  }
 }
 
 export function setFont(doc: jsPDF, style: 'normal'|'bold'|'italic'|'bolditalic') {
-  // 'times' supporte les 4 styles, 'helvetica' aussi, 'courier' supporte normal/bold/oblique/boldoblique
-  // jsPDF mappe 'italic' → 'oblique' pour helvetica/courier automatiquement
   try {
+    if (TPL_FONT === 'roboto') {
+      // jsPDF API: setFont(family, fontStyle, fontWeight)
+      const map: Record<string, [string, string]> = {
+        normal:     ['normal', 'normal'],
+        bold:       ['bold',   'normal'],
+        italic:     ['italic', 'normal'],
+        bolditalic: ['italic', 'bold'],
+      };
+      const [fontStyle, weight] = map[style];
+      doc.setFont('roboto', fontStyle, weight);
+      return;
+    }
     doc.setFont(TPL_FONT, style);
   } catch {
     doc.setFont('helvetica', style);
