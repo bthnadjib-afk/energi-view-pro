@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2, Save, Mail, Plus, Trash2, Edit2, AlertTriangle } from 'lucide-react';
+import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2, Save, Mail, Plus, Trash2, Edit2, AlertTriangle, UserCog, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import Utilisateurs from '@/pages/Utilisateurs';
+import Preferences from '@/pages/Preferences';
 
 interface EmailTemplate {
   id: string;
