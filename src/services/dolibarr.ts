@@ -861,6 +861,52 @@ export async function createAcompteLibre(socid: string, montant: number, descrip
   return result || '';
 }
 
+// --- Acompte depuis un devis : reprend les lignes du devis et applique le taux d'acompte (50% si HT≤5000, sinon 30%) ---
+export async function createAcompteFromDevis(devisId: string): Promise<{ factureId: string; tauxAcompte: number; montantHT: number }> {
+  const devis = await dolibarrCall<any>(`/proposals/${devisId}`, 'GET');
+  if (!devis) throw new Error('Devis introuvable');
+  const totalHT = parseFloat(devis.total_ht) || 0;
+  if (totalHT <= 0) throw new Error('Devis sans montant');
+  const tauxAcompte = totalHT > 5000 ? 0.30 : 0.50;
+  const ref = devis.ref || `devis ${devisId}`;
+
+  // On reprend chaque ligne du devis avec subprice × tauxAcompte (Dolibarr exige des lignes pour type=3)
+  const lines = (devis.lines || []).map((l: any) => {
+    const origSubprice = parseFloat(l.subprice) || 0;
+    const qty = parseFloat(l.qty) || 1;
+    return {
+      desc: `[Acompte ${Math.round(tauxAcompte * 100)}%] ${l.desc || l.label || l.product_label || ''}`.slice(0, 250),
+      qty,
+      subprice: Math.round(origSubprice * tauxAcompte * 100) / 100,
+      tva_tx: parseFloat(l.tva_tx) || 0,
+      product_type: parseInt(l.product_type || '0', 10),
+    };
+  });
+
+  if (lines.length === 0) {
+    // Fallback : une ligne unique calculée sur le total
+    lines.push({
+      desc: `Acompte ${Math.round(tauxAcompte * 100)}% — ${ref}`,
+      qty: 1,
+      subprice: Math.round(totalHT * tauxAcompte * 100) / 100,
+      tva_tx: 0,
+      product_type: 1,
+    });
+  }
+
+  const factureId = await dolibarrCall<string>('/invoices', 'POST', {
+    socid: parseInt(devis.socid, 10) || devis.socid,
+    type: 3,
+    date: toUnixTimestamp(new Date().toISOString()),
+    lines,
+    linked_objects: { propal: devisId },
+    note_private: `Facture d'acompte ${Math.round(tauxAcompte * 100)}% liée au devis ${ref}`,
+  });
+
+  return { factureId: factureId || '', tauxAcompte, montantHT: totalHT };
+}
+
+
 // --- Avoir lié à une facture (Dolibarr type=2) ---
 // Lignes auto-remplies en NÉGATIF depuis la facture source (Dolibarr l'exige : avoir = montants négatifs).
 export async function createAvoirFromFacture(
