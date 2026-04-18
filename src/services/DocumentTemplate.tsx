@@ -225,7 +225,8 @@ export function DocumentTemplate({
   const showValidite = docType === 'devis';
   const showAcompte = docType === 'devis';
   const showSignatures = docType === 'intervention';
-  const showTableTotals = docType !== 'intervention' || (data.lignes && data.lignes.length > 0);
+  // Pas de totaux sur le bon d'intervention (pas de prix)
+  const showTableTotals = docType === 'devis' || docType === 'facture';
   const acompte = data.totaux.ttc * 0.3;
 
   // Bloc "infos entreprise" — nom + coordonnées en italique
