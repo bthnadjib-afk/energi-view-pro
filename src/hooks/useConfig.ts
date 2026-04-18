@@ -48,12 +48,23 @@ export interface AppConfig {
     margeBas: number;         // mm
     margeGauche: number;      // mm
     margeDroite: number;      // mm
-    tailleTitre: number;      // pt (ex 22)
-    tailleTexte: number;      // pt (ex 8.5)
-    piedDePage: string;       // texte libre du footer
+    tailleTitre: number;      // pt — titre principal (FACTURE / DEVIS)
+    tailleTexte: number;      // pt — taille de base (corps)
+    // ─── Tailles fines (1 par zone) — toutes en pt ─────────────
+    tailleEntreprise: number;       // Nom entreprise dans le header
+    tailleCoordonnees: number;      // Adresse / contact entreprise + client
+    tailleRubanLabel: number;       // Libellés du ruban (Date, Référence…)
+    tailleRubanValeur: number;      // Valeurs du ruban
+    tailleTableauHeader: number;    // En-têtes du tableau (Description, Qté…)
+    tailleTableauLignes: number;    // Lignes du tableau (articles)
+    tailleTotaux: number;           // Lignes Total HT / Total TVA
+    tailleTotalTTC: number;         // Total TTC mis en avant
+    // ─── Debug : largeur de capture HTML→Canvas (px) ──────────
+    captureWidth: number;           // 700–1200, défaut 794 (A4 @ 96dpi)
+    piedDePage: string;
     afficherRib: boolean;
     afficherCgv: boolean;
-    texteCgv: string;         // contenu des CGV (multi-ligne) — page finale du PDF
+    texteCgv: string;
   };
 }
 
@@ -105,6 +116,16 @@ const DEFAULT_CONFIG: AppConfig = {
     margeDroite: 15,
     tailleTitre: 22,
     tailleTexte: 8.5,
+    // Valeurs par défaut alignées avec les valeurs hardcodées historiques
+    tailleEntreprise: 11,
+    tailleCoordonnees: 9,
+    tailleRubanLabel: 6.5,
+    tailleRubanValeur: 8.5,
+    tailleTableauHeader: 8.5,
+    tailleTableauLignes: 8.5,
+    tailleTotaux: 9.5,
+    tailleTotalTTC: 11,
+    captureWidth: 794,
     piedDePage: '',
     afficherRib: true,
     afficherCgv: true,
