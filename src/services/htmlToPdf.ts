@@ -26,18 +26,17 @@ import {
 } from './DocumentTemplate';
 import logoFallback from '@/assets/logo.png';
 
-// A4 en mm
+// A4 cible dans le PDF final (mm)
 const A4_W_MM = 210;
 const A4_H_MM = 297;
-// Échelle d'affichage du DocumentTemplate pour le rendu PDF.
-// Le composant utilise des "unités" qui représentent des mm. On les rend
-// en pixels CSS via PX_PER_MM pour matcher une vraie page A4 (96dpi).
-const PX_PER_MM = 96 / 25.4; // ≈ 3.7795
-const RENDER_SCALE = PX_PER_MM; // passé au composant comme scale
-const A4_W_PX = A4_W_MM * PX_PER_MM; // ≈ 794
-const A4_H_PX = A4_H_MM * PX_PER_MM; // ≈ 1123
-// Densité de capture html2canvas pour la netteté
-const RENDER_DPR = 2;
+// Le template a été construit avec une grille "virtuelle" 210×297 en pixels CSS.
+// Il ne faut donc PAS le sur-échantillonner en lui injectant un scale mm→px,
+// sinon tout le contenu devient trop gros dans le PDF.
+const TEMPLATE_W_PX = 210;
+const TEMPLATE_H_PX = 297;
+const RENDER_SCALE = 1;
+// On garde la netteté via html2canvas, pas via le layout interne.
+const RENDER_DPR = 4;
 
 // ─── Lecture config template depuis localStorage ─────────────────────────────
 function readTemplateCfg(): DocumentTemplateCfg {
@@ -93,7 +92,7 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
   host.style.position = 'fixed';
   host.style.top = '0';
   host.style.left = '-10000px';
-  host.style.width = `${A4_W_PX}px`;
+  host.style.width = `${TEMPLATE_W_PX}px`;
   host.style.background = '#fff';
   host.style.zIndex = '-1';
   document.body.appendChild(host);
@@ -101,7 +100,7 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
   let root: Root | null = null;
   try {
     root = createRoot(host);
-    // Render à l'échelle "1mm = PX_PER_MM px" pour matcher une vraie page A4
+    // Render à l'échelle native du template pour conserver exactement les proportions
     root.render(createElement(DocumentTemplate, { ...props, scale: RENDER_SCALE }));
     await new Promise((r) => setTimeout(r, 80));
 
@@ -126,9 +125,9 @@ async function renderToCanvas(props: DocumentTemplateProps): Promise<HTMLCanvasE
       backgroundColor: '#ffffff',
       logging: false,
       imageTimeout: 4000,
-      width: A4_W_PX,
+      width: TEMPLATE_W_PX,
       height: target.scrollHeight,
-      windowWidth: A4_W_PX,
+      windowWidth: TEMPLATE_W_PX,
       windowHeight: target.scrollHeight,
     });
     return canvas;
