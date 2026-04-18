@@ -165,6 +165,17 @@ export function DocumentTemplate({
   const fsTableLigne   = (t.tailleTableauLignes?? 8.5)  * unit;
   const fsTotaux       = (t.tailleTotaux       ?? 9.5)  * unit;
   const fsTotalTTC     = (t.tailleTotalTTC     ?? 11)   * unit;
+  const fsEncartTexte  = (t.tailleEncartTexte  ?? 8.5)  * unit;
+  const fsPaiement     = (t.taillePaiement     ?? 9)    * unit;
+  const fsPiedDePage   = (t.taillePiedDePage   ?? 8)    * unit;
+  // Logo (mm → px). Valeurs par défaut équivalentes à l'ancien hardcode (50px ≈ 13mm, 180px ≈ 48mm).
+  const logoH = (t.logoHauteur ?? 13) * PX_PER_MM * scale * density;
+  const logoMaxW = (t.logoLargeurMax ?? 48) * PX_PER_MM * scale * density;
+  // Largeurs encarts (mm → px)
+  const wEncTotaux = (t.largeurEncartTotaux ?? 80) * PX_PER_MM * scale * density;
+  const wEncBonAccord = (t.largeurEncartBonAccord ?? 80) * PX_PER_MM * scale * density;
+  const entrepriseEnFace = t.entrepriseEnFaceClient !== false;
+  const rubanCompact = t.rubanCompact !== false;
 
   const primary = t.couleurPrimaire || '#1a1a1a';
   const accent = t.couleurAccent || '#cc0000';
