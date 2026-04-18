@@ -368,7 +368,17 @@ export function useCreateAcompteLibre() {
   });
 }
 
-export function useCreateAvoir() {
+export function useCreateAcompteFromDevis() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { devisId: string }) => createAcompteFromDevis(data.devisId),
+    onSuccess: (res) => {
+      toast.success(`Facture d'acompte ${Math.round(res.tauxAcompte * 100)}% créée depuis le devis`);
+      qc.invalidateQueries({ queryKey: ['factures'] });
+    },
+    onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
+  });
+}
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: { factureSourceId: string }) => createAvoirFromFacture(data.factureSourceId),
