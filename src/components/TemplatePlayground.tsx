@@ -69,7 +69,7 @@ export default function TemplatePlayground() {
       couleurPrimaire: '#1a1a1a',
       couleurAccent: '#cc0000',
       couleurTexte: '#1a1a1a',
-      police: 'roboto',
+      police: 'helvetica',
       margeHaut: 18,
       margeBas: 20,
       margeGauche: 15,
@@ -152,10 +152,7 @@ export default function TemplatePlayground() {
                 <Select value={t.police} onValueChange={(v: any) => updateTemplate({ police: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="roboto">Roboto</SelectItem>
-                    <SelectItem value="montserrat">Montserrat</SelectItem>
-                    <SelectItem value="inter">Inter</SelectItem>
-                    <SelectItem value="helvetica">Helvetica</SelectItem>
+                    <SelectItem value="helvetica">Helvetica (sans-serif)</SelectItem>
                     <SelectItem value="times">Times (serif)</SelectItem>
                     <SelectItem value="courier">Courier (monospace)</SelectItem>
                   </SelectContent>
