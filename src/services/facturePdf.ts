@@ -123,7 +123,7 @@ async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams
     headStyles: { fillColor: NOIR, textColor: BLANC, fontStyle: 'bold', fontSize: 8.5, font: 'helvetica' },
     alternateRowStyles: { fillColor: GRIS_CLAIR },
     columnStyles: {
-      0: { cellWidth: 'auto', halign: 'left' },
+      0: { cellWidth: 80,  halign: 'left' },
       1: { cellWidth: 16,     halign: 'center' },
       2: { cellWidth: 11,     halign: 'center' },
       3: { cellWidth: 12,     halign: 'center' },

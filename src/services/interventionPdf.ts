@@ -137,10 +137,10 @@ async function buildInterventionPdf({
       footStyles: { fillColor: GRIS_CLAIR, textColor: NOIR, fontStyle: 'bold' },
       alternateRowStyles: { fillColor: GRIS_CLAIR },
       columnStyles: {
-        0: { cellWidth: 10,   halign: 'center' },
-        1: { cellWidth: 'auto' },
-        2: { cellWidth: 28,   halign: 'center' },
-        3: { cellWidth: 22,   halign: 'center', fontStyle: 'bold' },
+        0: { cellWidth: 10,  halign: 'center' },
+        1: { cellWidth: 120 },
+        2: { cellWidth: 28,  halign: 'center' },
+        3: { cellWidth: 22,  halign: 'center', fontStyle: 'bold' },
       },
     });
 

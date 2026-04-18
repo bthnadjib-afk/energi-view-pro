@@ -114,13 +114,13 @@ async function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): Pro
     },
     alternateRowStyles: { fillColor: GRIS_CLAIR },
     columnStyles: {
-      0: { cellWidth: 'auto',  halign: 'left' },
-      1: { cellWidth: 16,      halign: 'center' },
-      2: { cellWidth: 11,      halign: 'center' },
-      3: { cellWidth: 12,      halign: 'center' },
-      4: { cellWidth: 23,      halign: 'right' },
-      5: { cellWidth: 13,      halign: 'center' },
-      6: { cellWidth: 25,      halign: 'right' },
+      0: { cellWidth: 80,  halign: 'left' },
+      1: { cellWidth: 16,  halign: 'center' },
+      2: { cellWidth: 11,  halign: 'center' },
+      3: { cellWidth: 12,  halign: 'center' },
+      4: { cellWidth: 23,  halign: 'right' },
+      5: { cellWidth: 13,  halign: 'center' },
+      6: { cellWidth: 25,  halign: 'right' },
     },
   });
 
