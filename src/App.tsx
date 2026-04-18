@@ -20,11 +20,9 @@ import ClientDetail from "./pages/ClientDetail";
 import Catalogue from "./pages/Catalogue";
 import Agenda from "./pages/Agenda";
 import Configuration from "./pages/Configuration";
-import Utilisateurs from "./pages/Utilisateurs";
 import Fournisseurs from "./pages/Fournisseurs";
 import Contrats from "./pages/Contrats";
 import Lots from "./pages/Lots";
-import Preferences from "./pages/Preferences";
 import Projets from "./pages/Projets";
 import Banque from "./pages/Banque";
 import Stock from "./pages/Stock";
@@ -130,8 +128,8 @@ function AuthenticatedApp() {
               <Route path="/rapports" element={<RouteGuard feature="factures"><Rapports /></RouteGuard>} />
               {/* Admin */}
               <Route path="/configuration" element={<RouteGuard feature="configuration"><Configuration /></RouteGuard>} />
-              <Route path="/utilisateurs" element={<RouteGuard feature="utilisateurs"><Utilisateurs /></RouteGuard>} />
-              <Route path="/preferences" element={<Preferences />} />
+              <Route path="/utilisateurs" element={<Navigate to="/configuration" replace />} />
+              <Route path="/preferences" element={<Navigate to="/configuration" replace />} />
               <Route path="/login" element={<Navigate to="/" replace />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

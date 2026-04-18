@@ -57,7 +57,7 @@ function LineEditor({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-foreground">Lignes du lot</p>
+        <p className="text-sm font-medium text-foreground">Lignes du forfait</p>
         <Button variant="outline" size="sm" onClick={add} className="gap-1.5">
           <Plus className="h-3.5 w-3.5" /> Ajouter une ligne
         </Button>
@@ -219,15 +219,15 @@ export default function Lots() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Layers className="h-6 w-6 text-primary" /> Lots / Gabarits de devis
-            <HelpTooltip text="Les lots sont des groupes d'articles pré-définis. Créez-en un pour chaque type de chantier fréquent (ex. borne de recharge). Lors de la création d'un devis, cliquez 'Insérer un lot' pour pré-remplir toutes les lignes automatiquement. Les lignes marquées ⚠ ont une quantité variable à saisir." />
+            <Layers className="h-6 w-6 text-primary" /> Forfaits
+            <HelpTooltip text="Les forfaits sont des groupes d'articles pré-définis. Créez-en un pour chaque type de chantier fréquent (ex. borne de recharge). Lors de la création d'un devis, cliquez 'Insérer un forfait' pour pré-remplir toutes les lignes automatiquement. Les lignes marquées ⚠ ont une quantité variable à saisir." />
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Créez des lots prédéfinis à insérer en un clic dans vos devis
+            Créez des forfaits prédéfinis à insérer en un clic dans vos devis
           </p>
         </div>
         <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Créer un lot
+          <Plus className="h-4 w-4" /> Créer un forfait
         </Button>
       </div>
 
@@ -238,12 +238,12 @@ export default function Lots() {
       ) : groups.length === 0 ? (
         <div className="bg-card rounded-lg border border-dashed border-border p-12 text-center space-y-3">
           <Layers className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-          <p className="text-muted-foreground font-medium">Aucun lot créé</p>
+          <p className="text-muted-foreground font-medium">Aucun forfait créé</p>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Créez des lots pour regrouper vos articles habituels (ex : "Borne IRVE", "Tableau électrique") et les insérer en un clic dans vos devis.
+            Créez des forfaits pour regrouper vos articles habituels (ex : "Borne IRVE", "Tableau électrique") et les insérer en un clic dans vos devis.
           </p>
           <Button onClick={openCreate} className="gap-2 mt-2">
-            <Plus className="h-4 w-4" /> Créer mon premier lot
+            <Plus className="h-4 w-4" /> Créer mon premier forfait
           </Button>
         </div>
       ) : (
@@ -272,7 +272,7 @@ export default function Lots() {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Supprimer le lot "{g.nom}" ?</AlertDialogTitle>
+                          <AlertDialogTitle>Supprimer le forfait "{g.nom}" ?</AlertDialogTitle>
                           <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -326,12 +326,12 @@ export default function Lots() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editGroup ? `Modifier — ${editGroup.nom}` : 'Nouveau lot'}</DialogTitle>
+            <DialogTitle>{editGroup ? `Modifier — ${editGroup.nom}` : 'Nouveau forfait'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-sm font-medium text-foreground">Nom du lot *</label>
+                <label className="text-sm font-medium text-foreground">Nom du forfait *</label>
                 <Input
                   placeholder="ex : Borne IRVE, Tableau divisionnaire..."
                   value={nom}
@@ -365,7 +365,7 @@ export default function Lots() {
               className="w-full h-11 text-base"
             >
               {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {isPending ? 'Enregistrement...' : editGroup ? 'Enregistrer les modifications' : 'Créer le lot'}
+              {isPending ? 'Enregistrement...' : editGroup ? 'Enregistrer les modifications' : 'Créer le forfait'}
             </Button>
           </div>
         </DialogContent>

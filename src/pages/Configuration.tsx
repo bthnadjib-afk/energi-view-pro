@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2, Save, Mail, Plus, Trash2, Edit2, AlertTriangle } from 'lucide-react';
+import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2, Save, Mail, Plus, Trash2, Edit2, AlertTriangle, UserCog, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import Utilisateurs from '@/pages/Utilisateurs';
+import Preferences from '@/pages/Preferences';
 
 interface EmailTemplate {
   id: string;
@@ -158,13 +160,15 @@ export default function Configuration() {
       </div>
 
       <Tabs defaultValue="entreprise" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="entreprise" className="gap-1.5"><Building2 className="h-3.5 w-3.5" /> Entreprise</TabsTrigger>
           <TabsTrigger value="defaults" className="gap-1.5"><Settings2 className="h-3.5 w-3.5" /> Valeurs par défaut</TabsTrigger>
           <TabsTrigger value="notifications" className="gap-1.5"><Bell className="h-3.5 w-3.5" /> Notifications</TabsTrigger>
           <TabsTrigger value="emails" className="gap-1.5"><Mail className="h-3.5 w-3.5" /> Modèles emails</TabsTrigger>
           <TabsTrigger value="smtp" className="gap-1.5"><Mail className="h-3.5 w-3.5" /> Serveur mail</TabsTrigger>
           <TabsTrigger value="dolibarr" className="gap-1.5"><Database className="h-3.5 w-3.5" /> Dolibarr</TabsTrigger>
+          <TabsTrigger value="utilisateurs" className="gap-1.5"><UserCog className="h-3.5 w-3.5" /> Utilisateurs</TabsTrigger>
+          <TabsTrigger value="preferences" className="gap-1.5"><SlidersHorizontal className="h-3.5 w-3.5" /> Préférences</TabsTrigger>
           <TabsTrigger value="maintenance" className="gap-1.5"><AlertTriangle className="h-3.5 w-3.5" /> Maintenance</TabsTrigger>
         </TabsList>
 
@@ -434,6 +438,14 @@ export default function Configuration() {
               Tester la connexion
             </Button>
           </div>
+        </TabsContent>
+
+        <TabsContent value="utilisateurs">
+          <Utilisateurs />
+        </TabsContent>
+
+        <TabsContent value="preferences">
+          <Preferences />
         </TabsContent>
 
         <TabsContent value="maintenance">
