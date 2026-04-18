@@ -759,7 +759,7 @@ export default function Factures() {
                   )}
 
                   {/* Classer abandonnée : facture validée non payée et pas déjà abandonnée */}
-                  {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && selectedFacture.fk_statut !== 3 && (
+                  {selectedFacture.fk_statut >= 1 && !selectedFacture.paye && !isFactureAbandonnee(selectedFacture.fk_statut, selectedFacture.paye, selectedFacture.close_code) && (
                     <Button
                       variant="outline"
                       className="gap-2 text-destructive hover:text-destructive"
