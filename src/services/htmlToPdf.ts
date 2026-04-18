@@ -31,11 +31,12 @@ const A4_W_MM = 210;
 const A4_H_MM = 297;
 // Le template a été construit avec une grille "virtuelle" 210×297 en pixels CSS.
 // On le rend sur une vraie largeur A4 CSS (~794px à 96dpi) pour éviter tout zoom.
-const TEMPLATE_W_PX = (A4_W_MM / 25.4) * 96;
-const TEMPLATE_H_PX = (A4_H_MM / 25.4) * 96;
+const TEMPLATE_W_PX = (A4_W_MM / 25.4) * 96;       // ≈ 794 px
+const TEMPLATE_H_PX = (A4_H_MM / 25.4) * 96;       // ≈ 1123 px
 const RENDER_SCALE = 1;
-// On garde la netteté via html2canvas, pas via le layout interne.
-const RENDER_DPR = 4;
+// Capture html2canvas à ~300 dpi (300/96 ≈ 3.125) pour une netteté impression.
+// → canvas final ≈ 2480×3508 px = vrai A4 300 dpi.
+const RENDER_DPR = 300 / 96;
 
 // ─── Lecture config template depuis localStorage ─────────────────────────────
 function readTemplateCfg(): DocumentTemplateCfg {
@@ -161,11 +162,11 @@ function canvasToPdf(canvas: HTMLCanvasElement): jsPDF {
       0, sy, canvas.width, sliceHeight,
       0, 0, canvas.width, sliceHeight
     );
-    const imgData = pageCanvas.toDataURL('image/jpeg', 0.92);
+    const imgData = pageCanvas.toDataURL('image/jpeg', 0.95);
     if (p > 0) pdf.addPage();
     // Hauteur réelle imprimée en mm (pour la dernière page < pleine hauteur)
     const printedHeightMm = (sliceHeight / pxPerMm);
-    pdf.addImage(imgData, 'JPEG', 0, 0, A4_W_MM, printedHeightMm);
+    pdf.addImage(imgData, 'JPEG', 0, 0, A4_W_MM, printedHeightMm, undefined, 'FAST');
   }
   return pdf;
 }
