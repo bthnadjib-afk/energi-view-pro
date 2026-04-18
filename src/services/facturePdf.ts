@@ -9,6 +9,7 @@ import {
   fmt, toText, formatDateFR,
   loadRobotoFonts, setFont,
   drawLogo, drawInfoBar, drawParties, drawTotaux,
+  drawSignatureAndNet,
   drawRib, drawFooter,
   type EntrepriseInfo, type ClientInfo,
 } from './pdfUtils';
@@ -173,8 +174,7 @@ async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams
   const totEndY = drawTotaux(doc, y, totRows);
   y = Math.max(y + 14, totEndY) + 6;
 
-  // ─── MONTANT PRINCIPAL (centré, grand) ────────────────────────
-  // Calculer le montant à afficher
+  // ─── SIGNATURE (gauche) + NET À PAYER + petit encart ACOMPTE (droite) ─
   const montantAffiche = isAcompte
     ? Math.round(facture.montantTTC * 0.30 * 100) / 100
     : facture.resteAPayer > 0 && !facture.paye ? facture.resteAPayer : facture.montantTTC;
@@ -184,28 +184,19 @@ async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams
     : facture.resteAPayer > 0 && facture.resteAPayer < facture.montantTTC ? 'RESTE À PAYER'
     : 'NET À PAYER';
 
-  // Grande box montant
-  const bigBoxH = 18;
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(...GRIS_LIGNE);
-  doc.setLineWidth(0.4);
-  doc.rect(ML, y, CW, bigBoxH, 'S');
-
-  setFont(doc, 'bolditalic');
-  doc.setFontSize(18);
-  doc.setTextColor(facture.paye ? VERT[0] : NOIR[0], facture.paye ? VERT[1] : NOIR[1], facture.paye ? VERT[2] : NOIR[2]);
-  doc.text(`${labelAffiche} : ${fmt(montantAffiche)} €`, PAGE_W / 2, y + 11, { align: 'center' });
-
-  y += bigBoxH + 8;
-
-  // ─── RESTE À PAYER (si paiements partiels) ───────────────────
+  // Petit encart acompte uniquement si paiements partiels (déjà réglé)
+  let acoLabel: string | undefined;
+  let acoValue: string | undefined;
   if (!facture.paye && facture.resteAPayer > 0 && facture.resteAPayer < facture.montantTTC && !isAcompte) {
-    setFont(doc, 'italic');
-    doc.setFontSize(8.5);
-    doc.setTextColor(...GRIS_TEXTE);
-    doc.text(`TOTAL TTC : ${fmt(facture.montantTTC)} €  |  Déjà réglé : ${fmt(facture.montantTTC - facture.resteAPayer)} €`, PAGE_W / 2, y, { align: 'center' });
-    y += 8;
+    acoLabel = 'DÉJÀ RÉGLÉ';
+    acoValue = `${fmt(facture.montantTTC - facture.resteAPayer)} €`;
   }
+
+  y = drawSignatureAndNet(
+    doc, y,
+    labelAffiche, `${fmt(montantAffiche)} €`,
+    acoLabel, acoValue
+  ) + 8;
 
   // ─── RIB ──────────────────────────────────────────────────────
   if (TPL_SHOW_RIB) {

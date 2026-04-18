@@ -11,7 +11,7 @@ type TemplateCfg = {
   couleurPrimaire?: string;
   couleurAccent?: string;
   couleurTexte?: string;
-  police?: 'helvetica' | 'times' | 'courier';
+  police?: 'helvetica' | 'times' | 'courier' | 'roboto';
   margeHaut?: number;
   margeBas?: number;
   margeGauche?: number;
@@ -61,8 +61,8 @@ export const PAGE_H = 297;
 export const COL_R  = PAGE_W - MR;
 export const CW     = PAGE_W - ML - MR;
 
-// Police globale (helvetica/times/courier)
-export const TPL_FONT: 'helvetica' | 'times' | 'courier' = (_T.police || 'helvetica') as any;
+// Police globale (helvetica/times/courier/roboto)
+export const TPL_FONT: 'helvetica' | 'times' | 'courier' | 'roboto' = (_T.police || 'roboto') as any;
 export const TPL_LOGO_URL: string = _T.logoUrl || '';
 export const TPL_FOOTER_TEXT: string = _T.piedDePage || '';
 export const TPL_SHOW_RIB: boolean = _T.afficherRib !== false;
@@ -95,18 +95,59 @@ async function loadImageEl(src: string): Promise<HTMLImageElement> {
   });
 }
 
-// ─── Police Helvetica (intégrée jsPDF, pas de chargement externe) ──────
-// jsPDF ne supporte pas le format woff/woff2 nativement.
-// Helvetica est visuellement identique à Roboto dans les viewers PDF.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function loadRobotoFonts(_doc: jsPDF): Promise<void> {
-  // No-op — Helvetica est utilisée directement via setFont
+// ─── Police Roboto (chargée depuis jsdelivr CDN, mise en cache) ──────
+let _robotoLoaded = false;
+const ROBOTO_URLS: Record<string, string> = {
+  normal:     'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Regular.ttf',
+  bold:       'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Bold.ttf',
+  italic:     'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Italic.ttf',
+  bolditalic: 'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-BoldItalic.ttf',
+};
+
+async function fetchAsBase64(url: string): Promise<string> {
+  const res = await fetch(url);
+  const buf = await res.arrayBuffer();
+  let bin = '';
+  const bytes = new Uint8Array(buf);
+  for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+export async function loadRobotoFonts(doc: jsPDF): Promise<void> {
+  if (TPL_FONT !== 'roboto') return;
+  try {
+    const styles: Array<['normal'|'bold'|'italic'|'bolditalic', string]> = [
+      ['normal', ROBOTO_URLS.normal],
+      ['bold', ROBOTO_URLS.bold],
+      ['italic', ROBOTO_URLS.italic],
+      ['bolditalic', ROBOTO_URLS.bolditalic],
+    ];
+    for (const [style, url] of styles) {
+      const b64 = await fetchAsBase64(url);
+      const filename = `Roboto-${style}.ttf`;
+      doc.addFileToVFS(filename, b64);
+      doc.addFont(filename, 'roboto', style === 'bolditalic' ? 'bold' : style, style === 'bolditalic' ? 'italic' : 'normal');
+    }
+    _robotoLoaded = true;
+  } catch (e) {
+    console.warn('Roboto load failed, fallback helvetica', e);
+  }
 }
 
 export function setFont(doc: jsPDF, style: 'normal'|'bold'|'italic'|'bolditalic') {
-  // 'times' supporte les 4 styles, 'helvetica' aussi, 'courier' supporte normal/bold/oblique/boldoblique
-  // jsPDF mappe 'italic' → 'oblique' pour helvetica/courier automatiquement
   try {
+    if (TPL_FONT === 'roboto') {
+      // jsPDF API: setFont(family, fontStyle, fontWeight)
+      const map: Record<string, [string, string]> = {
+        normal:     ['normal', 'normal'],
+        bold:       ['bold',   'normal'],
+        italic:     ['italic', 'normal'],
+        bolditalic: ['italic', 'bold'],
+      };
+      const [fontStyle, weight] = map[style];
+      doc.setFont('roboto', fontStyle, weight);
+      return;
+    }
     doc.setFont(TPL_FONT, style);
   } catch {
     doc.setFont('helvetica', style);
@@ -118,8 +159,11 @@ export async function drawLogo(doc: jsPDF, x: number, y: number): Promise<number
   const src = TPL_LOGO_URL || logoUrl;
   try {
     const img = await loadImageEl(src);
-    const logoW = 52;
-    const logoH = Math.round(logoW / 3.5);
+    const logoW = 72; // agrandi (avant 52)
+    // Conserve le ratio naturel de l'image pour éviter toute déformation
+    const naturalRatio =
+      img.naturalHeight && img.naturalWidth ? img.naturalHeight / img.naturalWidth : 1 / 3.5;
+    const logoH = Math.round(logoW * naturalRatio);
     doc.addImage(img, 'PNG', x, y, logoW, logoH);
     return logoH;
   } catch {
@@ -167,10 +211,9 @@ export function drawParties(
   client: ClientInfo,
   entreprise?: EntrepriseInfo
 ): number {
-  const colMid = ML + CW / 2;
   const startY = y;
 
-  // Client (gauche)
+  // ─── CLIENT (gauche, aligné à gauche) ─────────────────────────
   setFont(doc, 'bolditalic');
   doc.setFontSize(9.5);
   doc.setTextColor(...NOIR);
@@ -188,13 +231,13 @@ export function drawParties(
   if (client.telephone) clientLines.push(toText(client.telephone));
   clientLines.forEach(l => { doc.text(l, ML, y); y += 4.8; });
 
-  // Entreprise (droite)
+  // ─── ENTREPRISE (droite, aligné à droite sur COL_R) ───────────
   const ent = entreprise;
   let ey = startY;
   setFont(doc, 'bolditalic');
   doc.setFontSize(9.5);
   doc.setTextColor(...NOIR);
-  doc.text(toText(ent?.nom || 'EURL ELECTRICIEN DU GENEVOIS').toUpperCase(), colMid, ey);
+  doc.text(toText(ent?.nom || 'EURL ELECTRICIEN DU GENEVOIS').toUpperCase(), COL_R, ey, { align: 'right' });
   ey += 5.5;
 
   setFont(doc, 'normal');
@@ -207,7 +250,7 @@ export function drawParties(
     (ent?.email || 'CONTACT@ELECTRICIENDUGENEVOIS.FR').toUpperCase(),
     ent?.telephone || '06 02 04 42 02',
   ];
-  entLines.forEach(l => { doc.text(l, colMid, ey); ey += 4.8; });
+  entLines.forEach(l => { doc.text(l, COL_R, ey, { align: 'right' }); ey += 4.8; });
 
   return Math.max(y, ey);
 }
@@ -234,7 +277,8 @@ export function drawTotaux(
   return y;
 }
 
-// ─── Signature + NET À PAYER ──────────────────────────────────
+// ─── Signature (gauche) + NET À PAYER + petit encart ACOMPTE (droite) ──
+// L'encart acompte fait la MÊME LARGEUR que la box NET et est juste en dessous.
 export function drawSignatureAndNet(
   doc: jsPDF,
   y: number,
@@ -243,12 +287,15 @@ export function drawSignatureAndNet(
   acompteLabel?: string,
   acompteValue?: string
 ): number {
-  const sigW  = Math.round(CW * 0.52);
-  const netW  = CW - sigW - 5;
-  const netX  = ML + sigW + 5;
-  const sigH  = 30;
+  const rightW = Math.round(CW * 0.45);     // largeur bloc droit (TTC + acompte)
+  const rightX = COL_R - rightW;
+  const sigW   = rightX - ML - 5;           // signature à gauche, gap 5mm
+  const netH   = 16;                        // hauteur box NET
+  const acoH   = acompteLabel ? 12 : 0;     // hauteur petit encart acompte
+  const totalH = netH + (acoH ? acoH + 2 : 0); // 2mm de gap entre les 2 boxes
+  const sigH   = Math.max(totalH, 30);
 
-  // Box signature (tiretée)
+  // ─ Box signature (gauche) ─
   doc.setDrawColor(...GRIS_LIGNE);
   doc.setLineWidth(0.5);
   doc.rect(ML, y, sigW, sigH, 'S');
@@ -257,26 +304,27 @@ export function drawSignatureAndNet(
   doc.setTextColor(...GRIS_SOMBRE);
   doc.text("Signature précédée de la mention « bon pour accord » :", ML + 3, y + 6);
 
-  // Bloc droit : NET + ACOMPTE
+  // ─ Box NET À PAYER (droite, haut) ─
+  doc.setFillColor(...NOIR);
+  doc.rect(rightX, y, rightW, netH, 'F');
   setFont(doc, 'bolditalic');
-  doc.setFontSize(12);
-  doc.setTextColor(...NOIR);
-  const netLines = doc.splitTextToSize(`${netLabel} : ${netValue}`, netW);
-  doc.text(netLines, netX + netW / 2, y + 9, { align: 'center' });
+  doc.setFontSize(11);
+  doc.setTextColor(...BLANC);
+  doc.text(`${netLabel} : ${netValue}`, rightX + rightW / 2, y + netH / 2 + 1.5, { align: 'center' });
 
+  // ─ Petit encart ACOMPTE (droite, juste en dessous, même largeur) ─
   if (acompteLabel && acompteValue) {
-    const boxY = y + 16;
-    const boxH = 13;
+    const acoY = y + netH + 2;
     doc.setFillColor(...ROUGE_BG);
     doc.setDrawColor(...ROUGE);
-    doc.setLineWidth(1.5);
-    doc.roundedRect(netX, boxY, netW, boxH, 1.5, 1.5, 'FD');
+    doc.setLineWidth(1.2);
+    doc.roundedRect(rightX, acoY, rightW, acoH, 1.2, 1.2, 'FD');
     setFont(doc, 'bolditalic');
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setTextColor(...ROUGE);
-    doc.text(acompteLabel, netX + netW / 2, boxY + 5.5, { align: 'center' });
-    doc.setFontSize(10);
-    doc.text(acompteValue, netX + netW / 2, boxY + 10.5, { align: 'center' });
+    doc.text(acompteLabel, rightX + rightW / 2, acoY + 4.5, { align: 'center' });
+    doc.setFontSize(9);
+    doc.text(acompteValue, rightX + rightW / 2, acoY + 9, { align: 'center' });
   }
 
   return y + sigH;
