@@ -219,15 +219,15 @@ export default function Lots() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Layers className="h-6 w-6 text-primary" /> Lots / Gabarits de devis
-            <HelpTooltip text="Les lots sont des groupes d'articles pré-définis. Créez-en un pour chaque type de chantier fréquent (ex. borne de recharge). Lors de la création d'un devis, cliquez 'Insérer un lot' pour pré-remplir toutes les lignes automatiquement. Les lignes marquées ⚠ ont une quantité variable à saisir." />
+            <Layers className="h-6 w-6 text-primary" /> Forfaits
+            <HelpTooltip text="Les forfaits sont des groupes d'articles pré-définis. Créez-en un pour chaque type de chantier fréquent (ex. borne de recharge). Lors de la création d'un devis, cliquez 'Insérer un forfait' pour pré-remplir toutes les lignes automatiquement. Les lignes marquées ⚠ ont une quantité variable à saisir." />
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Créez des lots prédéfinis à insérer en un clic dans vos devis
+            Créez des forfaits prédéfinis à insérer en un clic dans vos devis
           </p>
         </div>
         <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Créer un lot
+          <Plus className="h-4 w-4" /> Créer un forfait
         </Button>
       </div>
 
@@ -238,12 +238,12 @@ export default function Lots() {
       ) : groups.length === 0 ? (
         <div className="bg-card rounded-lg border border-dashed border-border p-12 text-center space-y-3">
           <Layers className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-          <p className="text-muted-foreground font-medium">Aucun lot créé</p>
+          <p className="text-muted-foreground font-medium">Aucun forfait créé</p>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Créez des lots pour regrouper vos articles habituels (ex : "Borne IRVE", "Tableau électrique") et les insérer en un clic dans vos devis.
+            Créez des forfaits pour regrouper vos articles habituels (ex : "Borne IRVE", "Tableau électrique") et les insérer en un clic dans vos devis.
           </p>
           <Button onClick={openCreate} className="gap-2 mt-2">
-            <Plus className="h-4 w-4" /> Créer mon premier lot
+            <Plus className="h-4 w-4" /> Créer mon premier forfait
           </Button>
         </div>
       ) : (
