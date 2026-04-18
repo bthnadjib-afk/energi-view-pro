@@ -71,7 +71,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
         title: 'Catalogue', url: '/catalogue', icon: Package, feature: 'clients',
         children: [
           { title: 'Articles', url: '/catalogue', icon: Package, feature: 'clients' },
-          { title: 'Lots / Gabarits', url: '/lots', icon: BookOpen, feature: 'clients' },
+          { title: 'Forfaits', url: '/lots', icon: BookOpen, feature: 'clients' },
         ],
       },
       { title: 'Stock', url: '/stock', icon: Warehouse, feature: 'factures' },
@@ -80,7 +80,6 @@ const navGroups: { label: string; items: NavItem[] }[] = [
 ];
 
 const adminNav: NavItem[] = [
-  { title: 'Utilisateurs', url: '/utilisateurs', icon: UserCog, feature: 'utilisateurs' },
   { title: 'Configuration', url: '/configuration', icon: Settings, feature: 'configuration' },
 ];
 
@@ -219,26 +218,7 @@ export function AppSidebar() {
         {!collapsed && profile && (
           <p className="text-xs text-muted-foreground truncate mb-2 px-1">{profile.nom || profile.email}</p>
         )}
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <NavLink
-                to="/preferences"
-                className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-muted-foreground"
-                activeClassName="bg-primary/15 text-primary font-medium [&_svg]:text-primary"
-              >
-                <SlidersHorizontal className="mr-2 h-4 w-4" />
-                {!collapsed && <span>Préférences</span>}
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
         <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground mt-1"
-          onClick={signOut}
-        >
           <LogOut className="h-4 w-4" />
           {!collapsed && <span>Déconnexion</span>}
         </Button>
