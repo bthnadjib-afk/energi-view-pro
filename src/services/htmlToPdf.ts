@@ -88,12 +88,13 @@ async function urlToDataUrl(url: string): Promise<string> {
 }
 
 // ─── Helper : crée un host off-screen STRICTEMENT à largeur A4 (pixel-to-point) ─
-function createHost(): { host: HTMLElement; root: Root } {
+// La largeur peut être surchargée via le slider de debug "captureWidth" en Préférences.
+function createHost(widthPx: number = TEMPLATE_W_PX): { host: HTMLElement; root: Root } {
   const host = document.createElement('div');
   host.style.position = 'fixed';
   host.style.top = '0';
   host.style.left = '-10000px';
-  host.style.width = `${TEMPLATE_W_PX}px`;     // 794px FIXE
+  host.style.width = `${widthPx}px`;             // configurable
   host.style.height = 'fit-content';            // pas de contrainte verticale
   host.style.overflow = 'hidden';               // empêche tout débordement parasite
   host.style.background = '#fff';
@@ -138,7 +139,13 @@ interface MainCaptureResult {
 }
 
 async function renderMain(props: DocumentTemplateProps): Promise<MainCaptureResult> {
-  const { host, root } = createHost();
+  // Largeur de capture configurable depuis Préférences (debug zoom).
+  // Bornée 700-1200, défaut 794 (A4 strict @ 96dpi).
+  const captureW = Math.min(1200, Math.max(700, Math.round(props.template.captureWidth ?? TEMPLATE_W_PX)));
+  // Hauteur "page" proportionnelle à la largeur de capture pour rester en ratio A4.
+  const captureH = Math.round((captureW * A4_H_MM) / A4_W_MM);
+
+  const { host, root } = createHost(captureW);
   try {
     // 1. Auto-fit densité jusqu'à rentrer sur A4
     let density = MAX_DENSITY;
@@ -157,12 +164,12 @@ async function renderMain(props: DocumentTemplateProps): Promise<MainCaptureResu
     };
 
     let needed = await measure(density);
-    while (needed > TEMPLATE_H_PX && density > MIN_DENSITY) {
+    while (needed > captureH && density > MIN_DENSITY) {
       density = Math.max(MIN_DENSITY, +(density - DENSITY_STEP).toFixed(2));
       needed = await measure(density);
     }
 
-    const multiPage = needed > TEMPLATE_H_PX;
+    const multiPage = needed > captureH;
 
     // 2. Render final
     //    - Single page : on contraint à A4 (overflow hidden).
@@ -179,7 +186,7 @@ async function renderMain(props: DocumentTemplateProps): Promise<MainCaptureResu
     await waitForImages(host);
 
     const target = host.firstElementChild as HTMLElement;
-    const finalHeight = multiPage ? target.scrollHeight : TEMPLATE_H_PX;
+    const finalHeight = multiPage ? target.scrollHeight : captureH;
 
     const canvas = await html2canvas(target, {
       scale: 1,                  // STRICT 1:1 (pixel-to-point)
@@ -188,9 +195,9 @@ async function renderMain(props: DocumentTemplateProps): Promise<MainCaptureResu
       backgroundColor: '#ffffff',
       logging: false,
       imageTimeout: 4000,
-      width: TEMPLATE_W_PX,
+      width: captureW,
       height: finalHeight,
-      windowWidth: TEMPLATE_W_PX, // 794
+      windowWidth: captureW,
       windowHeight: finalHeight,
     });
 
@@ -235,8 +242,8 @@ async function renderCgv(props: DocumentTemplateProps): Promise<HTMLCanvasElemen
 
 // ─── Ajoute un canvas à un PDF en le découpant en pages A4 ────────────────────
 function addCanvasToPdf(pdf: jsPDF, canvas: HTMLCanvasElement, isFirstPage: boolean) {
-  // Hauteur d'une page A4 en px à la même résolution que le canvas (RENDER_DPR=1)
-  const pageHeightPxAt1 = TEMPLATE_H_PX * RENDER_DPR;
+  // Hauteur d'une "page A4" exprimée en px du canvas courant (ratio A4 strict).
+  const pageHeightPxAt1 = Math.round((canvas.width * A4_H_MM) / A4_W_MM);
 
   // ─── Cas 1 : tout tient sur UNE page A4 → écrasement strict 210×297mm ───
   if (canvas.height <= pageHeightPxAt1 + 2) {

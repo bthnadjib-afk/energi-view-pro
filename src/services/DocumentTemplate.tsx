@@ -59,6 +59,16 @@ export interface DocumentTemplateCfg {
   margeDroite?: number;
   tailleTitre?: number;
   tailleTexte?: number;
+  // Tailles fines optionnelles (pt) — fallback sur valeurs historiques si absentes
+  tailleEntreprise?: number;
+  tailleCoordonnees?: number;
+  tailleRubanLabel?: number;
+  tailleRubanValeur?: number;
+  tailleTableauHeader?: number;
+  tailleTableauLignes?: number;
+  tailleTotaux?: number;
+  tailleTotalTTC?: number;
+  captureWidth?: number;
   piedDePage?: string;
   afficherRib?: boolean;
   afficherCgv?: boolean;
@@ -135,6 +145,17 @@ export function DocumentTemplate({
   const mr = (t.margeDroite ?? 15) * unit;
   const baseFontSize = (t.tailleTexte ?? 8.5) * unit * 1.2;
   const titleSize = (t.tailleTitre ?? 22) * unit;
+
+  // ─── Tailles fines (chacune réglable indépendamment dans Préférences) ───
+  // Si la valeur n'est pas définie, on retombe sur la valeur historique.
+  const fsEntreprise   = (t.tailleEntreprise   ?? 11)   * unit;
+  const fsCoord        = (t.tailleCoordonnees  ?? 9)    * unit;
+  const fsRubanLabel   = (t.tailleRubanLabel   ?? 6.5)  * unit;
+  const fsRubanValeur  = (t.tailleRubanValeur  ?? 8.5)  * unit;
+  const fsTableHeader  = (t.tailleTableauHeader?? 8.5)  * unit;
+  const fsTableLigne   = (t.tailleTableauLignes?? 8.5)  * unit;
+  const fsTotaux       = (t.tailleTotaux       ?? 9.5)  * unit;
+  const fsTotalTTC     = (t.tailleTotalTTC     ?? 11)   * unit;
 
   const primary = t.couleurPrimaire || '#1a1a1a';
   const accent = t.couleurAccent || '#cc0000';
@@ -217,8 +238,8 @@ export function DocumentTemplate({
             </div>
           )}
         </div>
-        <div style={{ textAlign: 'right', fontSize: 9 * unit, color: '#444', lineHeight: density < 1 ? 1.25 : 1.5 }}>
-          <div style={{ fontWeight: 700, color: primary, fontSize: 11 * unit, textTransform: 'uppercase' }}>
+        <div style={{ textAlign: 'right', fontSize: fsCoord, color: '#444', lineHeight: density < 1 ? 1.25 : 1.5 }}>
+          <div style={{ fontWeight: 700, color: primary, fontSize: fsEntreprise, textTransform: 'uppercase' }}>
             {entreprise.nom || ''}
           </div>
           {entreprise.adresse && <div>{entreprise.adresse}</div>}
@@ -276,10 +297,10 @@ export function DocumentTemplate({
               minWidth: 0,
             }}
           >
-            <div style={{ fontSize: 6.5 * unit, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+            <div style={{ fontSize: fsRubanLabel, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.3 }}>
               {c.l}
             </div>
-            <div style={{ fontSize: 8.5 * unit, fontWeight: 700, marginTop: 1 * unit }}>{c.v}</div>
+            <div style={{ fontSize: fsRubanValeur, fontWeight: 700, marginTop: 1 * unit }}>{c.v}</div>
           </div>
         ))}
       </div>
@@ -289,7 +310,7 @@ export function DocumentTemplate({
         <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 10 * unit, marginBottom: 2 * unit }}>
           {data.client.nom}
         </div>
-        <div style={{ fontSize: 8.5 * unit, color: '#333', lineHeight: density < 1 ? 1.22 : 1.5 }}>
+        <div style={{ fontSize: fsCoord, color: '#333', lineHeight: density < 1 ? 1.22 : 1.5 }}>
           {data.client.adresse && <div>{data.client.adresse}</div>}
           {(data.client.codePostal || data.client.ville) && (
             <div>
@@ -313,9 +334,9 @@ export function DocumentTemplate({
 
       {/* ─── TABLEAU DES LIGNES ─── */}
       {data.lignes.length > 0 && (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8.5 * unit, marginBottom: 8 * unit, lineHeight: density < 1 ? 1.12 : 1.3 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fsTableLigne, marginBottom: 8 * unit, lineHeight: density < 1 ? 1.12 : 1.3 }}>
           <thead>
-            <tr style={{ background: primary, color: '#fff' }}>
+            <tr style={{ background: primary, color: '#fff', fontSize: fsTableHeader }}>
               <th style={{ padding: 4 * unit, textAlign: 'left', fontWeight: 700 }}>Description</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 50 * unit }}>Réf</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 32 * unit }}>Qté</th>
@@ -350,7 +371,7 @@ export function DocumentTemplate({
       {/* ─── TOTAUX ─── */}
       {showTableTotals && (
         <div style={{ marginTop: 8 * unit, display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ minWidth: 200 * unit, fontSize: 9.5 * unit }}>
+          <div style={{ minWidth: 200 * unit, fontSize: fsTotaux }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0` }}>
               <span style={{ color: '#555', fontStyle: 'italic' }}>TOTAL HT :</span>
               <span style={{ fontWeight: 700 }}>{fmt(data.totaux.ht)} €</span>
@@ -371,7 +392,7 @@ export function DocumentTemplate({
                 padding: `${6 * unit}px 0`,
                 borderTop: `1.5px solid ${primary}`,
                 marginTop: 4 * unit,
-                fontSize: 11 * unit,
+                fontSize: fsTotalTTC,
               }}
             >
               <span style={{ fontWeight: 700, fontStyle: 'italic' }}>
@@ -380,7 +401,7 @@ export function DocumentTemplate({
               <span style={{ fontWeight: 700, color: primary }}>{fmt(data.totaux.ttc)} €</span>
             </div>
             {docType === 'facture' && !data.paye && data.resteAPayer != null && data.resteAPayer > 0 && data.resteAPayer < data.totaux.ttc && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0`, fontSize: 9.5 * unit }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0`, fontSize: fsTotaux }}>
                 <span style={{ color: accent, fontWeight: 700 }}>RESTE À PAYER :</span>
                 <span style={{ color: accent, fontWeight: 700 }}>{fmt(data.resteAPayer)} €</span>
               </div>
