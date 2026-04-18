@@ -923,7 +923,7 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
                     <div className="flex gap-2">
                       {productGroups.length > 0 && (
                         <Button variant="outline" size="sm" onClick={() => setInsertEditLotOpen(true)} className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10">
-                          <Layers className="h-3.5 w-3.5" /> Insérer un lot
+                          <Layers className="h-3.5 w-3.5" /> Insérer un forfait
                         </Button>
                       )}
                       <Button variant="outline" size="sm" onClick={() => setEditLines([...editLines, emptyLigne()])} className="gap-1.5">
@@ -1066,10 +1066,10 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
             </DialogContent>
           </Dialog>
 
-          {/* Dialog — Insérer un lot (modification) */}
+          {/* Dialog — Insérer un forfait (modification) */}
           <Dialog open={insertEditLotOpen} onOpenChange={setInsertEditLotOpen}>
             <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-              <DialogHeader><DialogTitle className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Insérer un lot</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Insérer un forfait</DialogTitle></DialogHeader>
               <div className="space-y-3 pt-2">
                 {productGroups.map(g => (
                   <button
@@ -1309,12 +1309,12 @@ export default function Devis() {
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                     Lignes du devis
-                    <HelpTooltip text="Chaque ligne représente une prestation ou une fourniture. Vous pouvez choisir un article du catalogue ou saisir librement. Cochez 'Ajouter au catalogue' pour sauvegarder une ligne libre pour la prochaine fois. Utilisez 'Insérer un lot' pour pré-remplir avec un groupe d'articles fréquent." />
+                    <HelpTooltip text="Chaque ligne représente une prestation ou une fourniture. Vous pouvez choisir un article du catalogue ou saisir librement. Cochez 'Ajouter au catalogue' pour sauvegarder une ligne libre pour la prochaine fois. Utilisez 'Insérer un forfait' pour pré-remplir avec un groupe d'articles fréquent." />
                   </h3>
                   <div className="flex gap-2">
                     {productGroups.length > 0 && (
                       <Button variant="outline" size="sm" onClick={() => setInsertLotOpen(true)} className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10">
-                        <Layers className="h-3.5 w-3.5" /> Insérer un lot
+                        <Layers className="h-3.5 w-3.5" /> Insérer un forfait
                       </Button>
                     )}
                     <Button variant="outline" size="sm" onClick={addLigne} className="gap-1.5"><Plus className="h-3.5 w-3.5" /> Ajouter une ligne</Button>
@@ -1445,10 +1445,10 @@ export default function Devis() {
           </DialogContent>
         </Dialog>
 
-        {/* Dialog — Insérer un lot (création) */}
+        {/* Dialog — Insérer un forfait (création) */}
         <Dialog open={insertLotOpen} onOpenChange={setInsertLotOpen}>
           <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-            <DialogHeader><DialogTitle className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Insérer un lot</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Insérer un forfait</DialogTitle></DialogHeader>
             <div className="space-y-3 pt-2">
               {productGroups.map(g => (
                 <button
