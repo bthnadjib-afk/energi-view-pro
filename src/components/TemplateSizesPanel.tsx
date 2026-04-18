@@ -76,8 +76,8 @@ export default function TemplateSizesPanel({ template, updateTemplate }: Props) 
       </div>
 
       {/* ─── Zone DEBUG ───────────────────────────────────────────── */}
-      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2 mt-6">
-        <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2 mt-6">
+        <div className="flex items-center gap-2 text-destructive">
           <Bug className="h-3.5 w-3.5" />
           <span className="text-xs font-semibold uppercase tracking-wide">Debug — Échelle de capture</span>
         </div>
