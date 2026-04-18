@@ -57,7 +57,7 @@ function LineEditor({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-foreground">Lignes du lot</p>
+        <p className="text-sm font-medium text-foreground">Lignes du forfait</p>
         <Button variant="outline" size="sm" onClick={add} className="gap-1.5">
           <Plus className="h-3.5 w-3.5" /> Ajouter une ligne
         </Button>
@@ -272,7 +272,7 @@ export default function Lots() {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Supprimer le lot "{g.nom}" ?</AlertDialogTitle>
+                          <AlertDialogTitle>Supprimer le forfait "{g.nom}" ?</AlertDialogTitle>
                           <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -326,12 +326,12 @@ export default function Lots() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editGroup ? `Modifier — ${editGroup.nom}` : 'Nouveau lot'}</DialogTitle>
+            <DialogTitle>{editGroup ? `Modifier — ${editGroup.nom}` : 'Nouveau forfait'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-sm font-medium text-foreground">Nom du lot *</label>
+                <label className="text-sm font-medium text-foreground">Nom du forfait *</label>
                 <Input
                   placeholder="ex : Borne IRVE, Tableau divisionnaire..."
                   value={nom}
@@ -365,7 +365,7 @@ export default function Lots() {
               className="w-full h-11 text-base"
             >
               {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {isPending ? 'Enregistrement...' : editGroup ? 'Enregistrer les modifications' : 'Créer le lot'}
+              {isPending ? 'Enregistrement...' : editGroup ? 'Enregistrer les modifications' : 'Créer le forfait'}
             </Button>
           </div>
         </DialogContent>
