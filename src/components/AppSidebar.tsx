@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutDashboard, FileText, ClipboardList, Wrench, Users, Package, Calendar,
   Settings, UserCog, LogOut, ShoppingCart, Truck, FileCheck, FolderOpen,
-  Landmark, Warehouse, BarChart2, ChevronDown, Building2, BookOpen, SlidersHorizontal,
+  Landmark, Warehouse, BarChart2, ChevronDown, Building2, BookOpen, SlidersHorizontal, Globe,
 } from 'lucide-react';
 import logo from '@/assets/logo.png';
 import logoDark from '@/assets/logo-dark.png';
@@ -62,6 +62,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
         ],
       },
       { title: 'Fournisseurs', url: '/fournisseurs', icon: Truck, feature: 'clients' },
+      { title: 'Sourcing fournisseurs', url: '/sourcing', icon: Globe, feature: 'configuration' },
     ],
   },
   {
