@@ -159,8 +159,9 @@ export async function drawLogo(doc: jsPDF, x: number, y: number): Promise<number
   const src = TPL_LOGO_URL || logoUrl;
   try {
     const img = await loadImageEl(src);
-    const logoW = 52;
-    const logoH = Math.round(logoW / 3.5);
+    const logoW = 72;
+    const ratio = img.naturalHeight && img.naturalWidth ? img.naturalHeight / img.naturalWidth : 1 / 3.5;
+    const logoH = Math.round(logoW * ratio);
     doc.addImage(img, 'PNG', x, y, logoW, logoH);
     return logoH;
   } catch {
