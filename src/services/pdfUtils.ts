@@ -55,7 +55,7 @@ export interface PdfConfig {
   ML: number; MR: number; MT: number;
   PAGE_W: number; PAGE_H: number;
   COL_R: number; CW: number;
-  TPL_FONT: 'helvetica' | 'times' | 'courier' | 'roboto';
+  TPL_FONT: 'helvetica' | 'times' | 'courier';
   TPL_LOGO_URL: string;
   TPL_FOOTER_TEXT: string;
   TPL_SHOW_RIB: boolean;
@@ -82,7 +82,7 @@ export function getPdfConfig(): PdfConfig {
     ML, MR, MT, PAGE_W, PAGE_H,
     COL_R: PAGE_W - MR,
     CW:    PAGE_W - ML - MR,
-    TPL_FONT:        (T.police || 'roboto') as PdfConfig['TPL_FONT'],
+    TPL_FONT:        (T.police === 'times' || T.police === 'courier' ? T.police : 'helvetica') as PdfConfig['TPL_FONT'],
     TPL_LOGO_URL:    T.logoUrl    || '',
     TPL_FOOTER_TEXT: T.piedDePage || '',
     TPL_SHOW_RIB:    T.afficherRib !== false,
@@ -143,71 +143,22 @@ async function loadImageEl(src: string): Promise<HTMLImageElement> {
   });
 }
 
-// ─── Police Roboto (CDN jsdelivr, cache module-level) ─────────
-const ROBOTO_URLS: Record<string, string> = {
-  normal:     'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Regular.ttf',
-  bold:       'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Bold.ttf',
-  italic:     'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Italic.ttf',
-  bolditalic: 'https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-BoldItalic.ttf',
-};
-
-// Cache base64 des polices — fetché une seule fois, réutilisé pour chaque doc
-const _robotoCache: Partial<Record<string, string>> = {};
-// Promise en cours pour éviter les doublons de fetch simultanés
-let _robotoLoadPromise: Promise<void> | null = null;
-
-async function fetchAsBase64(url: string): Promise<string> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const buf = await res.arrayBuffer();
-  let bin = '';
-  const bytes = new Uint8Array(buf);
-  for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
-}
-
-async function preloadRobotoFonts(): Promise<void> {
-  const variants: Array<['normal'|'bold'|'italic'|'bolditalic', string]> = [
-    ['normal',     ROBOTO_URLS.normal],
-    ['bold',       ROBOTO_URLS.bold],
-    ['italic',     ROBOTO_URLS.italic],
-    ['bolditalic', ROBOTO_URLS.bolditalic],
-  ];
-  for (const [style, url] of variants) {
-    if (!_robotoCache[style]) {
-      _robotoCache[style] = await fetchAsBase64(url);
-    }
-  }
-}
-
-export async function loadRobotoFonts(doc: jsPDF, cfg: PdfConfig): Promise<void> {
-  if (cfg.TPL_FONT !== 'roboto') return;
-  try {
-    // Un seul fetch CDN, les données sont réutilisées ensuite
-    if (!_robotoLoadPromise) {
-      _robotoLoadPromise = preloadRobotoFonts();
-    }
-    await _robotoLoadPromise;
-    const styles: Array<'normal'|'bold'|'italic'|'bolditalic'> = ['normal','bold','italic','bolditalic'];
-    for (const style of styles) {
-      const b64 = _robotoCache[style];
-      if (!b64) continue;
-      const filename = `Roboto-${style}.ttf`;
-      doc.addFileToVFS(filename, b64);
-      doc.addFont(filename, 'roboto', style);
-    }
-  } catch (e) {
-    console.warn('Roboto load failed, fallback helvetica', e);
-    _robotoLoadPromise = null; // reset pour réessayer la prochaine fois
-  }
+// ─── Police : on utilise les polices natives jsPDF (helvetica/times/courier) ──
+// Pas de fetch réseau, pas d'erreur de combinaison fontstyle/fontweight.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function loadRobotoFonts(_doc: jsPDF, _cfg: PdfConfig): Promise<void> {
+  // No-op : conservé pour compat API. Les polices natives sont toujours dispo.
+  return;
 }
 
 export function setFont(doc: jsPDF, style: 'normal'|'bold'|'italic'|'bolditalic', cfg: PdfConfig) {
+  const family = cfg.TPL_FONT; // 'helvetica' | 'times' | 'courier'
   try {
-    // jsPDF v4 : setFont(family, style) — style = 'bolditalic' directement
-    doc.setFont(cfg.TPL_FONT === 'roboto' ? 'roboto' : cfg.TPL_FONT, style);
+    doc.setFont(family, style);
   } catch {
-    doc.setFont('helvetica', style);
+    // Fallback ultime : helvetica + style simple
+    const safe = style === 'bolditalic' ? 'bold' : style;
+    doc.setFont('helvetica', safe);
   }
 }
 
