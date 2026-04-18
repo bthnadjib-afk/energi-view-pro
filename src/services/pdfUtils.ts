@@ -11,7 +11,7 @@ type TemplateCfg = {
   couleurPrimaire?: string;
   couleurAccent?: string;
   couleurTexte?: string;
-  police?: 'helvetica' | 'times' | 'courier';
+  police?: 'helvetica' | 'times' | 'courier' | 'roboto';
   margeHaut?: number;
   margeBas?: number;
   margeGauche?: number;
