@@ -228,10 +228,51 @@ export function DocumentTemplate({
   const showTableTotals = docType !== 'intervention' || (data.lignes && data.lignes.length > 0);
   const acompte = data.totaux.ttc * 0.3;
 
+  // Bloc "infos entreprise" — utilisé soit dans le header (mode classique), soit en face du client (mode côte-à-côte)
+  const blocEntreprise = (
+    <div style={{ fontSize: fsCoord, color: '#444', lineHeight: density < 1 ? 1.25 : 1.5 }}>
+      <div style={{ fontWeight: 700, color: primary, fontSize: fsEntreprise, textTransform: 'uppercase', marginBottom: 2 * unit }}>
+        {entreprise.nom || ''}
+      </div>
+      {entreprise.adresse && <div>{entreprise.adresse}</div>}
+      {(entreprise.codePostal || entreprise.ville) && (
+        <div>{entreprise.codePostal} {entreprise.ville}</div>
+      )}
+      {entreprise.telephone && <div>Tél : {entreprise.telephone}</div>}
+      {entreprise.email && <div>{entreprise.email}</div>}
+      {entreprise.siret && <div>SIRET : {entreprise.siret}</div>}
+    </div>
+  );
+
+  const blocClient = (
+    <div>
+      <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 10 * unit, marginBottom: 2 * unit }}>
+        {data.client.nom}
+      </div>
+      <div style={{ fontSize: fsCoord, color: '#333', lineHeight: density < 1 ? 1.22 : 1.5 }}>
+        {data.client.adresse && <div>{data.client.adresse}</div>}
+        {(data.client.codePostal || data.client.ville) && (
+          <div>{data.client.codePostal} {data.client.ville}</div>
+        )}
+        {data.client.email && <div>{data.client.email}</div>}
+        {data.client.telephone && <div>{data.client.telephone}</div>}
+      </div>
+    </div>
+  );
+
+  // Items du ruban
+  const rubanItems = [
+    { l: 'Référence', v: data.ref },
+    { l: docType === 'facture' ? 'Date facture' : 'Date', v: formatDateFR(data.date) },
+    ...(showEcheance ? [{ l: 'Échéance', v: data.echeance ? formatDateFR(data.echeance) : 'À réception' }] : []),
+    ...(showValidite ? [{ l: 'Validité', v: data.validite ? formatDateFR(data.validite) : '30 jours' }] : []),
+    ...(docType === 'intervention' ? [{ l: 'Type', v: data.type || '—' }] : []),
+    ...(docType === 'intervention' ? [{ l: 'Technicien', v: data.technicien || '—' }] : []),
+  ];
+
   return (
     <div style={pageStyle}>
-      {/* ─── EN-TÊTE : LOGO + TITRE ─── */}
-      {/* marginBottom réduit de 20% (14 → 11.2) pour rapprocher Émetteur ↔ Client */}
+      {/* ─── EN-TÊTE : LOGO + (TITRE ou ENTREPRISE) ─── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 11.2 * unit }}>
         <div>
           {t.logoUrl ? (
@@ -239,108 +280,83 @@ export function DocumentTemplate({
               src={t.logoUrl}
               alt=""
               crossOrigin="anonymous"
-              style={{ height: 50 * unit, maxWidth: 180 * unit, objectFit: 'contain', display: 'block' }}
+              style={{ height: logoH, maxWidth: logoMaxW, objectFit: 'contain', display: 'block' }}
             />
           ) : (
-            <div
-              style={{
-                height: 50 * unit,
-                width: 130 * unit,
-                background: '#eee',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 10 * unit,
-                color: '#999',
-              }}
-            >
+            <div style={{ height: logoH, width: logoMaxW * 0.7, background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 * unit, color: '#999' }}>
               [Logo]
             </div>
           )}
         </div>
-        <div style={{ textAlign: 'right', fontSize: fsCoord, color: '#444', lineHeight: density < 1 ? 1.25 : 1.5 }}>
-          <div style={{ fontWeight: 700, color: primary, fontSize: fsEntreprise, textTransform: 'uppercase' }}>
-            {entreprise.nom || ''}
-          </div>
-          {entreprise.adresse && <div>{entreprise.adresse}</div>}
-          {(entreprise.codePostal || entreprise.ville) && (
-            <div>
-              {entreprise.codePostal} {entreprise.ville}
-            </div>
+        <div style={{ textAlign: 'right' }}>
+          {entrepriseEnFace ? (
+            <>
+              <div style={{ fontSize: titleSize, fontWeight: 700, fontStyle: 'italic', color: primary, lineHeight: 1.1 }}>
+                {TITRES[docType]}
+              </div>
+              <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginTop: 2 * unit }}>
+                NUMÉRO : {data.ref}
+              </div>
+            </>
+          ) : (
+            blocEntreprise
           )}
-          {entreprise.telephone && <div>Tél : {entreprise.telephone}</div>}
-          {entreprise.email && <div>{entreprise.email}</div>}
-          {entreprise.siret && <div>SIRET : {entreprise.siret}</div>}
         </div>
       </div>
 
-      {/* ─── TITRE ─── */}
-      <div
-        style={{
-          fontSize: titleSize,
-          fontWeight: 700,
-          fontStyle: 'italic',
-          color: primary,
-          lineHeight: 1.1,
-          marginBottom: 2 * unit,
-        }}
-      >
-        {TITRES[docType]}
-      </div>
-      <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginBottom: 12 * unit }}>
-        NUMÉRO : {data.ref}
-      </div>
+      {/* ─── TITRE (mode classique uniquement) ─── */}
+      {!entrepriseEnFace && (
+        <>
+          <div style={{ fontSize: titleSize, fontWeight: 700, fontStyle: 'italic', color: primary, lineHeight: 1.1, marginBottom: 2 * unit }}>
+            {TITRES[docType]}
+          </div>
+          <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginBottom: 12 * unit }}>
+            NUMÉRO : {data.ref}
+          </div>
+        </>
+      )}
 
       {/* ─── BANDEAU INFOS ─── */}
-      <div
-        style={{
-          display: 'flex',
-          background: primary,
-          color: '#fff',
+      {rubanCompact ? (
+        <div style={{
+          background: primary, color: '#fff',
+          padding: `${5 * unit}px ${8 * unit}px`,
           marginBottom: 11.2 * unit,
-        }}
-      >
-        {[
-          { l: 'Référence', v: data.ref },
-          { l: docType === 'facture' ? 'Date facture' : docType === 'devis' ? 'Date' : 'Date', v: formatDateFR(data.date) },
-          ...(showEcheance ? [{ l: 'Échéance', v: data.echeance ? formatDateFR(data.echeance) : 'À réception' }] : []),
-          ...(showValidite ? [{ l: 'Validité', v: data.validite ? formatDateFR(data.validite) : '30 jours' }] : []),
-          ...(docType === 'intervention' ? [{ l: 'Type', v: data.type || '—' }] : []),
-          ...(docType === 'intervention' ? [{ l: 'Technicien', v: data.technicien || '—' }] : []),
-        ].map((c, i, arr) => (
-          <div
-            key={i}
-            style={{
-              flex: 1,
-              padding: `${5 * unit}px ${7 * unit}px`,
+          fontSize: fsRubanValeur,
+          display: 'flex', flexWrap: 'wrap', gap: `${4 * unit}px ${10 * unit}px`,
+        }}>
+          {rubanItems.map((c, i) => (
+            <span key={i} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4 * unit }}>
+              <span style={{ fontSize: fsRubanLabel, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.3 }}>{c.l} :</span>
+              <span style={{ fontWeight: 700 }}>{c.v}</span>
+              {i < rubanItems.length - 1 && <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: 6 * unit }}>|</span>}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', background: primary, color: '#fff', marginBottom: 11.2 * unit }}>
+          {rubanItems.map((c, i, arr) => (
+            <div key={i} style={{
+              flex: 1, padding: `${5 * unit}px ${7 * unit}px`,
               borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none',
               minWidth: 0,
-            }}
-          >
-            <div style={{ fontSize: fsRubanLabel, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.3 }}>
-              {c.l}
+            }}>
+              <div style={{ fontSize: fsRubanLabel, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.3 }}>{c.l}</div>
+              <div style={{ fontSize: fsRubanValeur, fontWeight: 700, marginTop: 1 * unit }}>{c.v}</div>
             </div>
-            <div style={{ fontSize: fsRubanValeur, fontWeight: 700, marginTop: 1 * unit }}>{c.v}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {/* ─── CLIENT ─── (marginBottom -20% : 14 → 11.2) */}
-      <div style={{ marginBottom: 11.2 * unit }}>
-        <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 10 * unit, marginBottom: 2 * unit }}>
-          {data.client.nom}
+      {/* ─── ENTREPRISE ↔ CLIENT côte-à-côte (mode par défaut) ─── */}
+      {entrepriseEnFace ? (
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 * unit, marginBottom: 11.2 * unit }}>
+          <div style={{ flex: 1 }}>{blocEntreprise}</div>
+          <div style={{ flex: 1, textAlign: 'right' }}>{blocClient}</div>
         </div>
-        <div style={{ fontSize: fsCoord, color: '#333', lineHeight: density < 1 ? 1.22 : 1.5 }}>
-          {data.client.adresse && <div>{data.client.adresse}</div>}
-          {(data.client.codePostal || data.client.ville) && (
-            <div>
-              {data.client.codePostal} {data.client.ville}
-            </div>
-          )}
-          {data.client.email && <div>{data.client.email}</div>}
-          {data.client.telephone && <div>{data.client.telephone}</div>}
-        </div>
-      </div>
+      ) : (
+        <div style={{ marginBottom: 11.2 * unit }}>{blocClient}</div>
+      )}
 
       {/* ─── DESCRIPTION (intervention) ─── */}
       {docType === 'intervention' && data.description && (
