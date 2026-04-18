@@ -1109,58 +1109,133 @@ export default function Factures() {
         </DialogContent>
       </Dialog>
 
-      {/* Acompte libre dialog */}
+      {/* Acompte dialog (depuis devis OU libre) */}
       <Dialog open={acompteOpen} onOpenChange={setAcompteOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Nouvelle facture d'acompte</DialogTitle>
-            <DialogDescription>Crée une facture d'acompte indépendante d'un devis.</DialogDescription>
+            <DialogDescription>
+              Acompte basé sur un devis (taux 50% si HT≤5000€, 30% sinon) ou montant libre.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <label className="text-sm text-muted-foreground">Client</label>
-              <Select value={acompteSocid} onValueChange={setAcompteSocid}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
-                <SelectContent>
-                  {clients.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm text-muted-foreground">Description</label>
-              <Input value={acompteDescription} onChange={e => setAcompteDescription(e.target.value.slice(0, 200))} placeholder="Acompte chantier..." maxLength={200} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+
+          <div className="flex gap-1 rounded-md border border-border bg-muted/30 p-1">
+            <button
+              type="button"
+              onClick={() => setAcompteMode('devis')}
+              className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition ${acompteMode === 'devis' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Depuis un devis
+            </button>
+            <button
+              type="button"
+              onClick={() => setAcompteMode('libre')}
+              className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition ${acompteMode === 'libre' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              Montant libre
+            </button>
+          </div>
+
+          {acompteMode === 'devis' ? (
+            <div className="space-y-4 pt-2">
               <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">Montant HT (€)</label>
-                <Input type="number" step="0.01" min="0" value={acompteMontant} onChange={e => setAcompteMontant(Math.max(0, Number(e.target.value)))} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">TVA (%)</label>
-                <Select value={String(acompteTva)} onValueChange={v => setAcompteTva(Number(v))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <label className="text-sm text-muted-foreground">Devis source (validés ou acceptés)</label>
+                <Select value={acompteDevisId} onValueChange={setAcompteDevisId}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner un devis" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">0 %</SelectItem>
-                    <SelectItem value="10">10 %</SelectItem>
-                    <SelectItem value="20">20 %</SelectItem>
+                    {allDevis
+                      .filter(d => d.fk_statut === 1 || d.fk_statut === 2)
+                      .map(d => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.ref} — {d.client} — {d.montantHT.toLocaleString('fr-FR')} € HT
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              {acompteDevisId && (() => {
+                const d = allDevis.find(x => x.id === acompteDevisId);
+                if (!d) return null;
+                const taux = d.montantHT > 5000 ? 30 : 50;
+                const montantHTAcompte = Math.round(d.montantHT * taux) / 100;
+                const montantTTCAcompte = Math.round(d.montantTTC * taux) / 100;
+                return (
+                  <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1 text-sm">
+                    <div className="font-medium">Acompte calculé : {taux}%</div>
+                    <div className="text-muted-foreground">
+                      Montant HT : <span className="text-foreground font-medium">{montantHTAcompte.toLocaleString('fr-FR')} €</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      Montant TTC : <span className="text-foreground font-medium">{montantTTCAcompte.toLocaleString('fr-FR')} €</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground pt-1">
+                      {d.lignes.length} ligne{d.lignes.length > 1 ? 's' : ''} du devis seront reprises au prorata.
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <Button
+                onClick={async () => {
+                  if (!acompteDevisId) { toast.error('Sélectionnez un devis'); return; }
+                  await createAcompteFromDevisMutation.mutateAsync({ devisId: acompteDevisId });
+                  setAcompteOpen(false);
+                  setAcompteDevisId('');
+                }}
+                disabled={createAcompteFromDevisMutation.isPending || !acompteDevisId}
+                className="w-full"
+              >
+                {createAcompteFromDevisMutation.isPending ? 'Création...' : "Créer la facture d'acompte"}
+              </Button>
             </div>
-            <Button
-              onClick={async () => {
-                if (!acompteSocid || acompteMontant <= 0) { toast.error('Sélectionnez un client et saisissez un montant'); return; }
-                await createAcompteLibreMutation.mutateAsync({ socid: acompteSocid, montant: acompteMontant, description: acompteDescription.trim() || 'Acompte', tva_tx: acompteTva });
-                setAcompteOpen(false);
-              }}
-              disabled={createAcompteLibreMutation.isPending || !acompteSocid || acompteMontant <= 0}
-              className="w-full"
-            >
-              {createAcompteLibreMutation.isPending ? 'Création...' : "Créer la facture d'acompte"}
-            </Button>
-          </div>
+          ) : (
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Client</label>
+                <Select value={acompteSocid} onValueChange={setAcompteSocid}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner un client" /></SelectTrigger>
+                  <SelectContent>
+                    {clients.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.nom}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Description</label>
+                <Input value={acompteDescription} onChange={e => setAcompteDescription(e.target.value.slice(0, 200))} placeholder="Acompte chantier..." maxLength={200} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Montant HT (€)</label>
+                  <Input type="number" step="0.01" min="0" value={acompteMontant} onChange={e => setAcompteMontant(Math.max(0, Number(e.target.value)))} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">TVA (%)</label>
+                  <Select value={String(acompteTva)} onValueChange={v => setAcompteTva(Number(v))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">0 %</SelectItem>
+                      <SelectItem value="10">10 %</SelectItem>
+                      <SelectItem value="20">20 %</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button
+                onClick={async () => {
+                  if (!acompteSocid || acompteMontant <= 0) { toast.error('Sélectionnez un client et saisissez un montant'); return; }
+                  await createAcompteLibreMutation.mutateAsync({ socid: acompteSocid, montant: acompteMontant, description: acompteDescription.trim() || 'Acompte', tva_tx: acompteTva });
+                  setAcompteOpen(false);
+                }}
+                disabled={createAcompteLibreMutation.isPending || !acompteSocid || acompteMontant <= 0}
+                className="w-full"
+              >
+                {createAcompteLibreMutation.isPending ? 'Création...' : "Créer la facture d'acompte"}
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
