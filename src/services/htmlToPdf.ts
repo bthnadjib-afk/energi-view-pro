@@ -162,11 +162,9 @@ function canvasToPdf(canvas: HTMLCanvasElement): jsPDF {
       0, sy, canvas.width, sliceHeight,
       0, 0, canvas.width, sliceHeight
     );
-    const imgData = pageCanvas.toDataURL('image/jpeg', 0.95);
+    const imgData = pageCanvas.toDataURL('image/png');
     if (p > 0) pdf.addPage();
-    // Hauteur réelle imprimée en mm (pour la dernière page < pleine hauteur)
-    const printedHeightMm = (sliceHeight / pxPerMm);
-    pdf.addImage(imgData, 'JPEG', 0, 0, A4_W_MM, printedHeightMm, undefined, 'FAST');
+    pdf.addImage(imgData, 'PNG', 0, 0, A4_W_MM, A4_H_MM);
   }
   return pdf;
 }
