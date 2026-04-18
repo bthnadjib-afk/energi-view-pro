@@ -78,9 +78,12 @@ export interface DocumentTemplateProps {
   data: DocumentTemplateData;
   template: DocumentTemplateCfg;
   entreprise?: EntrepriseInfo;
-  /** Échelle d'affichage (1 = 1mm:1px). Utiliser 1 pour la génération PDF, 2.5 pour l'aperçu écran. */
+  /** Échelle d'affichage globale du document. Utiliser 1 pour le PDF. */
   scale?: number;
 }
+
+const A4_W_PX = (210 / 25.4) * 96;
+const A4_H_PX = (297 / 25.4) * 96;
 
 const fmt = (n: number) =>
   (Number.isFinite(n) ? n : 0).toLocaleString('fr-FR', {
@@ -108,8 +111,8 @@ export function DocumentTemplate({
   entreprise = {},
   scale = 1,
 }: DocumentTemplateProps) {
-  const W = 210 * scale; // A4 width
-  const H = 297 * scale;
+  const W = A4_W_PX * scale;
+  const H = A4_H_PX * scale;
   const mt = (t.margeHaut ?? 18) * scale;
   const mb = (t.margeBas ?? 20) * scale;
   const ml = (t.margeGauche ?? 15) * scale;
