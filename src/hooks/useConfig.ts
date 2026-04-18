@@ -19,7 +19,7 @@ export interface AppConfig {
     tauxHoraire: number;
     chantierHeureDebut: string;
     chantierHeureFin: string;
-    chantierJours: string; // CSV des jours actifs : "1,3,5" = Lun,Mer,Ven (1=Lun, 7=Dim)
+    chantierJours: string;
   };
   notifications: {
     nouveauDevis: boolean;
@@ -37,6 +37,22 @@ export interface AppConfig {
     user: string;
     pass: string;
     from: string;
+  };
+  template: {
+    logoUrl: string;        // URL du logo (depuis le bucket document-logos), vide = défaut
+    couleurPrimaire: string;  // hex ex #1a1a1a — bandeau, titres
+    couleurAccent: string;    // hex ex #cc0000 — alertes, acomptes
+    couleurTexte: string;     // hex ex #1a1a1a
+    police: 'helvetica' | 'times' | 'courier';
+    margeHaut: number;        // mm
+    margeBas: number;         // mm
+    margeGauche: number;      // mm
+    margeDroite: number;      // mm
+    tailleTitre: number;      // pt (ex 22)
+    tailleTexte: number;      // pt (ex 8.5)
+    piedDePage: string;       // texte libre du footer
+    afficherRib: boolean;
+    afficherCgv: boolean;
   };
 }
 
@@ -75,6 +91,22 @@ const DEFAULT_CONFIG: AppConfig = {
     user: '',
     pass: '',
     from: '',
+  },
+  template: {
+    logoUrl: '',
+    couleurPrimaire: '#1a1a1a',
+    couleurAccent: '#cc0000',
+    couleurTexte: '#1a1a1a',
+    police: 'helvetica',
+    margeHaut: 18,
+    margeBas: 20,
+    margeGauche: 15,
+    margeDroite: 15,
+    tailleTitre: 22,
+    tailleTexte: 8.5,
+    piedDePage: '',
+    afficherRib: true,
+    afficherCgv: true,
   },
 };
 
@@ -212,6 +244,10 @@ export function useConfig() {
     setConfigState(prev => ({ ...prev, smtp: { ...prev.smtp, ...updates } }));
   }, []);
 
+  const updateTemplate = useCallback((updates: Partial<AppConfig['template']>) => {
+    setConfigState(prev => ({ ...prev, template: { ...prev.template, ...updates } }));
+  }, []);
+
   // Manual save — shows toast confirmation, for the "Sauvegarder les paramètres" button
   const saveToSupabase = useCallback(async () => {
     setSaving(true);
@@ -228,5 +264,5 @@ export function useConfig() {
     setSaving(false);
   }, [config]);
 
-  return { config, loading, saving, updateConfig, updateEntreprise, updateDefaults, updateNotifications, updateDolibarr, updateSmtp, saveToSupabase };
+  return { config, loading, saving, updateConfig, updateEntreprise, updateDefaults, updateNotifications, updateDolibarr, updateSmtp, updateTemplate, saveToSupabase };
 }
