@@ -242,8 +242,8 @@ async function renderCgv(props: DocumentTemplateProps): Promise<HTMLCanvasElemen
 
 // ─── Ajoute un canvas à un PDF en le découpant en pages A4 ────────────────────
 function addCanvasToPdf(pdf: jsPDF, canvas: HTMLCanvasElement, isFirstPage: boolean) {
-  // Hauteur d'une page A4 en px à la même résolution que le canvas (RENDER_DPR=1)
-  const pageHeightPxAt1 = TEMPLATE_H_PX * RENDER_DPR;
+  // Hauteur d'une "page A4" exprimée en px du canvas courant (ratio A4 strict).
+  const pageHeightPxAt1 = Math.round((canvas.width * A4_H_MM) / A4_W_MM);
 
   // ─── Cas 1 : tout tient sur UNE page A4 → écrasement strict 210×297mm ───
   if (canvas.height <= pageHeightPxAt1 + 2) {
