@@ -440,6 +440,14 @@ export default function Configuration() {
           </div>
         </TabsContent>
 
+        <TabsContent value="utilisateurs">
+          <Utilisateurs />
+        </TabsContent>
+
+        <TabsContent value="preferences">
+          <Preferences />
+        </TabsContent>
+
         <TabsContent value="maintenance">
           <div className="bg-card rounded-lg border border-destructive/50 p-6 shadow-sm space-y-4">
             <div className="flex items-center gap-2">
