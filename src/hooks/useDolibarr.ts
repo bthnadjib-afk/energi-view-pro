@@ -6,7 +6,7 @@ import {
   createDevis, updateDevis, updateDevisSocid, cloneDevis, validateDevis, closeDevis, deleteDevis, updateDevisLines,
   createFacture, validateFacture, deleteFacture, updateFactureLines,
   setFactureToDraft, setFactureToUnpaid, setDevisToDraft, reopenDevis,
-  convertDevisToFacture, createAcompteFacture, createAcompteLibre, createAvoirFromFacture, classifyFactureAbandonee,
+  convertDevisToFacture, createAcompteFacture, createAcompteLibre, createAcompteFromDevis, createAvoirFromFacture, classifyFactureAbandonee,
   createProduit, deleteProduit, updateProduit,
   bulkDeleteDevis, bulkDeleteFactures,
   createDolibarrUser, addPayment, updateDolibarrUser, saveInterventionSignatures,
