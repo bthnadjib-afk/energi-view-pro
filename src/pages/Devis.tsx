@@ -355,10 +355,10 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
     }
   };
 
-  const handleViewPDF = () => {
+  const handleViewPDF = async () => {
     setGeneratingPDF(true);
     try {
-      const url = devisPdfToBlobUrl({ devis, client: client as Client | undefined, entreprise: config.entreprise });
+      const url = await devisPdfToBlobUrl({ devis, client: client as Client | undefined, entreprise: config.entreprise });
       setPdfPreviewUrl(url);
       setPdfPreviewOpen(true);
     } catch (e: any) {

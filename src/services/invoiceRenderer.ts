@@ -9,8 +9,8 @@ import type { InvoiceTemplateProps } from './InvoiceTemplate';
 
 /** Génère un Blob PDF */
 async function buildBlob(params: InvoiceTemplateProps): Promise<Blob> {
-  const element = React.createElement(InvoiceDocument, params);
-  return pdf(element).toBlob();
+  const element = React.createElement(InvoiceDocument as any, params);
+  return pdf(element as any).toBlob();
 }
 
 /** Ouvre le PDF dans un nouvel onglet */

@@ -582,7 +582,7 @@ export default function Interventions() {
     setGeneratingPDF(true);
     try {
       const client = clients.find(c => c.id === selectedIntervention.socid);
-      const blobUrl = generateInterventionPdfBlobUrl({
+      const blobUrl = await generateInterventionPdfBlobUrl({
         intervention: selectedIntervention,
         client,
         lines: interventionLines,
