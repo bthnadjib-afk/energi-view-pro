@@ -3,9 +3,9 @@ import { Euro, CheckCircle, AlertCircle, Plus, Trash2, FileCheck, FileDown, Send
 import { HelpTooltip } from '@/components/HelpTooltip';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
-import { useFactures, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid, useCreateAvoir, useCreateAcompteLibre, useClassifyFactureAbandonee } from '@/hooks/useDolibarr';
+import { useFactures, useDevis, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid, useCreateAvoir, useCreateAcompteLibre, useCreateAcompteFromDevis, useClassifyFactureAbandonee } from '@/hooks/useDolibarr';
 import { useFactureRelances, useRecordFactureEnvoi, useSetFactureEnvoiDate, getRelanceStatus } from '@/hooks/useFactureRelances';
-import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, getFactureCloseCodeLabel, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
+import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, getFactureCloseCodeLabel, isFactureAbandonnee, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
 import { useQuery } from '@tanstack/react-query';
 import { openFacturePdf, facturePdfToBase64, facturePdfToBlobUrl } from '@/services/facturePdf';
 import { useConfig } from '@/hooks/useConfig';
@@ -57,7 +57,9 @@ export default function Factures() {
   const setToUnpaidMutation = useSetFactureToUnpaid();
   const createAvoirMutation = useCreateAvoir();
   const createAcompteLibreMutation = useCreateAcompteLibre();
+  const createAcompteFromDevisMutation = useCreateAcompteFromDevis();
   const classifyAbandoneeMutation = useClassifyFactureAbandonee();
+  const { data: allDevis = [] } = useDevis();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedFacture, setSelectedFacture] = useState<Facture | null>(null);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -101,8 +103,10 @@ export default function Factures() {
   const [editOpen, setEditOpen] = useState(false);
   const [editLines, setEditLines] = useState<LigneForm[]>([]);
 
-  // Acompte libre
+  // Acompte (mode 'devis' = depuis devis avec lignes & taux auto, 'libre' = montant libre sans devis)
   const [acompteOpen, setAcompteOpen] = useState(false);
+  const [acompteMode, setAcompteMode] = useState<'devis' | 'libre'>('devis');
+  const [acompteDevisId, setAcompteDevisId] = useState('');
   const [acompteSocid, setAcompteSocid] = useState('');
   const [acompteMontant, setAcompteMontant] = useState(0);
   const [acompteDescription, setAcompteDescription] = useState('Acompte');
@@ -126,7 +130,7 @@ export default function Factures() {
         if (filterStatut === 'impayee' && (f.fk_statut < 1 || f.paye || f.totalPaye > 0)) return false;
         if (filterStatut === 'partielle' && !(f.fk_statut >= 1 && !f.paye && f.totalPaye > 0)) return false;
         if (filterStatut === 'payee' && !f.paye) return false;
-        if (filterStatut === 'abandonnee' && f.fk_statut !== 3) return false;
+        if (filterStatut === 'abandonnee' && !isFactureAbandonnee(f.fk_statut, f.paye, f.close_code)) return false;
       }
       if (filterClient !== 'all' && f.socid !== filterClient) return false;
       if (searchQuery) {
