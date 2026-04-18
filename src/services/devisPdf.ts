@@ -5,6 +5,7 @@ import type { Devis, DevisLigne, Client } from '@/services/dolibarr';
 import {
   ML, MR, MT, PAGE_W, PAGE_H, COL_R, CW,
   NOIR, BLANC, GRIS_CLAIR, GRIS_LIGNE, GRIS_TEXTE,
+  TPL_SHOW_RIB, TPL_SHOW_CGV,
   fmt, toText, formatDateFR,
   loadRobotoFonts, setFont,
   drawLogo, drawInfoBar, drawParties, drawTotaux,
@@ -175,13 +176,17 @@ async function buildDevisPdf({ devis, client, entreprise }: DevisPdfParams): Pro
   ) + 8;
 
   // ─── RIB ──────────────────────────────────────────────────────
-  y = drawRib(doc, y) + 2;
+  if (TPL_SHOW_RIB) {
+    y = drawRib(doc, y) + 2;
+  }
 
   // ─── FOOTER ───────────────────────────────────────────────────
   drawFooter(doc);
 
   // ─── CGV (page 2) ─────────────────────────────────────────────
-  drawCGV(doc);
+  if (TPL_SHOW_CGV) {
+    drawCGV(doc);
+  }
 
   return doc;
 }

@@ -5,7 +5,7 @@ import type { Facture, DevisLigne, Client } from '@/services/dolibarr';
 import {
   ML, MR, MT, PAGE_W, PAGE_H, COL_R, CW,
   NOIR, BLANC, GRIS_CLAIR, GRIS_LIGNE, GRIS_TEXTE,
-  ROUGE, ROUGE_BG,
+  ROUGE, ROUGE_BG, TPL_SHOW_RIB,
   fmt, toText, formatDateFR,
   loadRobotoFonts, setFont,
   drawLogo, drawInfoBar, drawParties, drawTotaux,
@@ -208,7 +208,9 @@ async function buildFacturePdf({ facture, client, entreprise }: FacturePdfParams
   }
 
   // ─── RIB ──────────────────────────────────────────────────────
-  y = drawRib(doc, y) + 2;
+  if (TPL_SHOW_RIB) {
+    y = drawRib(doc, y) + 2;
+  }
 
   // ─── FOOTER ───────────────────────────────────────────────────
   drawFooter(doc);
