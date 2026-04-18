@@ -9,6 +9,7 @@ import {
   fmt, toText, formatDateFR,
   loadRobotoFonts, setFont,
   drawLogo, drawInfoBar, drawParties, drawTotaux,
+  drawSignatureAndNet,
   drawRib, drawFooter,
   type EntrepriseInfo, type ClientInfo,
 } from './pdfUtils';
