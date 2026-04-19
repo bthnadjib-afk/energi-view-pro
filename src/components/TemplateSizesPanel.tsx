@@ -40,8 +40,9 @@ const TEXT_FIELDS: Field[] = [
 
 // ─── Dimensions logo & encarts (mm) ────────────────────────────────────
 const SIZE_FIELDS: Field[] = [
-  { key: 'logoHauteur',           label: 'Hauteur du logo',              hint: 'Hauteur max du logo dans le header',         min: 8,  max: 35, step: 0.5, unit: 'mm', default: 13 },
-  { key: 'logoLargeurMax',        label: 'Largeur max du logo',          hint: 'Limite la largeur si le logo est très large', min: 20, max: 90, step: 1,   unit: 'mm', default: 48 },
+  { key: 'logoHauteur',           label: 'Hauteur du logo',              hint: 'Hauteur max du logo dans le header',         min: 8,  max: 80, step: 0.5, unit: 'mm', default: 13 },
+  { key: 'logoLargeurMax',        label: 'Largeur max du logo',          hint: 'Limite la largeur si le logo est très large', min: 20, max: 180, step: 1,  unit: 'mm', default: 48 },
+  { key: 'logoOffsetX',           label: 'Décalage horizontal du logo',  hint: 'Positionnement gauche→droite (mm)',           min: -50, max: 100, step: 1, unit: 'mm', default: 0 },
   { key: 'largeurEncartTotaux',   label: 'Largeur encart Récapitulatif', hint: 'Bloc des totaux HT/TVA/TTC en bas',          min: 50, max: 120, step: 1,  unit: 'mm', default: 80 },
   { key: 'largeurEncartBonAccord', label: 'Largeur encart Bon pour accord', hint: 'Bloc de signature client',                min: 50, max: 120, step: 1,  unit: 'mm', default: 80 },
 ];

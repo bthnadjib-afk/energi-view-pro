@@ -231,7 +231,9 @@ export default function TemplatePlayground() {
       </div>
 
       {/* ═══ PANNEAU DROIT — PREVIEW A4 ═══ */}
-      <PreviewPane previewType={previewType} setPreviewType={setPreviewType} template={t} entreprise={config.entreprise} totals={totals} />
+      <div className="sticky top-4 self-start max-h-[calc(100vh-2rem)] overflow-auto">
+        <PreviewPane previewType={previewType} setPreviewType={setPreviewType} template={t} entreprise={config.entreprise} totals={totals} />
+      </div>
     </div>
   );
 }

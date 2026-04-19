@@ -75,6 +75,7 @@ export interface DocumentTemplateCfg {
   taillePiedDePage?: number;
   logoHauteur?: number;
   logoLargeurMax?: number;
+  logoOffsetX?: number;
   largeurEncartTotaux?: number;
   largeurEncartBonAccord?: number;
   entrepriseEnFaceClient?: boolean;
@@ -179,6 +180,7 @@ export function DocumentTemplate({
   // Logo (mm → px). Valeurs par défaut équivalentes à l'ancien hardcode (50px ≈ 13mm, 180px ≈ 48mm).
   const logoH = (t.logoHauteur ?? 13) * PX_PER_MM * scale * density;
   const logoMaxW = (t.logoLargeurMax ?? 48) * PX_PER_MM * scale * density;
+  const logoOffsetX = (t.logoOffsetX ?? 0) * PX_PER_MM * scale * density;
   // Largeurs encarts (mm → px)
   const wEncTotaux = (t.largeurEncartTotaux ?? 80) * PX_PER_MM * scale * density;
   const wEncBonAccord = (t.largeurEncartBonAccord ?? 80) * PX_PER_MM * scale * density;
@@ -291,7 +293,7 @@ export function DocumentTemplate({
     <div style={pageStyle}>
       {/* ─── EN-TÊTE : LOGO + (TITRE ou ENTREPRISE) ─── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 11.2 * unit }}>
-        <div>
+        <div style={{ marginLeft: logoOffsetX }}>
           {t.logoUrl ? (
             <img
               src={t.logoUrl}
