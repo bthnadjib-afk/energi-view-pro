@@ -24,7 +24,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -1161,6 +1161,7 @@ export default function Devis() {
   const acompteMutation = useCreateAcompte();
   const deleteDevisMutation = useDeleteDevis();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [acompteDialog, setAcompteDialog] = useState<{ open: boolean; socid: string; montantHT: number; devisRef: string; montant: number } | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [socid, setSocid] = useState('');
   const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '', prixAchat: 0 }]);
@@ -1586,7 +1587,13 @@ export default function Devis() {
                       clients={clients}
                       produits={produits}
                       onConvert={async () => { try { await convertMutation.mutateAsync(d.id); } catch {} }}
-                      onAcompte={async () => { try { await acompteMutation.mutateAsync({ socid: d.socid || '', montantHT: d.montantHT, devisRef: d.ref }); } catch {} }}
+                      onAcompte={() => {
+                        const tauxCfg = config.defaults.tauxAcompte ?? 30;
+                        const seuil = config.defaults.seuilAcompte ?? 0;
+                        const tauxDepasse = config.defaults.tauxAcompteSeuilDepasse ?? 50;
+                        const taux = (seuil > 0 && d.montantHT > seuil) ? tauxDepasse : tauxCfg;
+                        setAcompteDialog({ open: true, socid: d.socid || '', montantHT: d.montantHT, devisRef: d.ref, montant: Math.round(d.montantHT * taux) / 100 });
+                      }}
                       convertPending={convertMutation.isPending}
                       acomptePending={acompteMutation.isPending}
                       onCollapse={() => setExpandedId(null)}
@@ -1607,6 +1614,50 @@ export default function Devis() {
           </table>
         </div>
       </div>
+
+      {/* ─── Dialog acompte ─── */}
+      {acompteDialog && (
+        <Dialog open={acompteDialog.open} onOpenChange={(o) => !o && setAcompteDialog(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Saisir un acompte</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <p className="text-sm text-muted-foreground">
+                Devis <strong>{acompteDialog.devisRef}</strong> — Total HT : {acompteDialog.montantHT.toLocaleString('fr-FR', { minimumFractionDigits: 2 })} {config.defaults.devise ?? '€'}
+              </p>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Montant de l'acompte HT</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                    value={acompteDialog.montant}
+                    onChange={(e) => setAcompteDialog({ ...acompteDialog, montant: parseFloat(e.target.value) || 0 })}
+                  />
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">{config.defaults.devise ?? '€'} HT</span>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAcompteDialog(null)}>Annuler</Button>
+              <Button
+                disabled={acompteMutation.isPending}
+                onClick={async () => {
+                  try {
+                    await acompteMutation.mutateAsync({ socid: acompteDialog.socid, montantHT: acompteDialog.montantHT, devisRef: acompteDialog.devisRef, montantAcompte: acompteDialog.montant });
+                    setAcompteDialog(null);
+                  } catch {}
+                }}
+              >
+                Créer la facture d'acompte
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

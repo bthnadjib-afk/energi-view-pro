@@ -352,7 +352,7 @@ export function useConvertDevisToFacture() {
 export function useCreateAcompte() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { socid: string; montantHT: number; devisRef: string }) => createAcompteFacture(data.socid, data.montantHT, data.devisRef),
+    mutationFn: (data: { socid: string; montantHT: number; devisRef: string; montantAcompte?: number }) => createAcompteFacture(data.socid, data.montantHT, data.devisRef, data.montantAcompte),
     onSuccess: () => { toast.success("Facture d'acompte créée"); qc.invalidateQueries({ queryKey: ['factures'] }); },
     onError: (e: any) => toast.error(`Erreur : ${e.message || e}`),
   });

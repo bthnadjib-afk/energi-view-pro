@@ -827,9 +827,11 @@ export async function convertDevisToFacture(devisId: string): Promise<string | n
   return result;
 }
 
-export async function createAcompteFacture(socid: string, montantHT: number, devisRef: string): Promise<string> {
+export async function createAcompteFacture(socid: string, montantHT: number, devisRef: string, montantAcompteOverride?: number): Promise<string> {
   const tauxAcompte = montantHT > 5000 ? 0.3 : 0.5;
-  const montantAcompte = Math.round(montantHT * tauxAcompte * 100) / 100;
+  const montantAcompte = montantAcompteOverride != null
+    ? Math.round(montantAcompteOverride * 100) / 100
+    : Math.round(montantHT * tauxAcompte * 100) / 100;
   const result = await dolibarrCall<string>('/invoices', 'POST', {
     socid: parseInt(socid, 10) || socid,
     type: 3,
