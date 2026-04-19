@@ -426,7 +426,7 @@ export function DocumentTemplate({
           <div style={{ minWidth: 200 * unit, fontSize: fsTotaux, paddingRight: 4 * unit }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0` }}>
               <span style={{ color: '#555', fontStyle: 'italic' }}>TOTAL HT :</span>
-              <span style={{ fontWeight: 700 }}>{fmt(data.totaux.ht)} €</span>
+              <span style={{ fontWeight: 700, fontStyle: 'italic' }}>{fmt(data.totaux.ht)} €</span>
             </div>
             {(data.totaux.tvaParTaux && data.totaux.tvaParTaux.length > 0
               ? data.totaux.tvaParTaux
@@ -434,7 +434,7 @@ export function DocumentTemplate({
             ).map((tva, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0` }}>
                 <span style={{ color: '#555', fontStyle: 'italic' }}>TVA ({tva.taux}%) :</span>
-                <span style={{ fontWeight: 700 }}>{fmt(tva.montant)} €</span>
+                <span style={{ fontWeight: 700, fontStyle: 'italic' }}>{fmt(tva.montant)} €</span>
               </div>
             ))}
             <div
@@ -450,7 +450,7 @@ export function DocumentTemplate({
               <span style={{ fontWeight: 700, fontStyle: 'italic' }}>
                 {data.paye ? 'TOTAL TTC PAYÉ' : 'TOTAL TTC :'}
               </span>
-              <span style={{ fontWeight: 700, color: primary }}>{fmt(data.totaux.ttc)} €</span>
+              <span style={{ fontWeight: 700, fontStyle: 'italic', color: primary }}>{fmt(data.totaux.ttc)} €</span>
             </div>
             {docType === 'facture' && !data.paye && data.resteAPayer != null && data.resteAPayer > 0 && data.resteAPayer < data.totaux.ttc && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0`, fontSize: fsTotaux }}>
@@ -486,23 +486,23 @@ export function DocumentTemplate({
       {/* ─── DEVIS : Récap totaux + Bon pour accord (uniquement devis, pas facture) ─── */}
       {docType === 'devis' && (
         <div style={{ marginTop: 12 * unit, display: 'flex', gap: 10 * unit, alignItems: 'stretch' }}>
-          <div style={{ flex: 1, border: `1px solid ${primary}`, padding: 6 * unit, fontSize: fsEncartTexte }}>
+          <div style={{ flex: 1, border: `2px solid ${primary}`, padding: 6 * unit, fontSize: fsEncartTexte }}>
             <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 3 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
               Récapitulatif
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${1.5 * unit}px 0` }}>
               <span style={{ color: '#555', fontStyle: 'italic' }}>Total HT :</span>
-              <span style={{ fontWeight: 700 }}>{fmt(data.totaux.ht)} €</span>
+              <span style={{ fontWeight: 700, fontStyle: 'italic' }}>{fmt(data.totaux.ht)} €</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${1.5 * unit}px 0` }}>
               <span style={{ color: '#555', fontStyle: 'italic' }}>
                 Total TVA ({(data.totaux.tvaParTaux?.[0]?.taux ?? 20)}%) :
               </span>
-              <span style={{ fontWeight: 700 }}>{fmt(data.totaux.tva)} €</span>
+              <span style={{ fontWeight: 700, fontStyle: 'italic' }}>{fmt(data.totaux.tva)} €</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0 0`, marginTop: 2 * unit, fontSize: fsEncartTexte * 1.18 }}>
               <span style={{ fontWeight: 700, fontStyle: 'italic', color: primary }}>Total TTC :</span>
-              <span style={{ fontWeight: 700, color: primary }}>{fmt(data.totaux.ttc)} €</span>
+              <span style={{ fontWeight: 700, fontStyle: 'italic', color: primary }}>{fmt(data.totaux.ttc)} €</span>
             </div>
           </div>
           <div style={{ flex: 1, border: `2px solid ${primary}`, padding: 6 * unit, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
