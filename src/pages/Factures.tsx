@@ -528,14 +528,14 @@ export default function Factures() {
                     {(() => {
                       const r = relanceByFactureId.get(f.id);
                       const rel = getRelanceStatus(r, f.paye, f.dateValidation);
-                      if (f.fk_statut >= 1 && !f.paye && (rel.variant === 'relance_1' || rel.variant === 'mise_en_demeure')) {
-                        const combined = rel.variant === 'mise_en_demeure'
-                          ? 'Non payée — Mise en demeure'
-                          : 'Non payée — Relance';
-                        return <StatusBadge statut={combined} />;
+                      if (f.fk_statut >= 1 && !f.paye && rel.variant === 'mise_en_demeure') {
+                        return <StatusBadge statut="Mise en demeure" />;
+                      }
+                      if (f.fk_statut >= 1 && !f.paye && rel.variant === 'relance_1') {
+                        return <StatusBadge statut="Relancée" />;
                       }
                       if (f.fk_statut >= 1 && !f.paye && r?.date_envoi) {
-                        return <StatusBadge statut="Non payée" />;
+                        return <StatusBadge statut="Envoyée" />;
                       }
                       return <StatusBadge statut={f.statut} />;
                     })()}
@@ -615,13 +615,13 @@ export default function Factures() {
                       const r = relanceByFactureId.get(selectedFacture.id);
                       const rel = getRelanceStatus(r, selectedFacture.paye, selectedFacture.dateValidation);
                       if (selectedFacture.fk_statut >= 1 && !selectedFacture.paye && rel.variant === 'mise_en_demeure') {
-                        return 'Non payée — Mise en demeure';
+                        return 'Mise en demeure';
                       }
                       if (selectedFacture.fk_statut >= 1 && !selectedFacture.paye && rel.variant === 'relance_1') {
-                        return 'Non payée — Relance';
+                        return 'Relancée';
                       }
                       if (selectedFacture.fk_statut >= 1 && !selectedFacture.paye && r?.date_envoi) {
-                        return 'Non payée';
+                        return 'Envoyée';
                       }
                       return selectedFacture.statut;
                     })()}

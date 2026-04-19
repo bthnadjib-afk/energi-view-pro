@@ -1,12 +1,6 @@
-// Générateur PDF — DEVIS — via DocumentTemplate (HTML→PDF, WYSIWYG)
+// Générateur PDF — DEVIS — via @react-pdf/renderer (vectoriel)
 import type { Devis, Client } from '@/services/dolibarr';
-import {
-  buildDocumentPdf,
-  documentPdfToBlobUrl,
-  openDocumentPdf,
-  downloadDocumentPdf,
-  documentPdfToBase64,
-} from './htmlToPdf';
+import { buildPdfBlob, buildPdfBase64, openPdf, downloadPdf, pdfToBlobUrl } from './reactPdf';
 import type { DocumentTemplateData, EntrepriseInfo } from './DocumentTemplate';
 
 export type { EntrepriseInfo } from './DocumentTemplate';
@@ -34,7 +28,6 @@ function buildData({ devis, client }: DevisPdfParams): DocumentTemplateData {
       tvaParTaux[String(l.tauxTVA)] = (tvaParTaux[String(l.tauxTVA)] || 0) + (l.totalHT * l.tauxTVA) / 100;
     }
   });
-  const tvaTotal = devis.montantTTC - devis.montantHT;
 
   return {
     ref: devis.ref,
@@ -51,35 +44,17 @@ function buildData({ devis, client }: DevisPdfParams): DocumentTemplateData {
     lignes,
     totaux: {
       ht: devis.montantHT,
-      tva: tvaTotal,
+      tva: devis.montantTTC - devis.montantHT,
       ttc: devis.montantTTC,
-      tvaParTaux: Object.entries(tvaParTaux).map(([taux, montant]) => ({
-        taux: Number(taux),
-        montant,
-      })),
+      tvaParTaux: Object.entries(tvaParTaux).map(([taux, montant]) => ({ taux: Number(taux), montant })),
     },
   };
 }
 
-export async function openDevisPdf(p: DevisPdfParams): Promise<void> {
-  return openDocumentPdf({ docType: 'devis', data: buildData(p), entrepriseOverride: p.entreprise });
-}
+const p2params = (p: DevisPdfParams) => ({ docType: 'devis' as const, data: buildData(p), entrepriseOverride: p.entreprise });
 
-export async function devisPdfToBlobUrl(p: DevisPdfParams): Promise<string> {
-  return documentPdfToBlobUrl({ docType: 'devis', data: buildData(p), entrepriseOverride: p.entreprise });
-}
-
-export async function downloadDevisPdf(p: DevisPdfParams): Promise<void> {
-  return downloadDocumentPdf(
-    { docType: 'devis', data: buildData(p), entrepriseOverride: p.entreprise },
-    `${p.devis.ref || 'devis'}.pdf`
-  );
-}
-
-export async function devisPdfToBase64(p: DevisPdfParams): Promise<string> {
-  return documentPdfToBase64({ docType: 'devis', data: buildData(p), entrepriseOverride: p.entreprise });
-}
-
-// Compat avec d'anciens imports éventuels
-export const buildDevisPdf = async (p: DevisPdfParams) =>
-  buildDocumentPdf({ docType: 'devis', data: buildData(p), entrepriseOverride: p.entreprise });
+export const openDevisPdf      = (p: DevisPdfParams) => openPdf(p2params(p));
+export const devisPdfToBlobUrl = (p: DevisPdfParams) => pdfToBlobUrl(p2params(p));
+export const downloadDevisPdf  = (p: DevisPdfParams) => downloadPdf(p2params(p), `${p.devis.ref || 'devis'}.pdf`);
+export const devisPdfToBase64  = (p: DevisPdfParams) => buildPdfBase64(p2params(p));
+export const buildDevisPdf     = (p: DevisPdfParams) => buildPdfBlob(p2params(p));

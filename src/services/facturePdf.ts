@@ -1,12 +1,6 @@
-// Générateur PDF — FACTURE — via DocumentTemplate (HTML→PDF, WYSIWYG)
+// Générateur PDF — FACTURE — via @react-pdf/renderer (vectoriel)
 import type { Facture, Client } from '@/services/dolibarr';
-import {
-  buildDocumentPdf,
-  documentPdfToBlobUrl,
-  openDocumentPdf,
-  downloadDocumentPdf,
-  documentPdfToBase64,
-} from './htmlToPdf';
+import { buildPdfBlob, buildPdfBase64, openPdf, downloadPdf, pdfToBlobUrl } from './reactPdf';
 import type { DocumentTemplateData, EntrepriseInfo } from './DocumentTemplate';
 
 export type { EntrepriseInfo } from './DocumentTemplate';
@@ -34,7 +28,6 @@ function buildData({ facture, client }: FacturePdfParams): DocumentTemplateData 
       tvaParTaux[String(l.tauxTVA)] = (tvaParTaux[String(l.tauxTVA)] || 0) + (l.totalHT * l.tauxTVA) / 100;
     }
   });
-  const tvaTotal = facture.montantTTC - facture.montantHT;
 
   return {
     ref: facture.ref,
@@ -51,36 +44,19 @@ function buildData({ facture, client }: FacturePdfParams): DocumentTemplateData 
     lignes,
     totaux: {
       ht: facture.montantHT,
-      tva: tvaTotal,
+      tva: facture.montantTTC - facture.montantHT,
       ttc: facture.montantTTC,
-      tvaParTaux: Object.entries(tvaParTaux).map(([taux, montant]) => ({
-        taux: Number(taux),
-        montant,
-      })),
+      tvaParTaux: Object.entries(tvaParTaux).map(([taux, montant]) => ({ taux: Number(taux), montant })),
     },
     paye: facture.paye,
     resteAPayer: facture.resteAPayer,
   };
 }
 
-export async function openFacturePdf(p: FacturePdfParams): Promise<void> {
-  return openDocumentPdf({ docType: 'facture', data: buildData(p), entrepriseOverride: p.entreprise });
-}
+const p2params = (p: FacturePdfParams) => ({ docType: 'facture' as const, data: buildData(p), entrepriseOverride: p.entreprise });
 
-export async function facturePdfToBlobUrl(p: FacturePdfParams): Promise<string> {
-  return documentPdfToBlobUrl({ docType: 'facture', data: buildData(p), entrepriseOverride: p.entreprise });
-}
-
-export async function downloadFacturePdf(p: FacturePdfParams): Promise<void> {
-  return downloadDocumentPdf(
-    { docType: 'facture', data: buildData(p), entrepriseOverride: p.entreprise },
-    `${p.facture.ref || 'facture'}.pdf`
-  );
-}
-
-export async function facturePdfToBase64(p: FacturePdfParams): Promise<string> {
-  return documentPdfToBase64({ docType: 'facture', data: buildData(p), entrepriseOverride: p.entreprise });
-}
-
-export const buildFacturePdf = async (p: FacturePdfParams) =>
-  buildDocumentPdf({ docType: 'facture', data: buildData(p), entrepriseOverride: p.entreprise });
+export const openFacturePdf      = (p: FacturePdfParams) => openPdf(p2params(p));
+export const facturePdfToBlobUrl = (p: FacturePdfParams) => pdfToBlobUrl(p2params(p));
+export const downloadFacturePdf  = (p: FacturePdfParams) => downloadPdf(p2params(p), `${p.facture.ref || 'facture'}.pdf`);
+export const facturePdfToBase64  = (p: FacturePdfParams) => buildPdfBase64(p2params(p));
+export const buildFacturePdf     = (p: FacturePdfParams) => buildPdfBlob(p2params(p));

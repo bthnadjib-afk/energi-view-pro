@@ -1,12 +1,6 @@
-// Générateur PDF — BON D'INTERVENTION — via DocumentTemplate (HTML→PDF, WYSIWYG)
+// Générateur PDF — BON D'INTERVENTION — via @react-pdf/renderer (vectoriel)
 import type { Intervention, Client, InterventionLine } from '@/services/dolibarr';
-import {
-  buildDocumentPdf,
-  documentPdfToBlobUrl,
-  openDocumentPdf,
-  downloadDocumentPdf,
-  documentPdfToBase64,
-} from './htmlToPdf';
+import { buildPdfBlob, buildPdfBase64, openPdf, downloadPdf, pdfToBlobUrl } from './reactPdf';
 import type { DocumentTemplateData, EntrepriseInfo } from './DocumentTemplate';
 
 export type { EntrepriseInfo } from './DocumentTemplate';
@@ -43,8 +37,6 @@ function buildData({
   signatureClient,
   signatureTech,
 }: InterventionPdfParams): DocumentTemplateData {
-  // Pour les interventions, on présente les lignes comme un mini-tableau "lignes de prestation"
-  // Format compatible avec les colonnes du DocumentTemplate.
   const lignes = (lines || []).map((l, i) => ({
     designation: l.description || `Ligne ${i + 1}`,
     ref: '',
@@ -56,7 +48,6 @@ function buildData({
   }));
 
   const totalDuration = (lines || []).reduce((s, l) => s + (l.duree || 0), 0);
-  const description = intervention.description || '';
   const totalDurationLabel = totalDuration > 0 ? `\n\nTotal heures : ${formatDuration(totalDuration)}` : '';
 
   return {
@@ -74,31 +65,23 @@ function buildData({
     },
     lignes,
     totaux: { ht: 0, tva: 0, ttc: 0 },
-    description: description + totalDurationLabel,
+    description: (intervention.description || '') + totalDurationLabel,
     observations: (intervention as any).compteRendu || (intervention as any).observations || '',
     signatureClient,
     signatureTech,
   };
 }
 
-export async function generateInterventionPdfLocal(p: InterventionPdfParams): Promise<void> {
-  return downloadDocumentPdf(
-    { docType: 'intervention', data: buildData(p), entrepriseOverride: p.entreprise },
-    `${p.intervention.ref || 'intervention'}.pdf`
-  );
-}
+const p2params = (p: InterventionPdfParams) => ({
+  docType: 'intervention' as const,
+  data: buildData(p),
+  entrepriseOverride: p.entreprise,
+});
 
-export async function generateInterventionPdfBlobUrl(p: InterventionPdfParams): Promise<string> {
-  return documentPdfToBlobUrl({ docType: 'intervention', data: buildData(p), entrepriseOverride: p.entreprise });
-}
-
-export async function generateInterventionPdfBase64(p: InterventionPdfParams): Promise<string> {
-  return documentPdfToBase64({ docType: 'intervention', data: buildData(p), entrepriseOverride: p.entreprise });
-}
-
-// Alias compat (utilisés par interventionRenderer.ts façade)
-export const openInterventionPdf = async (p: InterventionPdfParams) =>
-  openDocumentPdf({ docType: 'intervention', data: buildData(p), entrepriseOverride: p.entreprise });
-export const downloadInterventionPdf = generateInterventionPdfLocal;
-export const interventionPdfToBlobUrl = generateInterventionPdfBlobUrl;
-export const interventionPdfToBase64 = generateInterventionPdfBase64;
+export const generateInterventionPdfLocal    = (p: InterventionPdfParams) => downloadPdf(p2params(p), `${p.intervention.ref || 'intervention'}.pdf`);
+export const generateInterventionPdfBlobUrl  = (p: InterventionPdfParams) => pdfToBlobUrl(p2params(p));
+export const generateInterventionPdfBase64   = (p: InterventionPdfParams) => buildPdfBase64(p2params(p));
+export const openInterventionPdf             = (p: InterventionPdfParams) => openPdf(p2params(p));
+export const downloadInterventionPdf         = generateInterventionPdfLocal;
+export const interventionPdfToBlobUrl        = generateInterventionPdfBlobUrl;
+export const interventionPdfToBase64         = generateInterventionPdfBase64;

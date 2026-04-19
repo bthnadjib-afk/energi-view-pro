@@ -155,7 +155,7 @@ export function DocumentTemplate({
   // 0.5 = tout est divisé par 2 par rapport à la version précédente.
   const TEXT_SCALE = 0.5;
   const unit = scale * PX_PER_MM * density * TEXT_SCALE;
-  const W = A4_W_PX * scale;
+  const W = Math.round(A4_W_PX) * scale; // 794px exact = TEMPLATE_W_PX dans htmlToPdf
   const H = A4_H_PX * scale;
   const mt = (t.margeHaut ?? 18) * unit;
   const mb = (t.margeBas ?? 20) * unit;
@@ -168,8 +168,6 @@ export function DocumentTemplate({
   // Si la valeur n'est pas définie, on retombe sur la valeur historique.
   const fsEntreprise   = (t.tailleEntreprise   ?? 11)   * unit;
   const fsCoord        = (t.tailleCoordonnees  ?? 9)    * unit;
-  const fsRubanLabel   = (t.tailleRubanLabel   ?? 6.5)  * unit;
-  const fsRubanValeur  = (t.tailleRubanValeur  ?? 8.5)  * unit;
   const fsTableHeader  = (t.tailleTableauHeader?? 8.5)  * unit;
   const fsTableLigne   = (t.tailleTableauLignes?? 8.5)  * unit;
   const fsTotaux       = (t.tailleTotaux       ?? 9.5)  * unit;
@@ -181,11 +179,7 @@ export function DocumentTemplate({
   const logoH = (t.logoHauteur ?? 13) * PX_PER_MM * scale * density;
   const logoMaxW = (t.logoLargeurMax ?? 48) * PX_PER_MM * scale * density;
   const logoOffsetX = (t.logoOffsetX ?? 0) * PX_PER_MM * scale * density;
-  // Largeurs encarts (mm → px)
-  const wEncTotaux = (t.largeurEncartTotaux ?? 80) * PX_PER_MM * scale * density;
-  const wEncBonAccord = (t.largeurEncartBonAccord ?? 80) * PX_PER_MM * scale * density;
   const entrepriseEnFace = t.entrepriseEnFaceClient !== false;
-  const rubanCompact = t.rubanCompact !== false;
 
   const primary = t.couleurPrimaire || '#1a1a1a';
   const tableHeaderBg = t.couleurTableauHeader || primary;
@@ -279,15 +273,6 @@ export function DocumentTemplate({
     </div>
   );
 
-  // Items du ruban
-  const rubanItems = [
-    { l: 'Référence', v: data.ref },
-    { l: docType === 'facture' ? 'Date facture' : 'Date', v: formatDateFR(data.date) },
-    ...(showEcheance ? [{ l: 'Échéance', v: data.echeance ? formatDateFR(data.echeance) : 'À réception' }] : []),
-    ...(showValidite ? [{ l: 'Validité', v: data.validite ? formatDateFR(data.validite) : '30 jours' }] : []),
-    ...(docType === 'intervention' ? [{ l: 'Type', v: data.type || '—' }] : []),
-    ...(docType === 'intervention' ? [{ l: 'Technicien', v: data.technicien || '—' }] : []),
-  ];
 
   return (
     <div style={pageStyle}>
@@ -379,12 +364,12 @@ export function DocumentTemplate({
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fsTableLigne, marginBottom: 8 * unit, lineHeight: density < 1 ? 1.12 : 1.3 }}>
           <thead>
             <tr style={{ background: tableHeaderBg, color: '#fff', fontSize: fsTableHeader }}>
-              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap' }}>Description</th>
+              <th style={{ padding: 4 * unit, textAlign: 'left', verticalAlign: 'middle', fontWeight: 700 }}>Description</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 50 * unit }}>Réf</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 32 * unit }}>Qté</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 32 * unit }}>Unité</th>
-              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 60 * unit }}>P.U.</th>
-              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 70 * unit }}>Montant</th>
+              <th style={{ padding: 4 * unit, textAlign: 'right', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 60 * unit }}>P.U.</th>
+              <th style={{ padding: 4 * unit, textAlign: 'right', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 70 * unit }}>Montant</th>
             </tr>
           </thead>
           <tbody>
@@ -396,12 +381,12 @@ export function DocumentTemplate({
                   borderBottom: '0.5px solid #e0e0e0',
                 }}
               >
-                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle' }}>{l.designation}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'left', verticalAlign: 'middle' }}>{l.designation}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', color: '#888', verticalAlign: 'middle' }}>{l.ref || ''}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle' }}>{l.quantite}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle' }}>{l.unite || 'U'}</td>
-                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle' }}>{fmt(l.prixUnitaire)} {devise}</td>
-                <td style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, verticalAlign: 'middle' }}>{fmt(l.totalHT)} {devise}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'right', verticalAlign: 'middle' }}>{fmt(l.prixUnitaire)} {devise}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, verticalAlign: 'middle' }}>{fmt(l.totalHT)} {devise}</td>
               </tr>
             ))}
           </tbody>
@@ -497,7 +482,7 @@ export function DocumentTemplate({
       {docType === 'devis' && (
         <div style={{ marginTop: 12 * unit, display: 'flex', gap: 10 * unit, alignItems: 'stretch' }}>
           <div style={{ flex: 1, border: `1px solid ${primary}`, padding: 6 * unit, fontSize: fsEncartTexte }}>
-            <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 3 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 3 * unit, textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'center', textDecoration: 'underline' }}>
               Récapitulatif
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${1.5 * unit}px 0` }}>
@@ -516,7 +501,7 @@ export function DocumentTemplate({
             </div>
           </div>
           <div style={{ flex: 1, border: `1px solid ${primary}`, padding: 6 * unit, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-            <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 2 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 2 * unit, textTransform: 'uppercase', letterSpacing: 0.4, textDecoration: 'underline' }}>
               Bon pour accord
             </div>
             <div style={{ fontSize: fsEncartTexte * 0.88, color: '#666', marginBottom: 2 * unit }}>

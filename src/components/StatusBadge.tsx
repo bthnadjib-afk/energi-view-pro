@@ -27,8 +27,9 @@ const statusStyles: Record<string, string> = {
   'envoyée': 'bg-blue-100 text-blue-700 border-blue-200',
   'relance devis': 'bg-orange-100 text-orange-800 border-orange-300 font-semibold',
   'relancé': 'bg-sky-100 text-sky-700 border-sky-300',
+  'relancée': 'bg-orange-200 text-orange-900 border-orange-300 font-semibold',
   'relance': 'bg-orange-100 text-orange-700 border-orange-200',
-  'mise en demeure': 'bg-red-100 text-red-700 border-red-200',
+  'mise en demeure': 'bg-red-200 text-red-900 border-red-300 font-semibold',
   'non payée — relance': 'bg-orange-200 text-orange-900 border-orange-300',
   'non payée — mise en demeure': 'bg-red-200 text-red-900 border-red-300',
 };
