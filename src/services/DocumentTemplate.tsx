@@ -208,13 +208,12 @@ export function DocumentTemplate({
   // Les CGV doivent rester à leur taille NOMINALE pour conformité légale :
   // on neutralise TEXT_SCALE en divisant l'unit utilisée ici.
   if (cgvOnly) {
-    const cgvUnit = unit / TEXT_SCALE; // = scale * PX_PER_MM * density (sans réduction)
     return (
       <div style={pageStyle}>
-        <div style={{ fontSize: 14 * cgvUnit, fontWeight: 700, fontStyle: 'italic', color: primary, marginBottom: 10 * cgvUnit, borderBottom: `1.5px solid ${primary}`, paddingBottom: 4 * cgvUnit }}>
+        <div style={{ fontSize: 14 * unit, fontWeight: 700, fontStyle: 'italic', color: primary, marginBottom: 10 * unit, borderBottom: `1.5px solid ${primary}`, paddingBottom: 4 * unit }}>
           Conditions Générales de Vente
         </div>
-        <div style={{ fontSize: 8 * cgvUnit, color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.5, textAlign: 'justify' }}>
+        <div style={{ fontSize: 8 * unit, color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.5, textAlign: 'justify' }}>
           {t.texteCgv || 'Aucune CGV configurée. Renseignez le texte dans Préférences → Template.'}
         </div>
       </div>
