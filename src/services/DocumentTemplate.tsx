@@ -213,7 +213,7 @@ export function DocumentTemplate({
   if (cgvOnly) {
     return (
       <div style={pageStyle}>
-        <div style={{ fontSize: 14 * unit, fontWeight: 700, fontStyle: 'italic', color: primary, marginBottom: 10 * unit, borderBottom: `1.5px solid ${primary}`, paddingBottom: 4 * unit }}>
+        <div style={{ fontSize: 14 * unit, fontWeight: 700, fontStyle: 'italic', color: primary, marginBottom: 10 * unit, borderBottom: `0.75px solid ${primary}`, paddingBottom: 4 * unit }}>
           Conditions Générales de Vente
         </div>
         <div style={{ fontSize: 8 * unit, color: '#333', whiteSpace: 'pre-wrap', lineHeight: 1.5, textAlign: 'justify' }}>
@@ -421,34 +421,34 @@ export function DocumentTemplate({
       {/* ─── TOTAUX ─── */}
       {showTableTotals && (
         <div style={{ marginTop: 8 * unit, display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ minWidth: 200 * unit, fontSize: fsTotaux, paddingRight: 4 * unit }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0` }}>
-              <span style={{ color: '#555', fontStyle: 'italic' }}>TOTAL HT :</span>
-              <span style={{ fontWeight: 700, fontStyle: 'italic' }}>{fmt(data.totaux.ht)} €</span>
+          <div style={{ minWidth: 200 * unit, fontSize: fsTotaux }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: `${3 * unit}px 0` }}>
+              <span style={{ flex: 1, color: '#555', fontStyle: 'italic' }}>TOTAL HT :</span>
+              <span style={{ width: 70 * unit, textAlign: 'center', fontWeight: 700, fontStyle: 'italic' }}>{fmt(data.totaux.ht)} €</span>
             </div>
             {(data.totaux.tvaParTaux && data.totaux.tvaParTaux.length > 0
               ? data.totaux.tvaParTaux
               : [{ taux: 20, montant: data.totaux.tva }]
             ).map((tva, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0` }}>
-                <span style={{ color: '#555', fontStyle: 'italic' }}>TVA ({tva.taux}%) :</span>
-                <span style={{ fontWeight: 700, fontStyle: 'italic' }}>{fmt(tva.montant)} €</span>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', padding: `${3 * unit}px 0` }}>
+                <span style={{ flex: 1, color: '#555', fontStyle: 'italic' }}>TVA ({tva.taux}%) :</span>
+                <span style={{ width: 70 * unit, textAlign: 'center', fontWeight: 700, fontStyle: 'italic' }}>{fmt(tva.montant)} €</span>
               </div>
             ))}
             <div
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
+                alignItems: 'center',
                 padding: `${6 * unit}px 0`,
-                borderTop: `1.5px solid ${primary}`,
+                borderTop: `0.75px solid ${primary}`,
                 marginTop: 4 * unit,
                 fontSize: fsTotalTTC,
               }}
             >
-              <span style={{ fontWeight: 700, fontStyle: 'italic' }}>
+              <span style={{ flex: 1, fontWeight: 700, fontStyle: 'italic' }}>
                 {data.paye ? 'TOTAL TTC PAYÉ' : 'TOTAL TTC :'}
               </span>
-              <span style={{ fontWeight: 700, fontStyle: 'italic', color: primary }}>{fmt(data.totaux.ttc)} €</span>
+              <span style={{ width: 70 * unit, textAlign: 'center', fontWeight: 700, fontStyle: 'italic', color: primary }}>{fmt(data.totaux.ttc)} €</span>
             </div>
             {docType === 'facture' && !data.paye && data.resteAPayer != null && data.resteAPayer > 0 && data.resteAPayer < data.totaux.ttc && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0`, fontSize: fsTotaux }}>
@@ -466,7 +466,7 @@ export function DocumentTemplate({
           style={{
             marginTop: 14 * unit,
             padding: 8 * unit,
-            border: `2px solid ${accent}`,
+            border: `1px solid ${accent}`,
             background: `${accent}10`,
             display: 'flex',
             alignItems: 'center',
@@ -484,7 +484,7 @@ export function DocumentTemplate({
       {/* ─── DEVIS : Récap totaux + Bon pour accord (uniquement devis, pas facture) ─── */}
       {docType === 'devis' && (
         <div style={{ marginTop: 12 * unit, display: 'flex', gap: 10 * unit, alignItems: 'stretch' }}>
-          <div style={{ flex: 1, border: `2px solid ${primary}`, padding: 6 * unit, fontSize: fsEncartTexte }}>
+          <div style={{ flex: 1, border: `1px solid ${primary}`, padding: 6 * unit, fontSize: fsEncartTexte }}>
             <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 3 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
               Récapitulatif
             </div>
@@ -503,7 +503,7 @@ export function DocumentTemplate({
               <span style={{ fontWeight: 700, fontStyle: 'italic', color: primary }}>{fmt(data.totaux.ttc)} €</span>
             </div>
           </div>
-          <div style={{ flex: 1, border: `2px solid ${primary}`, padding: 6 * unit, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+          <div style={{ flex: 1, border: `1px solid ${primary}`, padding: 6 * unit, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
             <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 2 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
               Bon pour accord
             </div>
@@ -517,7 +517,7 @@ export function DocumentTemplate({
 
       {showSignatures && (
         <div style={{ marginTop: 12 * unit, display: 'flex', gap: 10 * unit }}>
-          <div style={{ flex: 1, border: '1px solid #ccc', padding: 5 * unit, minHeight: 38 * unit }}>
+          <div style={{ flex: 1, border: `0.5px solid #ccc`, padding: 5 * unit, minHeight: 38 * unit }}>
             <div style={{ fontSize: 7.5 * unit, fontWeight: 700, fontStyle: 'italic', color: '#444', marginBottom: 3 * unit }}>
               Signature du technicien :
             </div>
@@ -525,7 +525,7 @@ export function DocumentTemplate({
               <img src={data.signatureTech} alt="" crossOrigin="anonymous" style={{ maxWidth: '100%', maxHeight: 32 * unit, objectFit: 'contain' }} />
             )}
           </div>
-          <div style={{ flex: 1, border: '1px solid #ccc', padding: 5 * unit, minHeight: 38 * unit }}>
+          <div style={{ flex: 1, border: `0.5px solid #ccc`, padding: 5 * unit, minHeight: 38 * unit }}>
             <div style={{ fontSize: 7.5 * unit, fontWeight: 700, fontStyle: 'italic', color: '#444', marginBottom: 3 * unit }}>
               Signature du client :
             </div>
