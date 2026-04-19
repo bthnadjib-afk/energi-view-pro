@@ -141,19 +141,19 @@ export default function TemplateSizesPanel({ template, updateTemplate }: Props) 
       </div>
 
       {/* ─── Zone DEBUG ───────────────────────────────────────────── */}
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2 mt-6">
-        <div className="flex items-center gap-2 text-destructive">
+      <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2 mt-6">
+        <div className="flex items-center gap-2 text-foreground">
           <Bug className="h-3.5 w-3.5" />
-          <span className="text-xs font-semibold uppercase tracking-wide">Debug — Échelle de capture</span>
+          <span className="text-xs font-semibold uppercase tracking-wide">Résolution de capture PDF</span>
         </div>
         <p className="text-[10px] text-muted-foreground leading-tight">
-          Largeur du viewport HTML utilisée pour la capture PDF. <strong>794px = A4 strict @ 96 DPI</strong> (par défaut).
-          Augmentez si le PDF apparaît trop zoomé, diminuez s'il apparaît trop petit.
+          Largeur du layout HTML (px). La capture est faite à <strong>3.125× (300 DPI)</strong>.
+          794 px → canvas 2481 px → <strong>300 DPI</strong> dans le PDF final.
         </p>
         <div className="flex items-center justify-between">
           <Label className="text-xs font-medium">Largeur de capture</Label>
           <span className="text-xs font-mono text-muted-foreground tabular-nums">
-            {template.captureWidth ?? 794}px
+            {template.captureWidth ?? 794}px — {Math.round((template.captureWidth ?? 794) * 3.125 / (210 / 25.4))} DPI
           </span>
         </div>
         <Slider
