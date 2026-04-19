@@ -461,15 +461,16 @@ export interface ClientMutationData {
 }
 
 function buildClientArrayOptions(data: ClientMutationData) {
-  return {
-    options_etage: data.etage || '',
-    options_code_porte: data.codePorte || '',
-    options_type_logement: data.typeLogement || '',
-  };
+  const opts: Record<string, string> = {};
+  if (data.etage)        opts.options_etage = data.etage;
+  if (data.codePorte)    opts.options_code_porte = data.codePorte;
+  if (data.typeLogement) opts.options_type_logement = data.typeLogement;
+  return Object.keys(opts).length > 0 ? opts : null;
 }
 
 function buildClientPayload(data: ClientMutationData) {
   const isPro = data.clientType === 'professionnel';
+  const arrayOptions = buildClientArrayOptions(data);
   const payload: Record<string, unknown> = {
     name: data.nom,
     address: data.adresse || '',
@@ -477,9 +478,9 @@ function buildClientPayload(data: ClientMutationData) {
     town: data.ville || '',
     phone: data.telephone || '',
     email: data.email || '',
-    array_options: buildClientArrayOptions(data),
     client: 1,
   };
+  if (arrayOptions) payload.array_options = arrayOptions;
   if (isPro) {
     payload.idprof1 = data.siret || '';
     payload.tva_intra = data.tvaIntra || '';
