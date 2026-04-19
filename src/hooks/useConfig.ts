@@ -13,7 +13,6 @@ export interface AppConfig {
     email: string;
     tvaIntra?: string;
     capitalSocial?: string;
-    deviseCapitalSocial?: string;
     rcs?: string;
   };
   defaults: {
@@ -24,9 +23,10 @@ export interface AppConfig {
     chantierHeureDebut: string;
     chantierHeureFin: string;
     chantierJours: string;
-    tauxAcompte: number;          // % d'acompte par défaut (ex: 30)
-    seuilAcompte: number;         // montant TTC au-delà duquel le 2e taux s'applique (0 = désactivé)
-    tauxAcompteSeuilDepasse: number; // % d'acompte si TTC > seuil (ex: 50)
+    tauxAcompte: number;
+    seuilAcompte: number;
+    tauxAcompteSeuilDepasse: number;
+    devise: string;               // symbole monétaire global (€, CHF, $, £…)
   };
   notifications: {
     nouveauDevis: boolean;
@@ -100,7 +100,6 @@ const DEFAULT_CONFIG: AppConfig = {
     email: '',
     tvaIntra: '',
     capitalSocial: '',
-    deviseCapitalSocial: '€',
     rcs: '',
   },
   defaults: {
@@ -114,6 +113,7 @@ const DEFAULT_CONFIG: AppConfig = {
     tauxAcompte: 30,
     seuilAcompte: 0,
     tauxAcompteSeuilDepasse: 50,
+    devise: '€',
   },
   notifications: {
     nouveauDevis: true,

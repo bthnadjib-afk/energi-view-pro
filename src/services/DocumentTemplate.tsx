@@ -53,6 +53,7 @@ export interface DocumentTemplateCfg {
   couleurAccent?: string;
   couleurTexte?: string;
   couleurTableauHeader?: string;
+  devise?: string;
   police?: 'helvetica' | 'times' | 'courier';
   margeHaut?: number;
   margeBas?: number;
@@ -98,7 +99,6 @@ export interface EntrepriseInfo {
   email?: string;
   tvaIntra?: string;
   capitalSocial?: string;
-  deviseCapitalSocial?: string;
   rcs?: string;
 }
 
@@ -188,6 +188,7 @@ export function DocumentTemplate({
   const primary = t.couleurPrimaire || '#1a1a1a';
   const tableHeaderBg = t.couleurTableauHeader || primary;
   const accent = t.couleurAccent || '#cc0000';
+  const devise = t.devise || '€';
   const textColor = t.couleurTexte || '#1a1a1a';
   const fontFamily =
     t.police === 'times'
@@ -397,8 +398,8 @@ export function DocumentTemplate({
                 <td style={{ padding: 4 * unit, textAlign: 'center', color: '#888', verticalAlign: 'middle' }}>{l.ref || ''}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle' }}>{l.quantite}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle' }}>{l.unite || 'U'}</td>
-                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle' }}>{fmt(l.prixUnitaire)} €</td>
-                <td style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, verticalAlign: 'middle' }}>{fmt(l.totalHT)} €</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle' }}>{fmt(l.prixUnitaire)} {devise}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, verticalAlign: 'middle' }}>{fmt(l.totalHT)} {devise}</td>
               </tr>
             ))}
           </tbody>
@@ -433,7 +434,7 @@ export function DocumentTemplate({
           <div style={{ minWidth: 200 * unit, fontSize: fsTotaux }}>
             <div style={{ display: 'flex', alignItems: 'center', padding: `${3 * unit}px 0` }}>
               <span style={{ flex: 1, color: '#555', fontStyle: 'italic' }}>TOTAL HT :</span>
-              <span style={{ width: 70 * unit, textAlign: 'center', fontWeight: 700, fontStyle: 'italic' }}>{fmt(data.totaux.ht)} €</span>
+              <span style={{ width: 70 * unit, textAlign: 'center', fontWeight: 700, fontStyle: 'italic' }}>{fmt(data.totaux.ht)} {devise}</span>
             </div>
             {(data.totaux.tvaParTaux && data.totaux.tvaParTaux.length > 0
               ? data.totaux.tvaParTaux
@@ -441,7 +442,7 @@ export function DocumentTemplate({
             ).map((tva, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', padding: `${3 * unit}px 0` }}>
                 <span style={{ flex: 1, color: '#555', fontStyle: 'italic' }}>TVA ({tva.taux}%) :</span>
-                <span style={{ width: 70 * unit, textAlign: 'center', fontWeight: 700, fontStyle: 'italic' }}>{fmt(tva.montant)} €</span>
+                <span style={{ width: 70 * unit, textAlign: 'center', fontWeight: 700, fontStyle: 'italic' }}>{fmt(tva.montant)} {devise}</span>
               </div>
             ))}
             <div
@@ -457,12 +458,12 @@ export function DocumentTemplate({
               <span style={{ flex: 1, fontWeight: 700, fontStyle: 'italic' }}>
                 {data.paye ? 'TOTAL TTC PAYÉ' : 'TOTAL TTC :'}
               </span>
-              <span style={{ width: 70 * unit, textAlign: 'center', fontWeight: 700, fontStyle: 'italic', color: primary }}>{fmt(data.totaux.ttc)} €</span>
+              <span style={{ width: 70 * unit, textAlign: 'center', fontWeight: 700, fontStyle: 'italic', color: primary }}>{fmt(data.totaux.ttc)} {devise}</span>
             </div>
             {docType === 'facture' && !data.paye && data.resteAPayer != null && data.resteAPayer > 0 && data.resteAPayer < data.totaux.ttc && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0`, fontSize: fsTotaux }}>
                 <span style={{ color: accent, fontWeight: 700 }}>RESTE À PAYER :</span>
-                <span style={{ color: accent, fontWeight: 700 }}>{fmt(data.resteAPayer)} €</span>
+                <span style={{ color: accent, fontWeight: 700 }}>{fmt(data.resteAPayer)} {devise}</span>
               </div>
             )}
           </div>
@@ -486,7 +487,7 @@ export function DocumentTemplate({
             fontStyle: 'italic',
           }}
         >
-          ACOMPTE {tauxAcompte} % À PAYER À LA SIGNATURE — SOIT {fmt(acompte)} €
+          ACOMPTE {tauxAcompte} % À PAYER À LA SIGNATURE — SOIT {fmt(acompte)} {devise}
         </div>
       )}
 
@@ -499,17 +500,17 @@ export function DocumentTemplate({
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${1.5 * unit}px 0` }}>
               <span style={{ color: '#555', fontStyle: 'italic' }}>Total HT :</span>
-              <span style={{ fontWeight: 700, fontStyle: 'italic' }}>{fmt(data.totaux.ht)} €</span>
+              <span style={{ fontWeight: 700, fontStyle: 'italic' }}>{fmt(data.totaux.ht)} {devise}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${1.5 * unit}px 0` }}>
               <span style={{ color: '#555', fontStyle: 'italic' }}>
                 Total TVA ({(data.totaux.tvaParTaux?.[0]?.taux ?? 20)}%) :
               </span>
-              <span style={{ fontWeight: 700, fontStyle: 'italic' }}>{fmt(data.totaux.tva)} €</span>
+              <span style={{ fontWeight: 700, fontStyle: 'italic' }}>{fmt(data.totaux.tva)} {devise}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0 0`, marginTop: 2 * unit, fontSize: fsEncartTexte * 1.18 }}>
               <span style={{ fontWeight: 700, fontStyle: 'italic', color: primary }}>Total TTC :</span>
-              <span style={{ fontWeight: 700, fontStyle: 'italic', color: primary }}>{fmt(data.totaux.ttc)} €</span>
+              <span style={{ fontWeight: 700, fontStyle: 'italic', color: primary }}>{fmt(data.totaux.ttc)} {devise}</span>
             </div>
           </div>
           <div style={{ flex: 1, border: `1px solid ${primary}`, padding: 6 * unit, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
@@ -584,7 +585,7 @@ export function DocumentTemplate({
           <div style={{ marginTop: 3 * unit }}>
             {[
               entreprise.tvaIntra    && `TVA Intracommunautaire : ${entreprise.tvaIntra}`,
-              entreprise.capitalSocial && `Capital social : ${entreprise.capitalSocial} ${entreprise.deviseCapitalSocial ?? '€'}`,
+              entreprise.capitalSocial && `Capital social : ${entreprise.capitalSocial} ${devise}`,
               entreprise.rcs         && `RCS : ${entreprise.rcs}`,
             ].filter(Boolean).join('  —  ')}
           </div>

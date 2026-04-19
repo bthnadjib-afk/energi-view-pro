@@ -52,6 +52,7 @@ function readTemplateCfg(): DocumentTemplateCfg {
     if (def.tauxAcompte          !== undefined) tpl.tauxAcompte          = def.tauxAcompte;
     if (def.seuilAcompte         !== undefined) tpl.seuilAcompte         = def.seuilAcompte;
     if (def.tauxAcompteSeuilDepasse !== undefined) tpl.tauxAcompteSeuilDepasse = def.tauxAcompteSeuilDepasse;
+    if (def.devise               !== undefined) tpl.devise               = def.devise;
     return tpl;
   } catch {
     return {};

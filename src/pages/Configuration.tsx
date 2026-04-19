@@ -204,20 +204,7 @@ export default function Configuration() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Capital social</label>
-                <div className="flex gap-2">
-                  <Input value={config.entreprise.capitalSocial ?? ''} onChange={(e) => updateEntreprise({ capitalSocial: e.target.value })} placeholder="10 000" className="flex-1" />
-                  <Select value={config.entreprise.deviseCapitalSocial ?? '€'} onValueChange={(v) => updateEntreprise({ deviseCapitalSocial: v })}>
-                    <SelectTrigger className="w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="€">€</SelectItem>
-                      <SelectItem value="CHF">CHF</SelectItem>
-                      <SelectItem value="$">$</SelectItem>
-                      <SelectItem value="£">£</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Input value={config.entreprise.capitalSocial ?? ''} onChange={(e) => updateEntreprise({ capitalSocial: e.target.value })} placeholder="10 000" />
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">RCS</label>
@@ -246,6 +233,20 @@ export default function Configuration() {
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Taux horaire (€/h)</label>
                 <Input type="number" value={config.defaults.tauxHoraire} onChange={(e) => updateDefaults({ tauxHoraire: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Devise</label>
+                <Select value={config.defaults.devise ?? '€'} onValueChange={(v) => updateDefaults({ devise: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="€">€ — Euro</SelectItem>
+                    <SelectItem value="CHF">CHF — Franc suisse</SelectItem>
+                    <SelectItem value="$">$ — Dollar</SelectItem>
+                    <SelectItem value="£">£ — Livre sterling</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
