@@ -301,6 +301,24 @@ export function DocumentTemplate({
               <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginTop: 2 * unit }}>
                 NUMÉRO : {data.ref}
               </div>
+              <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
+                DATE : {formatDateFR(data.date)}
+              </div>
+              {showEcheance && (
+                <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
+                  ÉCHÉANCE : {data.echeance ? formatDateFR(data.echeance) : 'À réception'}
+                </div>
+              )}
+              {showValidite && (
+                <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
+                  VALIDITÉ : {data.validite ? formatDateFR(data.validite) : '30 jours'}
+                </div>
+              )}
+              {docType === 'intervention' && data.technicien && (
+                <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
+                  TECHNICIEN : {data.technicien}
+                </div>
+              )}
             </>
           ) : (
             blocEntreprise
@@ -320,38 +338,6 @@ export function DocumentTemplate({
         </>
       )}
 
-      {/* ─── BANDEAU INFOS ─── */}
-      {rubanCompact ? (
-        <div style={{
-          background: primary, color: '#fff',
-          padding: `${5 * unit}px ${8 * unit}px`,
-          marginBottom: 11.2 * unit,
-          fontSize: fsRubanValeur,
-          display: 'flex', flexWrap: 'wrap', gap: `${4 * unit}px ${10 * unit}px`,
-          justifyContent: 'center',
-        }}>
-          {rubanItems.map((c, i) => (
-            <span key={i} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4 * unit }}>
-              <span style={{ fontSize: fsRubanLabel, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.3 }}>{c.l} :</span>
-              <span style={{ fontWeight: 700 }}>{c.v}</span>
-              {i < rubanItems.length - 1 && <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: 6 * unit }}>|</span>}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <div style={{ display: 'flex', background: primary, color: '#fff', marginBottom: 11.2 * unit }}>
-          {rubanItems.map((c, i, arr) => (
-            <div key={i} style={{
-              flex: 1, padding: `${5 * unit}px ${7 * unit}px`,
-              borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none',
-              minWidth: 0, textAlign: 'center',
-            }}>
-              <div style={{ fontSize: fsRubanLabel, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.3 }}>{c.l}</div>
-              <div style={{ fontSize: fsRubanValeur, fontWeight: 700, marginTop: 1 * unit }}>{c.v}</div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* ─── ENTREPRISE ↔ CLIENT côte-à-côte (mode par défaut) ─── */}
       {entrepriseEnFace ? (
