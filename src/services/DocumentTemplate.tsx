@@ -370,7 +370,7 @@ export function DocumentTemplate({
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 32 * unit }}>Unité</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 60 * unit }}>P.U.</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 36 * unit }}>TVA</th>
-              <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 70 * unit }}>Montant</th>
+              <th style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, width: 70 * unit }}>Montant</th>
             </tr>
           </thead>
           <tbody>
@@ -388,7 +388,7 @@ export function DocumentTemplate({
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.unite || 'U'}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{fmt(l.prixUnitaire)} €</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.tauxTVA}%</td>
-                <td style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, verticalAlign: 'top' }}>{fmt(l.totalHT)} €</td>
+                <td style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>{fmt(l.totalHT)} €</td>
               </tr>
             ))}
           </tbody>
@@ -420,7 +420,7 @@ export function DocumentTemplate({
       {/* ─── TOTAUX ─── */}
       {showTableTotals && (
         <div style={{ marginTop: 8 * unit, display: 'flex', justifyContent: 'flex-end' }}>
-          <div style={{ minWidth: 200 * unit, fontSize: fsTotaux }}>
+          <div style={{ minWidth: 200 * unit, fontSize: fsTotaux, paddingRight: 4 * unit }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0` }}>
               <span style={{ color: '#555', fontStyle: 'italic' }}>TOTAL HT :</span>
               <span style={{ fontWeight: 700 }}>{fmt(data.totaux.ht)} €</span>
