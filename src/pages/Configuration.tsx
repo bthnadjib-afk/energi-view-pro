@@ -3,6 +3,7 @@ import { useConfig } from '@/hooks/useConfig';
 import { testDolibarrConnection, purgeAllDevisAndFactures } from '@/services/dolibarr';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { Input } from '@/components/ui/input';
+import { formatPhone } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -190,7 +191,7 @@ export default function Configuration() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Téléphone</label>
-                <Input value={config.entreprise.telephone} onChange={(e) => updateEntreprise({ telephone: e.target.value })} />
+                <Input value={config.entreprise.telephone} onChange={(e) => updateEntreprise({ telephone: formatPhone(e.target.value) })} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Email</label>

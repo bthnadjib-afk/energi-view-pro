@@ -28,7 +28,7 @@ import { CollisionAlert, checkCollision, type InterventionSlot } from '@/compone
 import { SignaturePad, type SignaturePadRef } from '@/components/SignaturePad';
 import { Plus, FileText, Receipt, Clock, ArrowRightLeft, Lock, FileDown, FileCheck, Trash2, Send, Play, CheckCircle2, Search, Pencil, RefreshCw, XCircle, RotateCcw, ListPlus, ChevronDown, CalendarDays, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, formatPhone } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { getInterventionStatusKey, STATUS_DOT_BG, STATUS_LABEL, STATUS_BADGE } from '@/lib/interventionStatus';
@@ -855,7 +855,7 @@ export default function Interventions() {
                     <Input placeholder="Code postal *" value={ncCodePostal} onChange={e => setNcCodePostal(e.target.value)} />
                     <Input placeholder="Ville *" value={ncVille} onChange={e => setNcVille(e.target.value)} />
                   </div>
-                  <Input placeholder="Téléphone *" value={ncTelephone} onChange={e => setNcTelephone(e.target.value)} />
+                  <Input placeholder="Téléphone *" value={ncTelephone} onChange={e => setNcTelephone(formatPhone(e.target.value))} />
                   <Input placeholder="Email *" type="email" value={ncEmail} onChange={e => setNcEmail(e.target.value)} />
                 </div>
               )}

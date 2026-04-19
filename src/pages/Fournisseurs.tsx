@@ -6,6 +6,7 @@ import {
   type Fournisseur,
 } from '@/services/dolibarr';
 import { Button } from '@/components/ui/button';
+import { formatPhone } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -105,7 +106,7 @@ export default function Fournisseurs() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm font-medium">Téléphone</label>
-                  <Input value={telephone} onChange={e => setTelephone(e.target.value)} placeholder="04 50 XX XX XX" />
+                  <Input value={telephone} onChange={e => setTelephone(formatPhone(e.target.value))} placeholder="04 50 XX XX XX" />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Email</label>

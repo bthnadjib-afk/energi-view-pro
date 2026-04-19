@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
-import { cn } from '@/lib/utils';
+import { cn, formatPhone } from '@/lib/utils';
 import type { Client, TypeLogement, ClientType } from '@/services/dolibarr';
 
 interface FormState {
@@ -233,7 +233,7 @@ export default function Clients() {
         <Input placeholder="Étage" value={form.etage} onChange={e => setField('etage', e.target.value)} />
         <Input placeholder="Code porte" value={form.codePorte} onChange={e => setField('codePorte', e.target.value)} />
       </div>
-      <Input placeholder="Téléphone *" value={form.telephone} onChange={e => setField('telephone', e.target.value)} />
+      <Input placeholder="Téléphone *" value={form.telephone} onChange={e => setField('telephone', formatPhone(e.target.value))} />
       <Input placeholder="Email *" type="email" value={form.email} onChange={e => setField('email', e.target.value)} />
     </div>
   );
