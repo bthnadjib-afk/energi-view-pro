@@ -367,12 +367,12 @@ export function DocumentTemplate({
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fsTableLigne, marginBottom: 8 * unit, lineHeight: density < 1 ? 1.12 : 1.3 }}>
           <thead>
             <tr style={{ background: primary, color: '#fff', fontSize: fsTableHeader }}>
-              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700 }}>Description</th>
-              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, width: 50 * unit }}>Réf</th>
-              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, width: 32 * unit }}>Qté</th>
-              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, width: 32 * unit }}>Unité</th>
-              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, width: 60 * unit }}>P.U.</th>
-              <th style={{ padding: 4 * unit, textAlign: 'right', verticalAlign: 'middle', fontWeight: 700, width: 70 * unit }}>Montant</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap' }}>Description</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 50 * unit }}>Réf</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 32 * unit }}>Qté</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 32 * unit }}>Unité</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 60 * unit }}>P.U.</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 70 * unit }}>Montant</th>
             </tr>
           </thead>
           <tbody>
@@ -389,7 +389,7 @@ export function DocumentTemplate({
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.quantite}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.unite || 'U'}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{fmt(l.prixUnitaire)} €</td>
-                <td style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>{fmt(l.totalHT)} €</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, verticalAlign: 'top' }}>{fmt(l.totalHT)} €</td>
               </tr>
             ))}
           </tbody>
