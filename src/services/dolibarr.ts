@@ -1129,7 +1129,7 @@ function getSmtpConfigFromStorage(): { smtpHost?: string; smtpPort?: string; smt
   }
 }
 
-async function invokeSmtpEmail(body: {
+export async function invokeSmtpEmail(body: {
   to: string;
   subject: string;
   message: string;

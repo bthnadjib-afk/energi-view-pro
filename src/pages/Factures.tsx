@@ -5,7 +5,7 @@ import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useFactures, useDevis, useClients, useProduits, useCreateFacture, useDeleteFacture, useValidateFacture, useAddPayment, useUpdateFactureLines, useSetFactureToDraft, useSetFactureToUnpaid, useCreateAvoir, useCreateAcompteLibre, useCreateAcompteFromDevis, useClassifyFactureAbandonee } from '@/hooks/useDolibarr';
 import { useFactureRelances, useRecordFactureEnvoi, useSetFactureEnvoiDate, getRelanceStatus } from '@/hooks/useFactureRelances';
-import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, getFactureCloseCodeLabel, isFactureAbandonnee, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
+import { formatDateFR, sendFactureByEmail, fetchComptesBancaires, getFactureCloseCodeLabel, isFactureAbandonnee, invokeSmtpEmail, type CreateDevisLine, type Facture, type Client } from '@/services/dolibarr';
 import { useQuery } from '@tanstack/react-query';
 import { openInvoicePdf, invoicePdfToBase64, invoicePdfToBlobUrl } from '@/services/invoiceRenderer';
 import { PdfFitViewer } from '@/components/PdfFitViewer';
@@ -1016,30 +1016,17 @@ export default function Factures() {
             <Button
               onClick={async () => {
                 if (!selectedFacture || !emailDest) return;
-                if (!config.smtp.user || !config.smtp.pass) {
-                  toast.error('SMTP non configuré. Allez dans Configuration → Serveur mail.');
-                  return;
-                }
                 setSendingEmail(true);
                 try {
                   const client = clients.find((c: Client) => c.id === selectedFacture.socid);
                   const pdfBase64 = await invoicePdfToBase64({ facture: selectedFacture, client, entreprise: config.entreprise });
-                  const { supabase } = await import('@/integrations/supabase/client');
-                  const { data, error } = await supabase.functions.invoke('send-email-smtp', {
-                    body: {
-                      to: emailDest,
-                      subject: emailObjet || `Facture ${selectedFacture.ref}`,
-                      message: emailMessage,
-                      pdfBase64,
-                      pdfFilename: `${selectedFacture.ref}.pdf`,
-                      smtpHost: config.smtp.host,
-                      smtpPort: config.smtp.port || '465',
-                      smtpUser: config.smtp.user,
-                      smtpPass: config.smtp.pass,
-                    },
+                  await invokeSmtpEmail({
+                    to: emailDest,
+                    subject: emailObjet || `Facture ${selectedFacture.ref}`,
+                    message: emailMessage,
+                    pdfBase64,
+                    pdfFilename: `${selectedFacture.ref}.pdf`,
                   });
-                  if (error) throw new Error(error.message);
-                  if (data && !data.ok) throw new Error(data.error || 'Erreur SMTP');
                   // Si la facture est encore en brouillon → la valider automatiquement
                   // Brouillon (0) → Validée (1 = "Non payée") à l'envoi par email
                   if (selectedFacture.fk_statut === 0) {

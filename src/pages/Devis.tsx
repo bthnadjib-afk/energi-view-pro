@@ -9,7 +9,7 @@ import {
 } from '@/hooks/useDolibarr';
 import {
   getAcompteBadge, formatDateFR, replaceEmailVariables, DEVIS_STATUTS,
-  saveDevisSignatureToken, markDevisSent, closeDevis, markDevisAutoExpired, markDevisRelance1, markDevisRelanceDone, type Devis as DevisType, type Client,
+  saveDevisSignatureToken, markDevisSent, closeDevis, markDevisAutoExpired, markDevisRelance1, markDevisRelanceDone, invokeSmtpEmail, type Devis as DevisType, type Client,
 } from '@/services/dolibarr';
 import { openDevisPdf, devisPdfToBase64, devisPdfToBlobUrl } from '@/services/devisRenderer';
 import { PdfFitViewer } from '@/components/PdfFitViewer';
@@ -180,28 +180,16 @@ function DevisDetail({ devis, clients, produits, onConvert, onAcompte, convertPe
 
   const handleSendEmail = async () => {
     if (!emailDest) return;
-    if (!config.smtp.user || !config.smtp.pass) {
-      toast.error('SMTP non configuré — allez dans Configuration → Serveur mail');
-      return;
-    }
     setSendingEmail(true);
     try {
       const pdfBase64 = await devisPdfToBase64({ devis, client: client as Client | undefined, entreprise: config.entreprise });
-      const { data, error } = await supabase.functions.invoke('send-email-smtp', {
-        body: {
-          to: emailDest,
-          subject: emailObjet || `Devis ${devis.ref}`,
-          message: emailMessage,
-          pdfBase64,
-          pdfFilename: `${devis.ref}.pdf`,
-          smtpHost: config.smtp.host,
-          smtpPort: config.smtp.port || '465',
-          smtpUser: config.smtp.user,
-          smtpPass: config.smtp.pass,
-        },
+      await invokeSmtpEmail({
+        to: emailDest,
+        subject: emailObjet || `Devis ${devis.ref}`,
+        message: emailMessage,
+        pdfBase64,
+        pdfFilename: `${devis.ref}.pdf`,
       });
-      if (error) throw new Error(error.message);
-      if (data && !data.ok) throw new Error(data.error || 'Erreur SMTP');
       toast.success(`Devis ${devis.ref} envoyé à ${emailDest}`);
       setEmailOpen(false);
       // Marquer le devis comme "Envoyé" dans Dolibarr (note_private) + refresh
