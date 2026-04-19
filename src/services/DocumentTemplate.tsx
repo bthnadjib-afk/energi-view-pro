@@ -570,8 +570,7 @@ export function DocumentTemplate({
           lineHeight: 1.6,
         }}
       >
-        {t.piedDePage ||
-          "Nos travaux sont couverts par notre assurance décennale et RC Pro auprès d'ERGO — Contrat n° 24015161184."}
+        {t.piedDePage || ''}
         {(entreprise.tvaIntra || entreprise.capitalSocial || entreprise.rcs) && (
           <div style={{ marginTop: 3 * unit }}>
             {[
