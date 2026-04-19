@@ -7,6 +7,7 @@ import { formatPhone } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Building2, Settings2, Bell, Database, CheckCircle2, XCircle, Loader2, Save, Mail, Plus, Trash2, Edit2, AlertTriangle, UserCog, SlidersHorizontal } from 'lucide-react';
@@ -203,7 +204,20 @@ export default function Configuration() {
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">Capital social</label>
-                <Input value={config.entreprise.capitalSocial ?? ''} onChange={(e) => updateEntreprise({ capitalSocial: e.target.value })} placeholder="10 000 €" />
+                <div className="flex gap-2">
+                  <Input value={config.entreprise.capitalSocial ?? ''} onChange={(e) => updateEntreprise({ capitalSocial: e.target.value })} placeholder="10 000" className="flex-1" />
+                  <Select value={config.entreprise.deviseCapitalSocial ?? '€'} onValueChange={(v) => updateEntreprise({ deviseCapitalSocial: v })}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="€">€</SelectItem>
+                      <SelectItem value="CHF">CHF</SelectItem>
+                      <SelectItem value="$">$</SelectItem>
+                      <SelectItem value="£">£</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm text-muted-foreground">RCS</label>

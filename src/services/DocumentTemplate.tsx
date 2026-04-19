@@ -97,6 +97,7 @@ export interface EntrepriseInfo {
   email?: string;
   tvaIntra?: string;
   capitalSocial?: string;
+  deviseCapitalSocial?: string;
   rcs?: string;
 }
 
@@ -581,7 +582,7 @@ export function DocumentTemplate({
           <div style={{ marginTop: 3 * unit }}>
             {[
               entreprise.tvaIntra    && `TVA Intracommunautaire : ${entreprise.tvaIntra}`,
-              entreprise.capitalSocial && `Capital social : ${entreprise.capitalSocial}`,
+              entreprise.capitalSocial && `Capital social : ${entreprise.capitalSocial} ${entreprise.deviseCapitalSocial ?? '€'}`,
               entreprise.rcs         && `RCS : ${entreprise.rcs}`,
             ].filter(Boolean).join('  —  ')}
           </div>

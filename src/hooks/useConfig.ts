@@ -13,6 +13,7 @@ export interface AppConfig {
     email: string;
     tvaIntra?: string;
     capitalSocial?: string;
+    deviseCapitalSocial?: string;
     rcs?: string;
   };
   defaults: {
@@ -98,6 +99,7 @@ const DEFAULT_CONFIG: AppConfig = {
     email: '',
     tvaIntra: '',
     capitalSocial: '',
+    deviseCapitalSocial: '€',
     rcs: '',
   },
   defaults: {
