@@ -50,6 +50,7 @@ export interface AppConfig {
     couleurPrimaire: string;  // hex ex #1a1a1a — bandeau, titres
     couleurAccent: string;    // hex ex #cc0000 — alertes, acomptes
     couleurTexte: string;     // hex ex #1a1a1a
+    couleurTableauHeader: string; // hex — fond du bandeau tableau (défaut = couleurPrimaire)
     police: 'helvetica' | 'times' | 'courier';
     margeHaut: number;        // mm
     margeBas: number;         // mm
@@ -136,6 +137,7 @@ const DEFAULT_CONFIG: AppConfig = {
     couleurPrimaire: '#1a1a1a',
     couleurAccent: '#cc0000',
     couleurTexte: '#1a1a1a',
+    couleurTableauHeader: '#1a1a1a',
     police: 'helvetica',
     margeHaut: 18,
     margeBas: 20,

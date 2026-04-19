@@ -52,6 +52,7 @@ export interface DocumentTemplateCfg {
   couleurPrimaire?: string;
   couleurAccent?: string;
   couleurTexte?: string;
+  couleurTableauHeader?: string;
   police?: 'helvetica' | 'times' | 'courier';
   margeHaut?: number;
   margeBas?: number;
@@ -185,6 +186,7 @@ export function DocumentTemplate({
   const rubanCompact = t.rubanCompact !== false;
 
   const primary = t.couleurPrimaire || '#1a1a1a';
+  const tableHeaderBg = t.couleurTableauHeader || primary;
   const accent = t.couleurAccent || '#cc0000';
   const textColor = t.couleurTexte || '#1a1a1a';
   const fontFamily =
@@ -373,7 +375,7 @@ export function DocumentTemplate({
       {data.lignes.length > 0 && docType !== 'intervention' && (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fsTableLigne, marginBottom: 8 * unit, lineHeight: density < 1 ? 1.12 : 1.3 }}>
           <thead>
-            <tr style={{ background: primary, color: '#fff', fontSize: fsTableHeader }}>
+            <tr style={{ background: tableHeaderBg, color: '#fff', fontSize: fsTableHeader }}>
               <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap' }}>Description</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 50 * unit }}>Réf</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle', fontWeight: 700, whiteSpace: 'nowrap', width: 32 * unit }}>Qté</th>
@@ -407,7 +409,7 @@ export function DocumentTemplate({
       {data.lignes.length > 0 && docType === 'intervention' && (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fsTableLigne, marginBottom: 8 * unit, lineHeight: density < 1 ? 1.12 : 1.3 }}>
           <thead>
-            <tr style={{ background: primary, color: '#fff', fontSize: fsTableHeader }}>
+            <tr style={{ background: tableHeaderBg, color: '#fff', fontSize: fsTableHeader }}>
               <th style={{ padding: 4 * unit, textAlign: 'left', fontWeight: 700 }}>Travaux / Fournitures</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 50 * unit }}>Qté</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 50 * unit }}>Unité</th>
@@ -447,7 +449,7 @@ export function DocumentTemplate({
                 display: 'flex',
                 alignItems: 'center',
                 padding: `${6 * unit}px 0`,
-                borderTop: `0.75px solid ${primary}`,
+                borderTop: '0.75px solid #1a1a1a',
                 marginTop: 4 * unit,
                 fontSize: fsTotalTTC,
               }}

@@ -72,6 +72,7 @@ export default function TemplatePlayground() {
       couleurPrimaire: '#1a1a1a',
       couleurAccent: '#cc0000',
       couleurTexte: '#1a1a1a',
+      couleurTableauHeader: '#1a1a1a',
       police: 'helvetica',
       margeHaut: 18,
       margeBas: 20,
@@ -148,6 +149,7 @@ export default function TemplatePlayground() {
               <ColorField label="Couleur primaire (titres, bandeau)" value={t.couleurPrimaire} onChange={(v) => updateTemplate({ couleurPrimaire: v })} />
               <ColorField label="Couleur accent (alertes, acomptes)" value={t.couleurAccent} onChange={(v) => updateTemplate({ couleurAccent: v })} />
               <ColorField label="Couleur texte principal" value={t.couleurTexte} onChange={(v) => updateTemplate({ couleurTexte: v })} />
+              <ColorField label="Couleur bandeau tableau (Description, Qté…)" value={t.couleurTableauHeader ?? t.couleurPrimaire ?? '#1a1a1a'} onChange={(v) => updateTemplate({ couleurTableauHeader: v })} />
             </TabsContent>
 
             {/* POLICE */}
