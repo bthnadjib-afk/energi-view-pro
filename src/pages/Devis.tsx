@@ -1161,7 +1161,7 @@ export default function Devis() {
   const acompteMutation = useCreateAcompte();
   const deleteDevisMutation = useDeleteDevis();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [acompteDialog, setAcompteDialog] = useState<{ open: boolean; socid: string; montantHT: number; devisRef: string; montant: number } | null>(null);
+  const [acompteDialog, setAcompteDialog] = useState<{ open: boolean; socid: string; montantHT: number; devisRef: string; montant: string } | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [socid, setSocid] = useState('');
   const [lignes, setLignes] = useState<LigneForm[]>([{ desc: '', qty: 1, subprice: 0, tva_tx: 20, product_type: 0, productId: '', prixAchat: 0 }]);
@@ -1592,7 +1592,7 @@ export default function Devis() {
                         const seuil = config.defaults.seuilAcompte ?? 0;
                         const tauxDepasse = config.defaults.tauxAcompteSeuilDepasse ?? 50;
                         const taux = (seuil > 0 && d.montantHT > seuil) ? tauxDepasse : tauxCfg;
-                        setAcompteDialog({ open: true, socid: d.socid || '', montantHT: d.montantHT, devisRef: d.ref, montant: Math.round(d.montantHT * taux) / 100 });
+                        setAcompteDialog({ open: true, socid: d.socid || '', montantHT: d.montantHT, devisRef: d.ref, montant: (Math.round(d.montantHT * taux) / 100).toFixed(2) });
                       }}
                       convertPending={convertMutation.isPending}
                       acomptePending={acompteMutation.isPending}
@@ -1635,7 +1635,7 @@ export default function Devis() {
                     step={0.01}
                     className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
                     value={acompteDialog.montant}
-                    onChange={(e) => setAcompteDialog({ ...acompteDialog, montant: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setAcompteDialog({ ...acompteDialog, montant: e.target.value })}
                   />
                   <span className="text-sm text-muted-foreground whitespace-nowrap">{config.defaults.devise ?? '€'} HT</span>
                 </div>
@@ -1647,7 +1647,7 @@ export default function Devis() {
                 disabled={acompteMutation.isPending}
                 onClick={async () => {
                   try {
-                    await acompteMutation.mutateAsync({ socid: acompteDialog.socid, montantHT: acompteDialog.montantHT, devisRef: acompteDialog.devisRef, montantAcompte: acompteDialog.montant });
+                    await acompteMutation.mutateAsync({ socid: acompteDialog.socid, montantHT: acompteDialog.montantHT, devisRef: acompteDialog.devisRef, montantAcompte: parseFloat(acompteDialog.montant) || 0 });
                     setAcompteDialog(null);
                   } catch {}
                 }}
