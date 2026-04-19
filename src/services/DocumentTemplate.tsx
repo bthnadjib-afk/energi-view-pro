@@ -431,10 +431,10 @@ export function DocumentTemplate({
             {(data.totaux.tvaParTaux && data.totaux.tvaParTaux.length > 0
               ? data.totaux.tvaParTaux
               : [{ taux: 20, montant: data.totaux.tva }]
-            ).map((t, i) => (
+            ).map((tva, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0` }}>
-                <span style={{ color: '#555', fontStyle: 'italic' }}>TVA ({t.taux}%) :</span>
-                <span style={{ fontWeight: 700 }}>{fmt(t.montant)} €</span>
+                <span style={{ color: '#555', fontStyle: 'italic' }}>TVA ({tva.taux}%) :</span>
+                <span style={{ fontWeight: 700 }}>{fmt(tva.montant)} €</span>
               </div>
             ))}
             <div
@@ -443,14 +443,14 @@ export function DocumentTemplate({
                 justifyContent: 'space-between',
                 padding: `${6 * unit}px 0`,
                 borderTop: `1.5px solid ${primary}`,
-                marginTop: 10 * unit,
+                marginTop: 4 * unit,
                 fontSize: fsTotalTTC,
               }}
             >
               <span style={{ fontWeight: 700, fontStyle: 'italic' }}>
                 {data.paye ? 'TOTAL TTC PAYÉ' : 'TOTAL TTC :'}
               </span>
-              <span style={{ fontWeight: 700, fontStyle: 'italic', color: primary }}>{fmt(data.totaux.ttc)} €</span>
+              <span style={{ fontWeight: 700, color: primary }}>{fmt(data.totaux.ttc)} €</span>
             </div>
             {docType === 'facture' && !data.paye && data.resteAPayer != null && data.resteAPayer > 0 && data.resteAPayer < data.totaux.ttc && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0`, fontSize: fsTotaux }}>
