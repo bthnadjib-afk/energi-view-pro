@@ -301,7 +301,7 @@ export function DocumentTemplate({
               <div style={{ fontSize: titleSize, fontWeight: 700, fontStyle: 'italic', color: primary, lineHeight: 1.1 }}>
                 {TITRES[docType]}
               </div>
-              <div style={{ fontSize: fsCoord, color: '#666', fontStyle: 'italic', marginTop: 2 * unit }}>
+              <div style={{ fontSize: fsCoord, color: '#666', fontStyle: 'italic', marginTop: 7 * unit }}>
                 NUMÉRO : {data.ref}
               </div>
               <div style={{ fontSize: fsCoord, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
