@@ -329,6 +329,7 @@ export function DocumentTemplate({
           marginBottom: 11.2 * unit,
           fontSize: fsRubanValeur,
           display: 'flex', flexWrap: 'wrap', gap: `${4 * unit}px ${10 * unit}px`,
+          justifyContent: 'center',
         }}>
           {rubanItems.map((c, i) => (
             <span key={i} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4 * unit }}>
@@ -344,7 +345,7 @@ export function DocumentTemplate({
             <div key={i} style={{
               flex: 1, padding: `${5 * unit}px ${7 * unit}px`,
               borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.2)' : 'none',
-              minWidth: 0,
+              minWidth: 0, textAlign: 'center',
             }}>
               <div style={{ fontSize: fsRubanLabel, color: '#ccc', textTransform: 'uppercase', letterSpacing: 0.3 }}>{c.l}</div>
               <div style={{ fontSize: fsRubanValeur, fontWeight: 700, marginTop: 1 * unit }}>{c.v}</div>
@@ -382,7 +383,7 @@ export function DocumentTemplate({
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 50 * unit }}>Réf</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 32 * unit }}>Qté</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 32 * unit }}>Unité</th>
-              <th style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, width: 60 * unit }}>P.U.</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 60 * unit }}>P.U.</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 36 * unit }}>TVA</th>
               <th style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, width: 70 * unit }}>Montant</th>
             </tr>
@@ -400,7 +401,7 @@ export function DocumentTemplate({
                 <td style={{ padding: 4 * unit, textAlign: 'center', color: '#888', verticalAlign: 'top' }}>{l.ref || ''}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.quantite}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.unite || 'U'}</td>
-                <td style={{ padding: 4 * unit, textAlign: 'right', verticalAlign: 'top' }}>{fmt(l.prixUnitaire)} €</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{fmt(l.prixUnitaire)} €</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.tauxTVA}%</td>
                 <td style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>{fmt(l.totalHT)} €</td>
               </tr>
@@ -495,7 +496,7 @@ export function DocumentTemplate({
       {/* ─── DEVIS : Récap totaux + Bon pour accord (uniquement devis, pas facture) ─── */}
       {docType === 'devis' && (
         <div style={{ marginTop: 12 * unit, display: 'flex', gap: 10 * unit, alignItems: 'stretch' }}>
-          <div style={{ width: wEncTotaux, border: `1px solid ${primary}`, padding: 6 * unit, fontSize: fsEncartTexte }}>
+          <div style={{ flex: 1, border: `1px solid ${primary}`, padding: 6 * unit, fontSize: fsEncartTexte }}>
             <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 3 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
               Récapitulatif
             </div>
@@ -512,14 +513,14 @@ export function DocumentTemplate({
               <span style={{ fontWeight: 700, color: primary }}>{fmt(data.totaux.ttc)} €</span>
             </div>
           </div>
-          <div style={{ width: wEncBonAccord, border: `2px solid ${primary}`, padding: 6 * unit, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, border: `2px solid ${primary}`, padding: 6 * unit, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
             <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: fsEncartTexte * 1.05, marginBottom: 2 * unit, textTransform: 'uppercase', letterSpacing: 0.4 }}>
               Bon pour accord
             </div>
             <div style={{ fontSize: fsEncartTexte * 0.88, color: '#666', marginBottom: 2 * unit }}>
               Date et signature précédées de la mention « Bon pour accord » :
             </div>
-            <div style={{ flex: 1, minHeight: 30 * unit, borderTop: '0.5px dashed #999', marginTop: 2 * unit }} />
+            <div style={{ flex: 1, minHeight: 30 * unit, borderTop: '0.5px dashed #999', marginTop: 2 * unit, width: '100%' }} />
           </div>
         </div>
       )}
