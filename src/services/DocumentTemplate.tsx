@@ -491,15 +491,17 @@ export function DocumentTemplate({
               Récapitulatif
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${1.5 * unit}px 0` }}>
-              <span style={{ color: '#555' }}>Total HT :</span>
+              <span style={{ color: '#555', fontStyle: 'italic' }}>Total HT :</span>
               <span style={{ fontWeight: 700 }}>{fmt(data.totaux.ht)} €</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${1.5 * unit}px 0` }}>
-              <span style={{ color: '#555' }}>Total TVA :</span>
+              <span style={{ color: '#555', fontStyle: 'italic' }}>
+                Total TVA ({(data.totaux.tvaParTaux?.[0]?.taux ?? 20)}%) :
+              </span>
               <span style={{ fontWeight: 700 }}>{fmt(data.totaux.tva)} €</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0 0`, borderTop: `1px solid ${primary}`, marginTop: 2 * unit, fontSize: fsEncartTexte * 1.18 }}>
-              <span style={{ fontWeight: 700, color: primary }}>Total TTC :</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0 0`, marginTop: 2 * unit, fontSize: fsEncartTexte * 1.18 }}>
+              <span style={{ fontWeight: 700, fontStyle: 'italic', color: primary }}>Total TTC :</span>
               <span style={{ fontWeight: 700, color: primary }}>{fmt(data.totaux.ttc)} €</span>
             </div>
           </div>
