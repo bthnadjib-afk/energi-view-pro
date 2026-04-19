@@ -92,6 +92,9 @@ export interface EntrepriseInfo {
   siret?: string;
   telephone?: string;
   email?: string;
+  tvaIntra?: string;
+  capitalSocial?: string;
+  rcs?: string;
 }
 
 export interface DocumentTemplateProps {
@@ -569,6 +572,15 @@ export function DocumentTemplate({
       >
         {t.piedDePage ||
           "Nos travaux sont couverts par notre assurance décennale et RC Pro auprès d'ERGO — Contrat n° 24015161184."}
+        {(entreprise.tvaIntra || entreprise.capitalSocial || entreprise.rcs) && (
+          <div style={{ marginTop: 3 * unit }}>
+            {[
+              entreprise.tvaIntra    && `TVA Intracommunautaire : ${entreprise.tvaIntra}`,
+              entreprise.capitalSocial && `Capital social : ${entreprise.capitalSocial}`,
+              entreprise.rcs         && `RCS : ${entreprise.rcs}`,
+            ].filter(Boolean).join('  —  ')}
+          </div>
+        )}
       </div>
     </div>
   );

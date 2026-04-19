@@ -196,6 +196,18 @@ export default function Configuration() {
                 <label className="text-sm text-muted-foreground">Email</label>
                 <Input value={config.entreprise.email} onChange={(e) => updateEntreprise({ email: e.target.value })} type="email" />
               </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">TVA Intracommunautaire</label>
+                <Input value={config.entreprise.tvaIntra ?? ''} onChange={(e) => updateEntreprise({ tvaIntra: e.target.value })} placeholder="FR00 123456789" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">Capital social</label>
+                <Input value={config.entreprise.capitalSocial ?? ''} onChange={(e) => updateEntreprise({ capitalSocial: e.target.value })} placeholder="10 000 €" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm text-muted-foreground">RCS</label>
+                <Input value={config.entreprise.rcs ?? ''} onChange={(e) => updateEntreprise({ rcs: e.target.value })} placeholder="RCS Annecy 123 456 789" />
+              </div>
             </div>
           </div>
         </TabsContent>

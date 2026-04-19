@@ -11,6 +11,9 @@ export interface AppConfig {
     siret: string;
     telephone: string;
     email: string;
+    tvaIntra?: string;
+    capitalSocial?: string;
+    rcs?: string;
   };
   defaults: {
     tauxTVA: number;
@@ -90,6 +93,9 @@ const DEFAULT_CONFIG: AppConfig = {
     siret: '',
     telephone: '',
     email: '',
+    tvaIntra: '',
+    capitalSocial: '',
+    rcs: '',
   },
   defaults: {
     tauxTVA: 20,
