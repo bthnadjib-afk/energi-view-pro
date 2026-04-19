@@ -36,9 +36,8 @@ const MAX_DENSITY = 1;
 // que de continuer à miniaturiser le texte.
 const MIN_DENSITY = 0.85;
 const DENSITY_STEP = 0.05;
-// Capture STRICTEMENT 1:1 (96 DPI). On stabilise d'abord l'échelle ;
-// la qualité d'impression sera revisitée ensuite.
-const RENDER_DPR = 1;
+// 300 DPI : scale = 300/96 = 3.125 → canvas 2481px large pour 210mm → 300 DPI exact dans le PDF.
+const RENDER_DPR = 3.125;
 
 // ─── Lecture config ───────────────────────────────────────────────────────────
 function readTemplateCfg(): DocumentTemplateCfg {
@@ -189,7 +188,7 @@ async function renderMain(props: DocumentTemplateProps): Promise<MainCaptureResu
     const finalHeight = multiPage ? target.scrollHeight : captureH;
 
     const canvas = await html2canvas(target, {
-      scale: 1,                  // STRICT 1:1 (pixel-to-point)
+      scale: RENDER_DPR,         // 300 DPI (3.125 × 96dpi)
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
@@ -225,7 +224,7 @@ async function renderCgv(props: DocumentTemplateProps): Promise<HTMLCanvasElemen
 
     const target = host.firstElementChild as HTMLElement;
     return await html2canvas(target, {
-      scale: 1,                   // STRICT 1:1
+      scale: RENDER_DPR,          // 300 DPI (3.125 × 96dpi)
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
