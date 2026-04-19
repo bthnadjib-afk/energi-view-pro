@@ -248,7 +248,7 @@ export function DocumentTemplate({
   );
 
   // Bloc client — sur le bon d'intervention : nom uniquement (pas de coordonnées)
-  const showClientCoords = docType !== 'intervention';
+  const showClientCoords = true;
   const blocClient = (
     <div>
       <div style={{ fontWeight: 700, fontStyle: 'italic', color: primary, fontSize: 10 * unit, marginBottom: 2 * unit }}>
@@ -547,7 +547,7 @@ export function DocumentTemplate({
       )}
 
       {/* ─── RIB ─── */}
-      {t.afficherRib && (
+      {t.afficherRib && docType !== 'intervention' && (
         <div style={{ marginTop: 14 * unit, fontSize: fsPaiement }}>
           <div style={{ fontWeight: 700, color: primary, marginBottom: 3 * unit }}>Moyens de paiement :</div>
           <div style={{ fontFamily: '"Courier New", Courier, monospace', color: '#333', lineHeight: 1.6 }}>
