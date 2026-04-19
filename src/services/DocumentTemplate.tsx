@@ -384,12 +384,12 @@ export function DocumentTemplate({
                   borderBottom: '0.5px solid #e0e0e0',
                 }}
               >
-                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.designation}</td>
-                <td style={{ padding: 4 * unit, textAlign: 'center', color: '#888', verticalAlign: 'top' }}>{l.ref || ''}</td>
-                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.quantite}</td>
-                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.unite || 'U'}</td>
-                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{fmt(l.prixUnitaire)} €</td>
-                <td style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, verticalAlign: 'top' }}>{fmt(l.totalHT)} €</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle' }}>{l.designation}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', color: '#888', verticalAlign: 'middle' }}>{l.ref || ''}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle' }}>{l.quantite}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle' }}>{l.unite || 'U'}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'middle' }}>{fmt(l.prixUnitaire)} €</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, verticalAlign: 'middle' }}>{fmt(l.totalHT)} €</td>
               </tr>
             ))}
           </tbody>
