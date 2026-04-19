@@ -79,6 +79,9 @@ export interface DocumentTemplateCfg {
   rubanCompact?: boolean;
   captureWidth?: number;
   piedDePage?: string;
+  tauxAcompte?: number;
+  seuilAcompte?: number;
+  tauxAcompteSeuilDepasse?: number;
   afficherRib?: boolean;
   afficherCgv?: boolean;
   texteCgv?: string;
@@ -229,7 +232,10 @@ export function DocumentTemplate({
   const showSignatures = docType === 'intervention';
   // Pas de totaux sur le bon d'intervention (pas de prix)
   const showTableTotals = docType === 'devis' || docType === 'facture';
-  const acompte = data.totaux.ttc * 0.3;
+  const tauxAcompte = (t.seuilAcompte && t.seuilAcompte > 0 && data.totaux.ttc > t.seuilAcompte)
+    ? (t.tauxAcompteSeuilDepasse ?? 50)
+    : (t.tauxAcompte ?? 30);
+  const acompte = data.totaux.ttc * (tauxAcompte / 100);
 
   // Bloc "infos entreprise" — nom + coordonnées en italique
   const blocEntreprise = (
@@ -477,7 +483,7 @@ export function DocumentTemplate({
             fontStyle: 'italic',
           }}
         >
-          ACOMPTE 30 % À PAYER À LA SIGNATURE — SOIT {fmt(acompte)} €
+          ACOMPTE {tauxAcompte} % À PAYER À LA SIGNATURE — SOIT {fmt(acompte)} €
         </div>
       )}
 

@@ -236,6 +236,25 @@ export default function Configuration() {
             </div>
 
             <div className="mt-6 pt-6 border-t border-border space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">Acompte sur devis</h3>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Taux d'acompte par défaut (%)</label>
+                  <Input type="number" min={0} max={100} value={config.defaults.tauxAcompte ?? 30} onChange={(e) => updateDefaults({ tauxAcompte: Number(e.target.value) })} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Seuil TTC (€) — 0 = désactivé</label>
+                  <Input type="number" min={0} value={config.defaults.seuilAcompte ?? 0} onChange={(e) => updateDefaults({ seuilAcompte: Number(e.target.value) })} placeholder="0" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Taux si TTC dépasse le seuil (%)</label>
+                  <Input type="number" min={0} max={100} value={config.defaults.tauxAcompteSeuilDepasse ?? 50} onChange={(e) => updateDefaults({ tauxAcompteSeuilDepasse: Number(e.target.value) })} />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Ex : 30 % par défaut, puis 50 % si le devis dépasse 5 000 €</p>
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-border space-y-3">
               <h3 className="text-sm font-semibold text-foreground">Chantier — valeurs par défaut</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">

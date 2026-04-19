@@ -23,6 +23,9 @@ export interface AppConfig {
     chantierHeureDebut: string;
     chantierHeureFin: string;
     chantierJours: string;
+    tauxAcompte: number;          // % d'acompte par défaut (ex: 30)
+    seuilAcompte: number;         // montant TTC au-delà duquel le 2e taux s'applique (0 = désactivé)
+    tauxAcompteSeuilDepasse: number; // % d'acompte si TTC > seuil (ex: 50)
   };
   notifications: {
     nouveauDevis: boolean;
@@ -105,6 +108,9 @@ const DEFAULT_CONFIG: AppConfig = {
     chantierHeureDebut: '08:00',
     chantierHeureFin: '18:00',
     chantierJours: '1,2,3,4,5',
+    tauxAcompte: 30,
+    seuilAcompte: 0,
+    tauxAcompteSeuilDepasse: 50,
   },
   notifications: {
     nouveauDevis: true,

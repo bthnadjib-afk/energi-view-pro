@@ -46,7 +46,13 @@ function readTemplateCfg(): DocumentTemplateCfg {
     const raw = window.localStorage.getItem('electropro-config');
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    return (parsed?.template as DocumentTemplateCfg) || {};
+    const tpl = (parsed?.template as DocumentTemplateCfg) || {};
+    const def = parsed?.defaults || {};
+    // Merge acompte settings from defaults into template cfg
+    if (def.tauxAcompte          !== undefined) tpl.tauxAcompte          = def.tauxAcompte;
+    if (def.seuilAcompte         !== undefined) tpl.seuilAcompte         = def.seuilAcompte;
+    if (def.tauxAcompteSeuilDepasse !== undefined) tpl.tauxAcompteSeuilDepasse = def.tauxAcompteSeuilDepasse;
+    return tpl;
   } catch {
     return {};
   }
