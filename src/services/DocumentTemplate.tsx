@@ -298,24 +298,24 @@ export function DocumentTemplate({
               <div style={{ fontSize: titleSize, fontWeight: 700, fontStyle: 'italic', color: primary, lineHeight: 1.1 }}>
                 {TITRES[docType]}
               </div>
-              <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginTop: 2 * unit }}>
+              <div style={{ fontSize: fsCoord, color: '#666', fontStyle: 'italic', marginTop: 2 * unit }}>
                 NUMÉRO : {data.ref}
               </div>
-              <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
+              <div style={{ fontSize: fsCoord, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
                 DATE : {formatDateFR(data.date)}
               </div>
               {showEcheance && (
-                <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
+                <div style={{ fontSize: fsCoord, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
                   ÉCHÉANCE : {data.echeance ? formatDateFR(data.echeance) : 'À réception'}
                 </div>
               )}
               {showValidite && (
-                <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
+                <div style={{ fontSize: fsCoord, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
                   VALIDITÉ : {data.validite ? formatDateFR(data.validite) : '30 jours'}
                 </div>
               )}
               {docType === 'intervention' && data.technicien && (
-                <div style={{ fontSize: 8 * unit, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
+                <div style={{ fontSize: fsCoord, color: '#666', fontStyle: 'italic', marginTop: 1.5 * unit }}>
                   TECHNICIEN : {data.technicien}
                 </div>
               )}
@@ -364,13 +364,13 @@ export function DocumentTemplate({
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: fsTableLigne, marginBottom: 8 * unit, lineHeight: density < 1 ? 1.12 : 1.3 }}>
           <thead>
             <tr style={{ background: primary, color: '#fff', fontSize: fsTableHeader }}>
-              <th style={{ padding: 4 * unit, textAlign: 'left', fontWeight: 700 }}>Description</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700 }}>Description</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 50 * unit }}>Réf</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 32 * unit }}>Qté</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 32 * unit }}>Unité</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 60 * unit }}>P.U.</th>
               <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 36 * unit }}>TVA</th>
-              <th style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, width: 70 * unit }}>Montant</th>
+              <th style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, width: 70 * unit }}>Montant</th>
             </tr>
           </thead>
           <tbody>
@@ -382,13 +382,13 @@ export function DocumentTemplate({
                   borderBottom: '0.5px solid #e0e0e0',
                 }}
               >
-                <td style={{ padding: 4 * unit, verticalAlign: 'top' }}>{l.designation}</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.designation}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', color: '#888', verticalAlign: 'top' }}>{l.ref || ''}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.quantite}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.unite || 'U'}</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{fmt(l.prixUnitaire)} €</td>
                 <td style={{ padding: 4 * unit, textAlign: 'center', verticalAlign: 'top' }}>{l.tauxTVA}%</td>
-                <td style={{ padding: 4 * unit, textAlign: 'right', fontWeight: 700, verticalAlign: 'top' }}>{fmt(l.totalHT)} €</td>
+                <td style={{ padding: 4 * unit, textAlign: 'center', fontWeight: 700, verticalAlign: 'top' }}>{fmt(l.totalHT)} €</td>
               </tr>
             ))}
           </tbody>
@@ -467,14 +467,16 @@ export function DocumentTemplate({
             padding: 8 * unit,
             border: `2px solid ${accent}`,
             background: `${accent}10`,
-            textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             color: accent,
             fontSize: 10 * unit,
             fontWeight: 700,
             fontStyle: 'italic',
           }}
         >
-          ⚠ ACOMPTE 30 % À PAYER À LA SIGNATURE — SOIT {fmt(acompte)} €
+          ACOMPTE 30 % À PAYER À LA SIGNATURE — SOIT {fmt(acompte)} €
         </div>
       )}
 
@@ -486,15 +488,15 @@ export function DocumentTemplate({
               Récapitulatif
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${1.5 * unit}px 0` }}>
-              <span style={{ color: '#555' }}>Total HT</span>
+              <span style={{ color: '#555' }}>Total HT :</span>
               <span style={{ fontWeight: 700 }}>{fmt(data.totaux.ht)} €</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${1.5 * unit}px 0` }}>
-              <span style={{ color: '#555' }}>Total TVA</span>
+              <span style={{ color: '#555' }}>Total TVA :</span>
               <span style={{ fontWeight: 700 }}>{fmt(data.totaux.tva)} €</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: `${3 * unit}px 0 0`, borderTop: `1px solid ${primary}`, marginTop: 2 * unit, fontSize: fsEncartTexte * 1.18 }}>
-              <span style={{ fontWeight: 700, color: primary }}>Total TTC</span>
+              <span style={{ fontWeight: 700, color: primary }}>Total TTC :</span>
               <span style={{ fontWeight: 700, color: primary }}>{fmt(data.totaux.ttc)} €</span>
             </div>
           </div>
