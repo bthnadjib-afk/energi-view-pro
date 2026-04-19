@@ -292,7 +292,7 @@ export function DocumentTemplate({
   return (
     <div style={pageStyle}>
       {/* ─── EN-TÊTE : LOGO + (TITRE ou ENTREPRISE) ─── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 11.2 * unit }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 11.2 * unit }}>
         <div style={{ marginLeft: logoOffsetX }}>
           {t.logoUrl ? (
             <img
